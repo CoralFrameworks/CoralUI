@@ -1,10 +1,12 @@
 [submodule "external/CoralCore"]
 	path = external/CoralCore
 	url = https://github.com/CoralFrameworks/CoralCore.git
+	update = none
 
 [submodule "external/CoralGraphics"]
 	path = external/CoralGraphics
 	url = https://github.com/CoralFrameworks/CoralGraphics.git
+	update = none
 
 [submodule "third_party/libz"]
 	path = third_party/libz

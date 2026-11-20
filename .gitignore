@@ -11,3 +11,9 @@ toolchains
 /out*
 /build
 /build-*
+
+# Python bytecode written by modules/ui/tools/unicode/*.py when the generator runs. Bytecode is a
+# build output of whatever interpreter is installed, so it must not enter the repository: a committed
+# .pyc makes every run dirty the checkout and carries one interpreter version's magic number.
+__pycache__/
+*.pyc
