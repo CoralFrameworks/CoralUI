@@ -1,0 +1,43 @@
+# English catalog for the editor demo. Keys are grouped by screen.
+app.name=Coral Editor
+app.title=Coral Editor - Untitled
+app.ready=Ready
+app.open=Open
+app.save=Save
+app.status.modified=Modified - Ctrl+S to save
+editor.media=Media
+editor.import=Import...
+editor.import.title=Import Media
+editor.import.filter=Media
+editor.preview=Preview
+editor.inspector=Inspector
+editor.timeline=Timeline
+editor.transport.play=Play
+editor.transport.pause=Pause
+editor.transport.stop=Stop
+editor.add_to_timeline=Add to Timeline
+editor.property=Property {0}: {1}
+editor.status.accent=Accent color {r},{g},{b}
+editor.status.zoom=Zoom {0}%
+editor.inspector.clip=Clip:
+editor.inspector.track=Track:
+editor.inspector.curves=Curves:
+editor.inspector.none=none
+editor.inspector.hint=Drag the clip to move; drag an edge to trim.
+editor.property.start=Start
+editor.property.duration=Duration
+editor.property.source=Source
+editor.property.opacity=Opacity
+editor.property.scale=Scale
+editor.property.offsetx=Offset X
+editor.property.offsety=Offset Y
+editor.curve=Curve:
+editor.guides.on=Guides on
+editor.guides.off=Guides off
+
+# Strings the framework itself draws. Applications can override any of them.
+ui.textinput.cut=Cut
+ui.textinput.copy=Copy
+ui.textinput.paste=Paste
+ui.textinput.selectAll=Select All
+ui.table.cell=Row {row}, column {column}

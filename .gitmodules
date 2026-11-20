@@ -1,0 +1,19 @@
+[submodule "external/CoralCore"]
+	path = external/CoralCore
+	url = https://github.com/CoralFrameworks/CoralCore.git
+
+[submodule "external/CoralGraphics"]
+	path = external/CoralGraphics
+	url = https://github.com/CoralFrameworks/CoralGraphics.git
+
+[submodule "third_party/libz"]
+	path = third_party/libz
+	url = https://github.com/CoralFrameworks/libz.git
+
+[submodule "third_party/libyuv"]
+	path = third_party/libyuv
+	url = https://github.com/CoralFrameworks/libyuv.git
+
+[submodule "third_party/libgtest"]
+	path = third_party/libgtest
+	url = https://github.com/CoralFrameworks/libgtest.git

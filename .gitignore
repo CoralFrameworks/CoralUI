@@ -1,0 +1,13 @@
+.DS_Store
+.idea
+.vscode
+cmake-*
+ImportExecutables-*.cmake
+out*
+dist
+dist-*
+toolchains
+.cache
+/out*
+/build
+/build-*

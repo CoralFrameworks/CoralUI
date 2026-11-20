@@ -1,0 +1,141 @@
+@PACKAGE_INIT@
+
+# CoralUI — the GUI SDK.
+#
+# The first-party targets are exported by `install(EXPORT)` (`CoralUITargets.cmake`), so their
+# include directories, link order and compile features are whatever the build tree declared. Two kinds
+# of dependency cannot live in that export and are added here instead:
+#
+#  * vendored archives (png/jpeg/webp/freetype/harfbuzz/minilog/SPIRV-Cross/shaderc/...), whose CMake
+#    targets are not installable packages, and
+#  * platform libraries and imported system targets (OpenGL::GL, X11::X11, Threads::Threads, ...),
+#    which only exist in a configured build tree.
+#
+# Both are declared as imported targets / plain library names below and appended to the exported
+# targets' `INTERFACE_LINK_LIBRARIES`, which is why the static archives link to completion in an
+# installed tree.
+#
+# Consumers use: find_package(CoralUI REQUIRED) + target_link_libraries(app PRIVATE Coral::ui)
+
+# The observer is header-only and exported on its own as CoralCore; include it before the UI targets
+# because `Coral::ui` links `Coral::observer`.
+include("${CMAKE_CURRENT_LIST_DIR}/../CoralCore/CoralCoreTargets.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/CoralUITargets.cmake")
+
+# Where `ui::loadCatalogDirectory()` finds the shipped translation catalogues (see
+# docs/UI_API_GUIDE.md). A consumer that ships its own catalogues can ignore it.
+set(CoralUI_I18N_DIR "${PACKAGE_PREFIX_DIR}/share/coral/i18n")
+
+set(_coral_ui_include "${PACKAGE_PREFIX_DIR}/include")
+set(_coral_ui_libdirs "${PACKAGE_PREFIX_DIR}/lib/@CORAL_UI_LIB_SUBDIR@" "${PACKAGE_PREFIX_DIR}/lib")
+
+if (WIN32)
+  set(_coral_ui_platform_libs
+    opengl32 d3d11 dxgi d3dcompiler dwrite dwmapi gdi32 user32 shell32 ole32 oleaut32 comdlg32
+    imm32 advapi32 winmm shcore psapi dbghelp)
+elseif (APPLE)
+  set(_coral_ui_platform_libs "-framework OpenGL" "-framework CoreText" "-framework CoreGraphics"
+    "-framework AppKit" bz2)
+else ()
+  set(_coral_ui_platform_libs GL X11 dl pthread)
+endif ()
+
+# Required archive: a missing one means the install tree is incomplete, so fail loudly.
+function(_coral_ui_import name file)
+  if (TARGET Coral::${name})
+    return()
+  endif ()
+  set(_found "")
+  foreach (_dir ${_coral_ui_libdirs})
+    if (EXISTS "${_dir}/${file}")
+      set(_found "${_dir}/${file}")
+    endif ()
+  endforeach ()
+  if (NOT _found)
+    message(FATAL_ERROR "CoralUI: missing library '${file}' under '${_coral_ui_libdirs}'")
+  endif ()
+  add_library(Coral::${name} STATIC IMPORTED)
+  set_target_properties(Coral::${name} PROPERTIES
+    IMPORTED_LOCATION "${_found}"
+    INTERFACE_INCLUDE_DIRECTORIES "${_coral_ui_include}"
+    INTERFACE_COMPILE_FEATURES cxx_std_20)
+endfunction()
+
+# Third-party archive that the install tree may or may not carry; skipped when absent so a minimal
+# build still links as far as its own objects allow.
+function(_coral_ui_optional name file)
+  if (TARGET Coral::${name})
+    return()
+  endif ()
+  set(_found "")
+  foreach (_dir ${_coral_ui_libdirs})
+    if (EXISTS "${_dir}/${file}")
+      set(_found "${_dir}/${file}")
+    endif ()
+  endforeach ()
+  if (NOT _found)
+    return()
+  endif ()
+  add_library(Coral::${name} STATIC IMPORTED)
+  set_target_properties(Coral::${name} PROPERTIES
+    IMPORTED_LOCATION "${_found}"
+    INTERFACE_INCLUDE_DIRECTORIES "${_coral_ui_include}")
+endfunction()
+
+_coral_ui_optional(minilog minilog.lib)
+_coral_ui_optional(harfbuzz harfbuzz.lib)
+_coral_ui_optional(jpeg-static jpeg-static.lib)
+_coral_ui_optional(png png.lib)
+_coral_ui_optional(zlib z.lib)
+_coral_ui_optional(SPIRV-Cross SPIRV-Cross.lib)
+_coral_ui_optional(shaderc shaderc.lib)
+_coral_ui_optional(shaderc_util shaderc_util.lib)
+_coral_ui_optional(glslang glslang.lib)
+_coral_ui_optional(glslang glslangd.lib)
+_coral_ui_optional(SPIRV SPIRV.lib)
+_coral_ui_optional(SPIRV SPIRVd.lib)
+_coral_ui_optional(SPIRV-Tools SPIRV-Tools.lib)
+_coral_ui_optional(SPIRV-Tools-opt SPIRV-Tools-opt.lib)
+_coral_ui_optional(freetype freetype.lib)
+# CMake's debug postfix on the vendored FreeType build.
+_coral_ui_optional(freetype freetyped.lib)
+_coral_ui_optional(libwebp libwebp.lib)
+
+# `graphics` was built against these archives; the export cannot name the build-tree targets, so the
+# link interface is completed here.
+set(_coral_ui_graphics_deps "Coral::backend;Coral::geometry;Coral::utils")
+foreach (_dep minilog harfbuzz jpeg-static freetype png zlib libwebp SPIRV-Cross shaderc shaderc_util glslang SPIRV SPIRV-Tools-opt SPIRV-Tools)
+  if (TARGET Coral::${_dep})
+    list(APPEND _coral_ui_graphics_deps "Coral::${_dep}")
+  endif ()
+endforeach ()
+
+if (TARGET Coral::graphics)
+  set_property(TARGET Coral::graphics APPEND PROPERTY INTERFACE_LINK_LIBRARIES
+    "${_coral_ui_graphics_deps}")
+endif ()
+if (TARGET Coral::backend)
+  set_property(TARGET Coral::backend APPEND PROPERTY INTERFACE_LINK_LIBRARIES
+    "${_coral_ui_platform_libs}")
+endif ()
+if (TARGET Coral::utils)
+  set_property(TARGET Coral::utils APPEND PROPERTY INTERFACE_LINK_LIBRARIES
+    "${_coral_ui_platform_libs}")
+endif ()
+if (TARGET Coral::ui)
+  set_property(TARGET Coral::ui APPEND PROPERTY INTERFACE_LINK_LIBRARIES
+    "${_coral_ui_platform_libs}")
+endif ()
+
+# The exported targets carry the compile feature, but an INTERFACE target that only consumes the
+# package should not have to restate it.
+foreach (_coral_ui_target utils event geometry backend graphics ui observer)
+  if (TARGET Coral::${_coral_ui_target})
+    set_property(TARGET Coral::${_coral_ui_target} APPEND PROPERTY INTERFACE_COMPILE_FEATURES cxx_std_20)
+  endif ()
+endforeach ()
+
+unset(_coral_ui_include)
+unset(_coral_ui_libdirs)
+unset(_coral_ui_platform_libs)
+unset(_coral_ui_graphics_deps)

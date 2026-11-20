@@ -1,0 +1,1803 @@
+{
+  "unicodeVersion": "18.0.0",
+  "description": "UAX #14 default line breaking rules for Unicode 18.0.0, encoded as boundary-anchored left/right token patterns.",
+  "rules": [
+    {
+      "id": "LB4",
+      "priority": 40,
+      "action": "mandatory_break",
+      "left": [
+        {
+          "classes": [
+            "BK"
+          ]
+        }
+      ],
+      "right": []
+    },
+    {
+      "id": "LB5",
+      "priority": 50,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "CR"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "LF"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB5",
+      "priority": 51,
+      "action": "mandatory_break",
+      "left": [
+        {
+          "classes": [
+            "CR"
+          ]
+        }
+      ],
+      "right": []
+    },
+    {
+      "id": "LB5",
+      "priority": 52,
+      "action": "mandatory_break",
+      "left": [
+        {
+          "classes": [
+            "LF"
+          ]
+        }
+      ],
+      "right": []
+    },
+    {
+      "id": "LB5",
+      "priority": 53,
+      "action": "mandatory_break",
+      "left": [
+        {
+          "classes": [
+            "NL"
+          ]
+        }
+      ],
+      "right": []
+    },
+    {
+      "id": "LB6",
+      "priority": 60,
+      "action": "no_break",
+      "left": [],
+      "right": [
+        {
+          "classes": [
+            "BK",
+            "CR",
+            "LF",
+            "NL"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB7",
+      "priority": 70,
+      "action": "no_break",
+      "left": [],
+      "right": [
+        {
+          "classes": [
+            "SP",
+            "ZW"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB8",
+      "priority": 80,
+      "action": "allow_break",
+      "left": [
+        {
+          "classes": [
+            "ZW"
+          ]
+        },
+        {
+          "repeat": {
+            "min": 0,
+            "items": [
+              {
+                "classes": [
+                  "SP"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "right": []
+    },
+    {
+      "id": "LB8a",
+      "priority": 81,
+      "action": "no_break",
+      "left": [
+        {
+          "flagsAll": [
+            "zwjTail"
+          ]
+        }
+      ],
+      "right": []
+    },
+    {
+      "id": "LB11",
+      "priority": 110,
+      "action": "no_break",
+      "left": [],
+      "right": [
+        {
+          "classes": [
+            "WJ"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB11",
+      "priority": 110,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "WJ"
+          ]
+        }
+      ],
+      "right": []
+    },
+    {
+      "id": "LB12",
+      "priority": 120,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "GL"
+          ]
+        }
+      ],
+      "right": []
+    },
+    {
+      "id": "LB12a",
+      "priority": 121,
+      "action": "no_break",
+      "left": [
+        {
+          "notClasses": [
+            "SP",
+            "HY",
+            "HH"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "GL"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB13",
+      "priority": 130,
+      "action": "no_break",
+      "left": [],
+      "right": [
+        {
+          "classes": [
+            "CL",
+            "CP",
+            "EX",
+            "SY"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB14",
+      "priority": 140,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "OP"
+          ]
+        },
+        {
+          "repeat": {
+            "min": 0,
+            "items": [
+              {
+                "classes": [
+                  "SP"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "right": []
+    },
+    {
+      "id": "LB15a",
+      "priority": 151,
+      "action": "no_break",
+      "left": [
+        {
+          "sot": true
+        },
+        {
+          "classes": [
+            "QU"
+          ],
+          "flagsAll": [
+            "pi"
+          ]
+        },
+        {
+          "repeat": {
+            "min": 0,
+            "items": [
+              {
+                "classes": [
+                  "SP"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "right": []
+    },
+    {
+      "id": "LB15a",
+      "priority": 151,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "BK",
+            "CR",
+            "LF",
+            "NL",
+            "OP",
+            "QU",
+            "GL",
+            "SP",
+            "ZW"
+          ]
+        },
+        {
+          "classes": [
+            "QU"
+          ],
+          "flagsAll": [
+            "pi"
+          ]
+        },
+        {
+          "repeat": {
+            "min": 0,
+            "items": [
+              {
+                "classes": [
+                  "SP"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "right": []
+    },
+    {
+      "id": "LB15b",
+      "priority": 152,
+      "action": "no_break",
+      "left": [],
+      "right": [
+        {
+          "classes": [
+            "QU"
+          ],
+          "flagsAll": [
+            "pf"
+          ]
+        },
+        {
+          "classes": [
+            "SP",
+            "GL",
+            "WJ",
+            "CL",
+            "QU",
+            "CP",
+            "EX",
+            "IS",
+            "SY",
+            "BK",
+            "CR",
+            "LF",
+            "NL",
+            "ZW"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB15b",
+      "priority": 152,
+      "action": "no_break",
+      "left": [],
+      "right": [
+        {
+          "classes": [
+            "QU"
+          ],
+          "flagsAll": [
+            "pf"
+          ]
+        },
+        {
+          "eot": true
+        }
+      ]
+    },
+    {
+      "id": "LB15c",
+      "priority": 153,
+      "action": "allow_break",
+      "left": [
+        {
+          "classes": [
+            "SP"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "IS"
+          ]
+        },
+        {
+          "classes": [
+            "NU"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB15d",
+      "priority": 154,
+      "action": "no_break",
+      "left": [],
+      "right": [
+        {
+          "classes": [
+            "IS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB16",
+      "priority": 160,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "CL",
+            "CP"
+          ]
+        },
+        {
+          "repeat": {
+            "min": 0,
+            "items": [
+              {
+                "classes": [
+                  "SP"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "NS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB17",
+      "priority": 170,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "B2"
+          ]
+        },
+        {
+          "repeat": {
+            "min": 0,
+            "items": [
+              {
+                "classes": [
+                  "SP"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "B2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB18",
+      "priority": 180,
+      "action": "allow_break",
+      "left": [
+        {
+          "classes": [
+            "SP"
+          ]
+        }
+      ],
+      "right": []
+    },
+    {
+      "id": "LB19",
+      "priority": 190,
+      "action": "no_break",
+      "left": [],
+      "right": [
+        {
+          "classes": [
+            "QU"
+          ],
+          "flagsNone": [
+            "pi"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB19",
+      "priority": 190,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "QU"
+          ],
+          "flagsNone": [
+            "pf"
+          ]
+        }
+      ],
+      "right": []
+    },
+    {
+      "id": "LB19a",
+      "priority": 191,
+      "action": "no_break",
+      "left": [
+        {
+          "flagsNone": [
+            "ea"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "QU"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB19a",
+      "priority": 191,
+      "action": "no_break",
+      "left": [],
+      "right": [
+        {
+          "classes": [
+            "QU"
+          ]
+        },
+        {
+          "flagsNone": [
+            "ea"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB19a",
+      "priority": 191,
+      "action": "no_break",
+      "left": [],
+      "right": [
+        {
+          "classes": [
+            "QU"
+          ]
+        },
+        {
+          "eot": true
+        }
+      ]
+    },
+    {
+      "id": "LB19a",
+      "priority": 191,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "QU"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "flagsNone": [
+            "ea"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB19a",
+      "priority": 191,
+      "action": "no_break",
+      "left": [
+        {
+          "sot": true
+        },
+        {
+          "classes": [
+            "QU"
+          ]
+        }
+      ],
+      "right": []
+    },
+    {
+      "id": "LB19a",
+      "priority": 191,
+      "action": "no_break",
+      "left": [
+        {
+          "flagsNone": [
+            "ea"
+          ]
+        },
+        {
+          "classes": [
+            "QU"
+          ]
+        }
+      ],
+      "right": []
+    },
+    {
+      "id": "LB20",
+      "priority": 200,
+      "action": "allow_break",
+      "left": [],
+      "right": [
+        {
+          "classes": [
+            "CB"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB20",
+      "priority": 200,
+      "action": "allow_break",
+      "left": [
+        {
+          "classes": [
+            "CB"
+          ]
+        }
+      ],
+      "right": []
+    },
+    {
+      "id": "LB20a",
+      "priority": 201,
+      "action": "no_break",
+      "left": [
+        {
+          "sot": true
+        },
+        {
+          "classes": [
+            "HY",
+            "HH"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "AL",
+            "HL"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB20a",
+      "priority": 201,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "BK",
+            "CR",
+            "LF",
+            "NL",
+            "SP",
+            "ZW",
+            "CB",
+            "GL"
+          ]
+        },
+        {
+          "classes": [
+            "HY",
+            "HH"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "AL",
+            "HL"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB21",
+      "priority": 210,
+      "action": "no_break",
+      "left": [],
+      "right": [
+        {
+          "classes": [
+            "BA",
+            "HH",
+            "HY",
+            "NS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB21",
+      "priority": 210,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "BB"
+          ]
+        }
+      ],
+      "right": []
+    },
+    {
+      "id": "LB21a",
+      "priority": 211,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "HL"
+          ]
+        },
+        {
+          "classes": [
+            "HY",
+            "HH"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "notClasses": [
+            "HL"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB21b",
+      "priority": 212,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "SY"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "HL"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB22",
+      "priority": 220,
+      "action": "no_break",
+      "left": [],
+      "right": [
+        {
+          "classes": [
+            "IN"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB23",
+      "priority": 230,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "AL",
+            "HL"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "NU"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB23",
+      "priority": 230,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "NU"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "AL",
+            "HL"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB23a",
+      "priority": 231,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "PR"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "ID",
+            "EB",
+            "EM"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB23a",
+      "priority": 231,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "ID",
+            "EB",
+            "EM"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "PO"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB24",
+      "priority": 240,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "PR",
+            "PO"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "AL",
+            "HL"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB24",
+      "priority": 240,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "AL",
+            "HL"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "PR",
+            "PO"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB25",
+      "priority": 250,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "NU"
+          ]
+        },
+        {
+          "repeat": {
+            "min": 0,
+            "items": [
+              {
+                "classes": [
+                  "SY",
+                  "IS"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "classes": [
+            "CL"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "PO"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB25",
+      "priority": 250,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "NU"
+          ]
+        },
+        {
+          "repeat": {
+            "min": 0,
+            "items": [
+              {
+                "classes": [
+                  "SY",
+                  "IS"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "classes": [
+            "CP"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "PO"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB25",
+      "priority": 250,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "NU"
+          ]
+        },
+        {
+          "repeat": {
+            "min": 0,
+            "items": [
+              {
+                "classes": [
+                  "SY",
+                  "IS"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "classes": [
+            "CL"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "PR"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB25",
+      "priority": 250,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "NU"
+          ]
+        },
+        {
+          "repeat": {
+            "min": 0,
+            "items": [
+              {
+                "classes": [
+                  "SY",
+                  "IS"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "classes": [
+            "CP"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "PR"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB25",
+      "priority": 250,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "NU"
+          ]
+        },
+        {
+          "repeat": {
+            "min": 0,
+            "items": [
+              {
+                "classes": [
+                  "SY",
+                  "IS"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "PO"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB25",
+      "priority": 250,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "NU"
+          ]
+        },
+        {
+          "repeat": {
+            "min": 0,
+            "items": [
+              {
+                "classes": [
+                  "SY",
+                  "IS"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "PR"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB25",
+      "priority": 250,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "PO"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "OP"
+          ]
+        },
+        {
+          "classes": [
+            "NU"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB25",
+      "priority": 250,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "PO"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "OP"
+          ]
+        },
+        {
+          "classes": [
+            "IS"
+          ]
+        },
+        {
+          "classes": [
+            "NU"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB25",
+      "priority": 250,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "PO"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "NU"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB25",
+      "priority": 250,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "PR"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "OP"
+          ]
+        },
+        {
+          "classes": [
+            "NU"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB25",
+      "priority": 250,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "PR"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "OP"
+          ]
+        },
+        {
+          "classes": [
+            "IS"
+          ]
+        },
+        {
+          "classes": [
+            "NU"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB25",
+      "priority": 250,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "PR"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "NU"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB25",
+      "priority": 250,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "HY"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "NU"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB25",
+      "priority": 250,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "IS"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "NU"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB25",
+      "priority": 250,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "NU"
+          ]
+        },
+        {
+          "repeat": {
+            "min": 0,
+            "items": [
+              {
+                "classes": [
+                  "SY",
+                  "IS"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "NU"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB26",
+      "priority": 260,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "JL"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "JL",
+            "JV",
+            "H2",
+            "H3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB26",
+      "priority": 260,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "JV",
+            "H2"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "JV",
+            "JT"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB26",
+      "priority": 260,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "JT",
+            "H3"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "JT"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB27",
+      "priority": 270,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "JL",
+            "JV",
+            "JT",
+            "H2",
+            "H3"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "PO"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB27",
+      "priority": 270,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "PR"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "JL",
+            "JV",
+            "JT",
+            "H2",
+            "H3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB28",
+      "priority": 280,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "AL",
+            "HL"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "AL",
+            "HL"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB28a",
+      "priority": 281,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "AP"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "anyOf": [
+            {
+              "classes": [
+                "AK",
+                "AS"
+              ]
+            },
+            {
+              "flagsAll": [
+                "u25cc"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB28a",
+      "priority": 281,
+      "action": "no_break",
+      "left": [
+        {
+          "anyOf": [
+            {
+              "classes": [
+                "AK",
+                "AS"
+              ]
+            },
+            {
+              "flagsAll": [
+                "u25cc"
+              ]
+            }
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "VF",
+            "VI"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB28a",
+      "priority": 281,
+      "action": "no_break",
+      "left": [
+        {
+          "anyOf": [
+            {
+              "classes": [
+                "AK",
+                "AS"
+              ]
+            },
+            {
+              "flagsAll": [
+                "u25cc"
+              ]
+            }
+          ]
+        },
+        {
+          "classes": [
+            "VI"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "anyOf": [
+            {
+              "classes": [
+                "AK"
+              ]
+            },
+            {
+              "flagsAll": [
+                "u25cc"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB28a",
+      "priority": 281,
+      "action": "no_break",
+      "left": [
+        {
+          "anyOf": [
+            {
+              "classes": [
+                "AK",
+                "AS"
+              ]
+            },
+            {
+              "flagsAll": [
+                "u25cc"
+              ]
+            }
+          ]
+        }
+      ],
+      "right": [
+        {
+          "anyOf": [
+            {
+              "classes": [
+                "AK",
+                "AS"
+              ]
+            },
+            {
+              "flagsAll": [
+                "u25cc"
+              ]
+            }
+          ]
+        },
+        {
+          "classes": [
+            "VF"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB29",
+      "priority": 290,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "IS"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "AL",
+            "HL"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB30",
+      "priority": 300,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "AL",
+            "HL",
+            "NU"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "OP"
+          ],
+          "flagsNone": [
+            "ea"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB30",
+      "priority": 300,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "CP"
+          ],
+          "flagsNone": [
+            "ea"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "AL",
+            "HL",
+            "NU"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB30a",
+      "priority": 301,
+      "action": "no_break",
+      "left": [
+        {
+          "sot": true
+        },
+        {
+          "repeat": {
+            "min": 0,
+            "items": [
+              {
+                "classes": [
+                  "RI"
+                ]
+              },
+              {
+                "classes": [
+                  "RI"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "classes": [
+            "RI"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "RI"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB30a",
+      "priority": 301,
+      "action": "no_break",
+      "left": [
+        {
+          "notClasses": [
+            "RI"
+          ]
+        },
+        {
+          "repeat": {
+            "min": 0,
+            "items": [
+              {
+                "classes": [
+                  "RI"
+                ]
+              },
+              {
+                "classes": [
+                  "RI"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "classes": [
+            "RI"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "RI"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB30b",
+      "priority": 302,
+      "action": "no_break",
+      "left": [
+        {
+          "classes": [
+            "EB"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "EM"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LB30b",
+      "priority": 302,
+      "action": "no_break",
+      "left": [
+        {
+          "flagsAll": [
+            "epCn"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "classes": [
+            "EM"
+          ]
+        }
+      ]
+    }
+  ]
+}

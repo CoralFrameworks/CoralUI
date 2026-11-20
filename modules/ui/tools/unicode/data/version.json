@@ -1,0 +1,181 @@
+{
+  "unicodeVersion": "18.0.0",
+  "generatorVersion": "2",
+  "license": "Unicode License V3 (see UNICODE-LICENSE.txt)",
+  "files": {
+    "LineBreak.txt": {
+      "date": "2026-08-07",
+      "sha256": "ae8cf1970c73f3f1a12d77852df96c4b2b1723ca8b388e36bb5739250c6849de",
+      "url": "https://www.unicode.org/Public/18.0.0/ucd/LineBreak.txt"
+    },
+    "DerivedGeneralCategory.txt": {
+      "date": "2026-06-29",
+      "sha256": "d6b151d2d40ee9b1876d26f417980f45ffae47b6055ccf7203cb31f07a030f94",
+      "url": "https://www.unicode.org/Public/18.0.0/ucd/extracted/DerivedGeneralCategory.txt"
+    },
+    "EastAsianWidth.txt": {
+      "date": "2026-06-29",
+      "sha256": "a0cf29eacd00cfcaec4381c6b7c281685f18dbb4e7ff82b4076ccb342ca839aa",
+      "url": "https://www.unicode.org/Public/18.0.0/ucd/EastAsianWidth.txt"
+    },
+    "emoji-data.txt": {
+      "date": "2026-01-30",
+      "sha256": "80d00f8e616a0ef27fd6b8de3b758c06383b5d917e2977709578e68baf733bf1",
+      "url": "https://www.unicode.org/Public/18.0.0/ucd/emoji/emoji-data.txt"
+    },
+    "LineBreakTest.txt": {
+      "date": "2026-08-07",
+      "sha256": "fd9ff9eca411080085b41471bba79ae19d9db2e16924f9770b8509f1affd3f95",
+      "url": "https://www.unicode.org/Public/18.0.0/ucd/auxiliary/LineBreakTest.txt"
+    },
+    "DerivedBidiClass.txt": {
+      "date": "2026-07-02",
+      "sha256": "d9e23222522551348ea1ccfbb4f62efbf98982afb95840f8959c08ed992c5607",
+      "url": "https://www.unicode.org/Public/18.0.0/ucd/extracted/DerivedBidiClass.txt"
+    },
+    "BidiBrackets.txt": {
+      "date": "2026-02-03",
+      "sha256": "4b3b62e4a14b84ee752808c810c602534921c09a4a1bf78cfbee566d66c125b3",
+      "url": "https://www.unicode.org/Public/18.0.0/ucd/BidiBrackets.txt"
+    },
+    "BidiMirroring.txt": {
+      "date": "2026-02-03",
+      "sha256": "cd54810ebf52f0e61a730c8b9cb25975de6c85f6d788a559b416afd548923fd6",
+      "url": "https://www.unicode.org/Public/18.0.0/ucd/BidiMirroring.txt"
+    },
+    "BidiTest.txt": {
+      "date": "2026-02-03",
+      "sha256": "9af2f882a4ab50912e388f069a673b94eacd82fa6d07d20a3ff7f3c759e905aa",
+      "url": "https://www.unicode.org/Public/18.0.0/ucd/BidiTest.txt"
+    },
+    "BidiCharacterTest.txt": {
+      "date": "2026-02-03",
+      "sha256": "045b24d2c8ab066951bd32fe8c6b4de34647f72b5b1c7df0265f24ab53573e01",
+      "url": "https://www.unicode.org/Public/18.0.0/ucd/BidiCharacterTest.txt"
+    },
+    "GraphemeBreakProperty.txt": {
+      "date": "2026-06-29",
+      "sha256": "0839dcb79e4ac639ecd538b1abf7c9d22e3f9dd265b7e182d33627aa4d75b45a",
+      "url": "https://www.unicode.org/Public/18.0.0/ucd/auxiliary/GraphemeBreakProperty.txt"
+    },
+    "DerivedCoreProperties.txt": {
+      "date": "2026-08-07",
+      "sha256": "09c928886a178fcafd93c29e4bd59073a058e5a100b716d425cb563ab50f68c9",
+      "url": "https://www.unicode.org/Public/18.0.0/ucd/DerivedCoreProperties.txt"
+    },
+    "GraphemeBreakTest.txt": {
+      "date": "2026-06-12",
+      "sha256": "b0cf047ee94485bbdc846de2b902f5f8a815f6b674f9d04223cddadd91c9df31",
+      "url": "https://www.unicode.org/Public/18.0.0/ucd/auxiliary/GraphemeBreakTest.txt"
+    },
+    "WordBreakProperty.txt": {
+      "date": "2026-06-29",
+      "sha256": "8dbfa17063e11084201f33c3e76d485d3b9166930c71db8e39ed1c9234171aec",
+      "url": "https://www.unicode.org/Public/18.0.0/ucd/auxiliary/WordBreakProperty.txt"
+    },
+    "WordBreakTest.txt": {
+      "date": "2026-06-12",
+      "sha256": "3dd70c071781276067c680d87303f60434adce7b067bd063194af374edad86a5",
+      "url": "https://www.unicode.org/Public/18.0.0/ucd/auxiliary/WordBreakTest.txt"
+    },
+    "ThaiDictionary.txt": {
+      "date": "2016-01-01",
+      "sha256": "3166abde40c0f44ab91c28f5ce96d7d1472cb7882e1c0bda0a72f8f69dba4274",
+      "url": "https://raw.githubusercontent.com/unicode-org/icu/main/icu4c/source/data/brkitr/dictionaries/thaidict.txt"
+    },
+    "KhmerDictionary.txt": {
+      "date": "2016-01-01",
+      "sha256": "87bee2d17cd5148aa36957eb05409eefc124de8ad519b81b789298ef3e60b5d9",
+      "url": "https://raw.githubusercontent.com/unicode-org/icu/main/icu4c/source/data/brkitr/dictionaries/khmerdict.txt"
+    },
+    "LaoDictionary.txt": {
+      "date": "2015-01-01",
+      "sha256": "3c876934a3fa81031d2333525eafaca6a7c9f842e3b98f18c38880420afb5d36",
+      "url": "https://raw.githubusercontent.com/unicode-org/icu/main/icu4c/source/data/brkitr/dictionaries/laodict.txt"
+    },
+    "BurmeseDictionary.txt": {
+      "date": "2016-01-01",
+      "sha256": "61d8abc3d9102b2f9bf0c9f44db0d7ab89b18172d8cd26832e4c83174bd8673b",
+      "url": "https://raw.githubusercontent.com/unicode-org/icu/main/icu4c/source/data/brkitr/dictionaries/burmesedict.txt",
+      "license": "ICU License (Unicode, Inc. and IBM, 2015-2016)"
+    },
+    "hyph-en-us.tex": {
+      "date": "2005-05-30",
+      "sha256": "f4ffcd96c5cbc886bdad23f95dcae8edc3cd3620eae62f7946eceda97c4e68f8",
+      "url": "https://raw.githubusercontent.com/hyphenation/tex-hyphen/master/hyph-utf8/tex/generic/hyph-utf8/patterns/tex/hyph-en-us.tex",
+      "license": "Copying and distribution permitted in any medium without royalty provided the copyright notice and this notice are preserved (Gerard D.C. Kuiken, 1990-2005)"
+    },
+    "hyph-it.tex": {
+      "date": "2014-04-22",
+      "sha256": "6ce56ed6ed2ca7c0688838e366e6595e0429f984f4fc6e96ec045cebb1e76a47",
+      "url": "https://raw.githubusercontent.com/hyphenation/tex-hyphen/master/hyph-utf8/tex/generic/hyph-utf8/patterns/tex/hyph-it.tex",
+      "license": "LPPL 1.3 or later, or MIT (Claudio Beccari, 2008-2011)"
+    },
+    "hyph-es.tex": {
+      "date": "2019-09-24",
+      "sha256": "6a2e5f39a991a23d1cd8a23dbd0f6fe96a9f07561a6695f4f3320f47030e236c",
+      "url": "https://raw.githubusercontent.com/hyphenation/tex-hyphen/master/hyph-utf8/tex/generic/hyph-utf8/patterns/tex/hyph-es.tex",
+      "license": "MIT/X11 (Javier Bezos, 1993-2019)"
+    },
+    "hyph-de-1996.tex": {
+      "date": "2024-02-28",
+      "sha256": "374ad1ce3263f8a2791ec070ef9b516c532dae64456f3fb656e617e8ae53a9d3",
+      "url": "https://raw.githubusercontent.com/hyphenation/tex-hyphen/master/hyph-utf8/tex/generic/hyph-utf8/patterns/tex/hyph-de-1996.tex",
+      "license": "MIT (TeX-Trennmuster contributors, 2013-2024)"
+    },
+    "hyph-fr.tex": {
+      "date": "2016-05-12",
+      "sha256": "526cad6fe8f52fcd3caa3fcaf667cb1740cfc14bca198680e00dc343a84594de",
+      "url": "https://raw.githubusercontent.com/hyphenation/tex-hyphen/master/hyph-utf8/tex/generic/hyph-utf8/patterns/tex/hyph-fr.tex",
+      "license": "MIT (Daniel Flipo, Bernard Gaulle, Arthur Reutenauer, 1994-2016)"
+    },
+    "hyph-pt.tex": {
+      "date": "2024-07-13",
+      "sha256": "c110a39e501db372d1d755e1c64464321a2efa7d8e9617f66001000389b941f2",
+      "url": "https://raw.githubusercontent.com/hyphenation/tex-hyphen/master/hyph-utf8/tex/generic/hyph-utf8/patterns/tex/hyph-pt.tex",
+      "license": "BSD 3-clause (Pedro J. de Rezende, J. Joao Dias Almeida, Leonardo Araujo, Aline Benevides, 1987-2024)"
+    },
+    "hyph-ru.tex": {
+      "date": "2003-03-10",
+      "sha256": "ce988fcc66e5e29d7474df5ab5b489d3f52a50ebccf570997f992d84221b922a",
+      "url": "https://raw.githubusercontent.com/hyphenation/tex-hyphen/master/hyph-utf8/tex/generic/hyph-utf8/patterns/tex/hyph-ru.tex",
+      "license": "LPPL 1.2 or later (Alexander I. Lebedev, 1999-2003)"
+    },
+    "hyph-el-monoton.tex": {
+      "date": "2011-01-01",
+      "sha256": "a3aa9ecba9c00dd958a2b1d1d3b3aa851701f6d0027ef9cc9d7365e432c5acb0",
+      "url": "https://raw.githubusercontent.com/hyphenation/tex-hyphen/master/hyph-utf8/tex/generic/hyph-utf8/patterns/tex/hyph-el-monoton.tex",
+      "license": "LPPL or MIT (Dimitrios Filippou, 2008-2011)"
+    },
+    "hyph-nl.tex": {
+      "date": "2026-11-14",
+      "sha256": "d21499bfbee53e4d50e867ef92a41fd28b65725d7c91c980e4f8f02889bf6b2a",
+      "url": "https://raw.githubusercontent.com/hyphenation/tex-hyphen/master/hyph-utf8/tex/generic/hyph-utf8/patterns/tex/hyph-nl.tex",
+      "license": "MIT (Piet Tutelaers, 1996)"
+    },
+    "hyph-sv.tex": {
+      "date": "2026-11-14",
+      "sha256": "102253382bd91cdb7535de5c20744254c9ac9aaa4ca12ed420eb835e5004c0b3",
+      "url": "https://raw.githubusercontent.com/hyphenation/tex-hyphen/master/hyph-utf8/tex/generic/hyph-utf8/patterns/tex/hyph-sv.tex",
+      "license": "LPPL 1.2 or later (Jan Michael Rynning, 1994)"
+    },
+    "hyph-da.tex": {
+      "date": "2026-11-14",
+      "sha256": "23e0a50f0c20d632be06f973e700323463961eac737bb14f6c3787675a4f5575",
+      "url": "https://raw.githubusercontent.com/hyphenation/tex-hyphen/master/hyph-utf8/tex/generic/hyph-utf8/patterns/tex/hyph-da.tex",
+      "license": "LPPL or MIT (Frank Jensen, 1994-2011)"
+    },
+    "hyph-fi.tex": {
+      "date": "2026-11-14",
+      "sha256": "cf68be5eb003d299f85f2b7185f31d8ff5799c19dfad3f0300eaf9843e9cc8d3",
+      "url": "https://raw.githubusercontent.com/hyphenation/tex-hyphen/master/hyph-utf8/tex/generic/hyph-utf8/patterns/tex/hyph-fi.tex",
+      "license": "Patterns may be freely distributed (Kauko Saarinen, 1986-1989)"
+    },
+    "hyph-ca.tex": {
+      "date": "2026-11-14",
+      "sha256": "153b51e2a9f8afdd87a8848f73f4462a902c58d597aa55c66506af65c5596e7a",
+      "url": "https://raw.githubusercontent.com/hyphenation/tex-hyphen/master/hyph-utf8/tex/generic/hyph-utf8/patterns/tex/hyph-ca.tex",
+      "license": "LPPL 1.0 or later (Gonçal Badenes, Francina Turon, 1991-2003)"
+    }
+  }
+}

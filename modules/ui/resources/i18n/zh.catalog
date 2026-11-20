@@ -1,0 +1,42 @@
+# 编辑器演示的中文 catalog：只覆盖一部分键，其余回退到 en.catalog。
+app.name=Coral 编辑器
+app.title=Coral 编辑器 - 未命名
+app.ready=就绪
+app.open=打开
+app.save=保存
+app.status.modified=已修改 - Ctrl+S 保存
+editor.media=媒体
+editor.import=导入...
+editor.import.title=导入媒体
+editor.import.filter=媒体
+editor.preview=预览
+editor.inspector=属性
+editor.timeline=时间线
+editor.transport.play=播放
+editor.transport.pause=暂停
+editor.transport.stop=停止
+editor.add_to_timeline=加入时间线
+editor.property=属性 {0}：{1}
+editor.status.accent=强调色 {r},{g},{b}
+editor.inspector.clip=剪辑：
+editor.inspector.track=轨道：
+editor.inspector.curves=曲线：
+editor.inspector.none=无
+editor.inspector.hint=拖动剪辑可移动，拖动边缘可裁剪。
+editor.property.start=起点
+editor.property.duration=时长
+editor.property.source=源
+editor.property.opacity=不透明度
+editor.property.scale=缩放
+editor.property.offsetx=水平偏移
+editor.property.offsety=垂直偏移
+editor.curve=曲线：
+editor.guides.on=参考线开
+editor.guides.off=参考线关
+
+# 框架自己绘制的字符串，应用可以覆盖任意一条。
+ui.textinput.cut=剪切
+ui.textinput.copy=复制
+ui.textinput.paste=粘贴
+ui.textinput.selectAll=全选
+ui.table.cell=第 {row} 行，第 {column} 列
