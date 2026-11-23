@@ -1,0 +1,63 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 19,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "macos-arm64",
+      "displayName": "macOS arm64",
+      "description": "Native Apple-silicon build with examples and unit tests.",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/out/macos-arm64",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_OSX_ARCHITECTURES": "arm64",
+        "CORAL_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "macos-x86_64",
+      "displayName": "macOS x86_64",
+      "description": "Intel-slice build; combine with macos-arm64 via scripts/make-universal-demo.sh.",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/out/macos-x86_64",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_OSX_ARCHITECTURES": "x86_64",
+        "CORAL_BUILD_TESTS": "ON",
+        "CORAL_SHADERS_COMPILER": "${sourceDir}/out/macos-arm64/coral-graphics/modules/graphics/tools/shader_compiler/shader_compiler"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "macos-arm64",
+      "configurePreset": "macos-arm64",
+      "jobs": 8
+    },
+    {
+      "name": "macos-x86_64",
+      "configurePreset": "macos-x86_64",
+      "jobs": 8
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "macos-arm64",
+      "configurePreset": "macos-arm64",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "macos-x86_64",
+      "configurePreset": "macos-x86_64",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}
