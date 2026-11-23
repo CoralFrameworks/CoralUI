@@ -24,11 +24,22 @@ jobs:
           path: CoralGraphics
           submodules: recursive
 
+      # external/CoralCore has `update = none` in CoralUI's .gitmodules, so actions/checkout's
+      # recursive submodule pass does not fetch it. Fetch it explicitly and point CMake at it.
+      - name: Checkout CoralCore
+        uses: actions/checkout@v4
+        with:
+          repository: CoralFrameworks/CoralCore
+          ref: main
+          path: CoralCore
+          submodules: recursive
+
       - name: Configure
         run: >
           cmake -S . -B build -G "Unix Makefiles"
           -DCMAKE_BUILD_TYPE=Release
           -DCORAL_BUILD_TESTS=ON
+          -DCORAL_CORE_DIR="${{ github.workspace }}/CoralCore"
           -DCORAL_GRAPHICS_DIR="${{ github.workspace }}/CoralGraphics"
 
       - name: Build
