@@ -37,6 +37,7 @@
 - [x] 候选窗定位：`firstRectForCharacterRange:` 使用 `WindowHost::imeCursorRect()` 并转换到屏幕坐标；
 - [x] `doCommandBySelector:` 把方向键、退格、删除、回车、Tab、PageUp/Down 等翻译成 `KeyEvent`；
 - [x] surrounding text / selected range：UTF-8 字节偏移转换为 UTF-16 范围，供 IME 查询；
+- [x] 自动化 native smoke：`ui_native_ax_smoke` 验证 AX role/AXPress 与 marked-text/commit；
 - [ ] 中文、日文、韩文输入法手工验证；
 - [ ] 死键、Option 变音、emoji picker 验证；
 - [ ] marked text 内部 selection / replacementRange / secure input / spell check 仍待补。
@@ -49,6 +50,7 @@
 - [x] 把 `AccessibilityNode` 的 role/name/description/value/state/actions/bounds 映射到 AX 属性；
 - [x] 焦点、值变化、选中变化、结构变化事件（`NSAccessibilityPostNotification`，节点路径粒度待细化）；
 - [x] 动作回传：AXPress、AXIncrement/AXDecrement、AXScrollToVisible；AXConfirm/AXCancel 待补；
+- [x] 自动化 native smoke：`ui_native_ax_smoke` 遍历 AX 树并触发 AXPress；
 - [ ] VoiceOver 手工验证；
 - [ ] 开启/关闭 accessibility bridge 的策略（类似 `CORAL_UI_UIA=0`）；
 - [ ] AXSetValue / 文本编辑动作、AX 行列/表格语义、hit test 与 AXFocus 的完整映射。
@@ -153,6 +155,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 | 2026-11-23 | 阶段 1.4 source：`CoralDragSource`、文本/文件/custom MIME、拖拽图像 | 基础 source 完成，file promise/真实 Finder 验收待补 |
 | 2026-11-23 | 阶段 1.5：文件对话框 sheet、UTType 过滤（UniformTypeIdentifiers）、默认路径/多选 | 部分完成，NSAlert/accessory/sandbox bookmark 待补 |
 | 2026-11-23 | 阶段 1.6：`CORAL_MACOS_CODE_SIGN_IDENTITY` / `CORAL_MACOS_HARDENED_RUNTIME` / entitlements 签名钩子；ad-hoc 签名实测通过 | 签名钩子完成，notarization/sandbox/universal preset 待补 |
+| 2026-11-23 | 新增 macOS native smoke：`ui_native_ax_smoke`（AX role/tree/AXPress + NSTextInputClient marked/commit） | 已加入 CTest native label |
 
 ## 5. 问题记录
 
@@ -195,7 +198,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 ```sh
 cmake --build out/examples -j8
 ctest --test-dir out/examples -L examples --output-on-failure
-ctest --test-dir out/tests -R "^test_ui$|^test_ui_shared_device$|^ui_native_smoke$" --output-on-failure
+ctest --test-dir out/tests -R "^test_ui$|^test_ui_shared_device$|^ui_native_smoke$|^ui_native_ax_smoke$" --output-on-failure
 ```
 
 新增能力要补对应的 native smoke 或手工验收步骤，并记录到本文档。

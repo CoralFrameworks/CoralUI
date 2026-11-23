@@ -82,6 +82,15 @@ target_link_libraries(ui_native_smoke PRIVATE ui)
 add_test(NAME ui_native_smoke COMMAND ui_native_smoke)
 set_tests_properties(ui_native_smoke PROPERTIES LABELS native SKIP_RETURN_CODE 77)
 
+if (APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  # The AppKit-only surface: NSAccessibility tree/actions and NSTextInputClient composition. Both
+  # are Objective-C++ and cannot live in the cross-platform test_ui binary.
+  add_executable(ui_native_ax_smoke ui_native_ax_smoke.mm)
+  target_link_libraries(ui_native_ax_smoke PRIVATE ui)
+  add_test(NAME ui_native_ax_smoke COMMAND ui_native_ax_smoke)
+  set_tests_properties(ui_native_ax_smoke PROPERTIES LABELS native SKIP_RETURN_CODE 77)
+endif ()
+
 if(WIN32)
   add_executable(ui_multimonitor_smoke ui_multimonitor_smoke.cpp)
   target_link_libraries(ui_multimonitor_smoke PRIVATE ui)
