@@ -132,7 +132,8 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 - [x] 窗口 frame autosave（`Window::Options::frameAutosaveName`）与原生 tabbing 基础（`TabbingMode`、Window 菜单 Show Tab Bar/Merge All Windows）；
 - [ ] 完整窗口 restoration（restorationClass/state restoration）、titlebar accessory；
 - [x] macOS secure event input（`Window::setSecureInputEnabled`，Carbon Enable/DisableSecureEventInput，进程级计数）；
-- [ ] 键盘输入源/布局变化、死键；
+- [x] 键盘输入源查询/变化通知：`currentKeyboardInputSource`/`setInputSourceChangedHandler`（TIS distributed notification）；
+- [ ] 键盘布局映射/死键；
 - [x] Trackpad 手势（magnify/rotate/swipe）→ `GestureEvent`/`Layer::onGesture`；
 - [x] Scroll phase/momentum/precise 字段，Cocoa 从 `NSEvent.phase`/`momentumPhase` 映射；
 - [ ] Force Touch、pen/pressure；
@@ -194,6 +195,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 | 2026-11-23 | 阶段 2 Sidebar section header + Toolbar customization/autosave；native smoke 校验 group row 与选择 | 分组完成，outline/titlebar/custom toolbar 细节待补 |
 | 2026-11-23 | 阶段 2 titlebar accessory：`TitlebarAccessoryItem`、trailing NSTitlebarAccessoryViewController、NSSegmentedControl、selection | 基础完成，任意 accessory view/leading 布局待补 |
 | 2026-11-23 | 阶段 2 secure input：`setSecureInputEnabled`/`isSecureInputEnabled`，Carbon 安全事件输入，native smoke 校验 | 完成基础能力，进程级/多窗口语义待补 |
+| 2026-11-23 | 阶段 2 键盘输入源：TIS current ID/name + `kTISNotifySelectedKeyboardInputSourceChanged` 主队列回调；native smoke 读取 SCIM | 查询/通知完成，布局/死键待补 |
 | 2026-11-23 | 阶段 2 spell check：`ui/SpellCheck.h` + NSSpellChecker，UTF-16→UTF-8 byte ranges，native smoke 校验 | API 完成，TextInput 下划线/autocorrect/字体面板待补 |
 | 2026-11-23 | 阶段 2 spell check UI：TextInput `setSpellCheckEnabled` 自动查询并绘制单行/多行红色下划线 | 下划线完成，右键建议/autocorrect/字体面板待补 |
 | 2026-11-23 | 阶段 2 spell suggestions：`spellSuggestions` + TextInput 动态右键菜单替换 word range；native smoke 校验 8 个候选 | 右键建议完成，autocorrect/字体面板待补 |
@@ -240,6 +242,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 - Toolbar 已允许用户自定义/自动保存，但没有显式 toolbar item 分组、flexible space、overflow 策略或 fullscreen 行为测试。
 - Titlebar accessory 目前固定为 trailing 的 `NSSegmentedControl`，API 只表达 label/symbol 段；尚未支持任意 CoralUI/NSView accessory、leading 布局或 accessory 的尺寸策略。
 - Secure event input 是进程级、由 OS 引用计数；`Window` 只平衡自己的一次 enable/disable，多窗口/异常退出时需要产品侧确保最终释放。只在 AppKit 主线程上生效。
+- 键盘输入源变化通过 TIS distributed notification 观察，回调 dispatch 到主队列；输入源 ID/name 已暴露，但键盘布局映射（物理 key → 字符）仍由 NSEvent characters/IME 处理，死键没有单独测试。
 - Spell check 现在有查询 API、TextInput 红色下划线和动态右键替换建议；每次文本变化/右键同步调用 `NSSpellChecker`，长文档可能阻塞 UI，后续应做后台/去抖检查。autocorrect、字体面板、上下文菜单键盘导航的完整验收尚未完成。
 - 手势路由按 pointer 命中层向父链冒泡；没有独立的 gesture recognizer/冲突仲裁，也没有 Force Touch、pen pressure 或 swipe 的完整方向/阶段语义。ScrollView 目前只消费 delta，phase 字段供上层控件使用。
 - SF Symbol 目前以模板黑色/alpha 图像返回，尚未暴露颜色/tint 配置和动态 accent color；SF Symbol 的 symbol configuration（weight/scale/variant）只暴露 pointSize 与 raster scale。

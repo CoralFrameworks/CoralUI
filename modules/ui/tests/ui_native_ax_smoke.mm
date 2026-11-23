@@ -23,6 +23,7 @@
 #include <ui/ApplicationLifecycle.h>
 #include <ui/Button.h>
 #include <ui/Flex.h>
+#include <ui/InputSource.h>
 #include <ui/NativeAlert.h>
 #include <ui/SecurityScopedBookmark.h>
 #include <ui/SpellCheck.h>
@@ -206,6 +207,12 @@ int main() {
       access->stopAccessing();
     }
 
+    const coral::ui::KeyboardInputSource inputSource = coral::ui::currentKeyboardInputSource();
+    if (!coral::ui::supportsInputSourceMonitoring() || !inputSource.valid()) {
+      std::fprintf(stderr, "FAIL: keyboard input source was not readable\n");
+      return 1;
+    }
+
     const std::vector<coral::ui::SpellIssue> issues = coral::ui::spellCheck("helo wrold");
     const std::vector<std::string> suggestions = coral::ui::spellSuggestions("helo");
     if (!coral::ui::supportsSpellChecking() || issues.empty() || suggestions.empty()) {
@@ -327,8 +334,9 @@ int main() {
     }
 
     std::printf("native AX/IME/symbol/alert/lifecycle/spell smoke: roles, AXPress, IME commit, "
-                "%dx%d SF Symbol, native alerts, lifecycle, %zu spell issues, %zu suggestions\n",
-                symbol.width(), symbol.height(), issues.size(), suggestions.size());
+                "%dx%d SF Symbol, native alerts, lifecycle, %zu spell issues, %zu suggestions, "
+                "input=%s\n", symbol.width(), symbol.height(), issues.size(), suggestions.size(),
+                inputSource.id.c_str());
     return 0;
   }
 }
