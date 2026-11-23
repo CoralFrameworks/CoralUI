@@ -42,6 +42,10 @@ jobs:
           repository: CoralFrameworks/libgtest
           ref: main
           path: third_party/libgtest
+          submodules: recursive
+
+      - name: Initialize GoogleTest sources
+        run: git -C third_party/libgtest submodule update --init --recursive
 
       # CoralGraphics' bundled zlib/libyuv are not gitlinks in its checkout; libz (and its zlib
       # submodule) is required by libpng even with the effect module off.
