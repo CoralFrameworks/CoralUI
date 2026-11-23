@@ -1195,29 +1195,62 @@ void TextInput::scrollBy(const float delta) {
 
 void TextInput::ensureContextMenu() {
   if (mContextMenu != nullptr || mFont == nullptr) return;
-  // Built on first use rather than in the constructor: the labels come from the theme's translator,
-  // and a control is theme-less until it is added to a tree.
+  // Created on first use; the items are rebuilt on every open because spelling suggestions depend on
+  // the word under the pointer.
   mContextMenu = std::make_shared<Menu>(mFont);
-  mContextMenu->addItem(tr("ui.textinput.cut", "Cut"), [this] { cutSelection(); });
-  mContextMenu->addItem(tr("ui.textinput.copy", "Copy"), [this] { copySelection(); });
-  mContextMenu->addItem(tr("ui.textinput.paste", "Paste"), [this] { paste(); });
-  mContextMenu->addSeparator();
-  mContextMenu->addItem(tr("ui.textinput.selectAll", "Select All"), [this] { selectAll(); });
   addChild(mContextMenu);
 }
 
 void TextInput::showContextMenu(const Point& position) {
   ensureContextMenu();
   if (mContextMenu == nullptr) return;
+  const auto range = wordRangeAt(mCursor);
+  mContextWordBegin = range.first;
+  mContextWordEnd = range.second;
+  std::vector<std::string> suggestions;
+  if (mContextWordEnd > mContextWordBegin) {
+    const std::string word = mText.substr(mContextWordBegin, mContextWordEnd - mContextWordBegin);
+    // Only offer replacements for a word the checker actually flags; guesses for a correct word are
+    // noise in a text-field context menu.
+    if (!spellCheck(word).empty()) suggestions = spellSuggestions(word);
+  }
+
+  mContextMenu->clear();
+  int index = 0;
+  for (const std::string& suggestion: suggestions) {
+    mContextMenu->addItem(suggestion, [this, suggestion] { replaceContextWord(suggestion); });
+    ++index;
+  }
+  if (index > 0) {
+    mContextMenu->addSeparator();
+    ++index;
+  }
+  mContextCutIndex = index;
+  mContextMenu->addItem(tr("ui.textinput.cut", "Cut"), [this] { cutSelection(); });
+  ++index;
+  mContextCopyIndex = index;
+  mContextMenu->addItem(tr("ui.textinput.copy", "Copy"), [this] { copySelection(); });
+  ++index;
+  mContextPasteIndex = index;
+  mContextMenu->addItem(tr("ui.textinput.paste", "Paste"), [this] { paste(); });
+  mContextMenu->addSeparator();
+  mContextMenu->addItem(tr("ui.textinput.selectAll", "Select All"), [this] { selectAll(); });
   updateContextMenu();
   mContextMenu->showAt(position);
 }
 
+void TextInput::replaceContextWord(const std::string& word) {
+  if (mContextWordEnd <= mContextWordBegin || mContextWordEnd > mText.size()) return;
+  mSelectionAnchor = mContextWordBegin;
+  mCursor = mContextWordEnd;
+  replaceSelection(word);
+}
+
 void TextInput::updateContextMenu() {
   if (mContextMenu == nullptr) return;
-  mContextMenu->setItemEnabled(0, hasSelection());
-  mContextMenu->setItemEnabled(1, hasSelection());
-  mContextMenu->setItemEnabled(2, !Clipboard::system()->getText().empty());
+  mContextMenu->setItemEnabled(mContextCutIndex, hasSelection());
+  mContextMenu->setItemEnabled(mContextCopyIndex, hasSelection());
+  mContextMenu->setItemEnabled(mContextPasteIndex, !Clipboard::system()->getText().empty());
 }
 
 void TextInput::copySelection() const {

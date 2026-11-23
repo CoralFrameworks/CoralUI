@@ -39,6 +39,10 @@ struct SpellIssue {
 [[nodiscard]] std::vector<SpellIssue> spellCheck(std::string_view utf8,
   std::string_view language = {});
 
+/** Replacement candidates for a misspelled word (empty when the platform has none). */
+[[nodiscard]] std::vector<std::string> spellSuggestions(std::string_view word,
+  std::string_view language = {});
+
 [[nodiscard]] bool supportsSpellChecking() noexcept;
 
 } // namespace coral::ui

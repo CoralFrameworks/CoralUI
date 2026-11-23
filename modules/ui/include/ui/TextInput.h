@@ -232,6 +232,7 @@ class TextInput final : public Layer {
   void ensureContextMenu();
   void showContextMenu(const Point& position);
   void updateContextMenu();
+  void replaceContextWord(const std::string& word);
   [[nodiscard]] std::pair<size_t, size_t> wordRangeAt(size_t index) const;
   [[nodiscard]] std::pair<size_t, size_t> lineRangeAt(size_t index) const;
   void eraseWordBefore();
@@ -288,6 +289,11 @@ class TextInput final : public Layer {
   std::vector<std::string> mUndo;
   std::vector<std::string> mRedo;
   std::shared_ptr<Menu> mContextMenu;
+  std::size_t mContextWordBegin = 0;
+  std::size_t mContextWordEnd = 0;
+  int mContextCutIndex = 0;
+  int mContextCopyIndex = 1;
+  int mContextPasteIndex = 2;
   std::chrono::steady_clock::time_point mLastClick{};
   Point mLastClickPosition{};
   int mClickCount = 0;

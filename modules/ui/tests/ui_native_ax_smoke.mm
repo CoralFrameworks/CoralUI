@@ -106,8 +106,9 @@ int main() {
     window->setSecureInputEnabled(false);
 
     const std::vector<coral::ui::SpellIssue> issues = coral::ui::spellCheck("helo wrold");
-    if (!coral::ui::supportsSpellChecking() || issues.empty()) {
-      std::fprintf(stderr, "FAIL: spell checker found no issue in 'helo wrold'\n");
+    const std::vector<std::string> suggestions = coral::ui::spellSuggestions("helo");
+    if (!coral::ui::supportsSpellChecking() || issues.empty() || suggestions.empty()) {
+      std::fprintf(stderr, "FAIL: spell checker/suggestions failed for 'helo wrold'\n");
       return 1;
     }
 
@@ -211,8 +212,8 @@ int main() {
     }
 
     std::printf("native AX/IME/symbol/alert/lifecycle/spell smoke: roles, AXPress, IME commit, "
-                "%dx%d SF Symbol, native alerts, lifecycle, %zu spell issues\n",
-                symbol.width(), symbol.height(), issues.size());
+                "%dx%d SF Symbol, native alerts, lifecycle, %zu spell issues, %zu suggestions\n",
+                symbol.width(), symbol.height(), issues.size(), suggestions.size());
     return 0;
   }
 }
