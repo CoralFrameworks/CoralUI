@@ -229,6 +229,13 @@ class Window final : public Renderer {
     Cocoa,
   };
 
+  /** macOS native window tabbing preference; ignored by the other backends. */
+  enum class TabbingMode : uint8_t {
+    Automatic,
+    Preferred,
+    Disallowed,
+  };
+
   struct Options {
     /**
      * Initial client size.
@@ -318,6 +325,15 @@ class Window final : public Renderer {
     float uiScale = 0.0f;
     /** When false, an automatic scale stays 1.0 even on a high-DPI display. */
     bool useDpiScale = true;
+
+    /**
+     * macOS only: AppKit frame autosave name, so the window restores its frame across launches.
+     * Empty disables frame saving; the position is centred as before.
+     */
+    std::string frameAutosaveName;
+
+    /** macOS only: native window tabbing preference. */
+    TabbingMode tabbingMode = TabbingMode::Automatic;
   };
 
   ~Window();

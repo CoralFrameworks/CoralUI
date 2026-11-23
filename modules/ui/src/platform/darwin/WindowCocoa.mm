@@ -356,7 +356,32 @@ class CocoaPlatform final : public WindowPlatform {
     }
     mWindow.releasedWhenClosed = NO;
     mWindow.title = [NSString stringWithUTF8String:mOptions.title.c_str()];
-    if (mOptions.position.has_value()) {
+    // Native tabbing and frame autosave are window-server features: the same NSWindow API that
+    // Finder/AppKit apps use, not a CoralUI-side position cache.
+    switch (mOptions.tabbingMode) {
+      case Window::TabbingMode::Preferred:
+        mWindow.tabbingMode = NSWindowTabbingModePreferred;
+        break;
+      case Window::TabbingMode::Disallowed:
+        mWindow.tabbingMode = NSWindowTabbingModeDisallowed;
+        break;
+      case Window::TabbingMode::Automatic:
+      default:
+        mWindow.tabbingMode = NSWindowTabbingModeAutomatic;
+        break;
+    }
+    mWindow.tabbingIdentifier = [NSString stringWithUTF8String:
+      (mOptions.appId.empty() ? "com.coral.ui" : mOptions.appId.c_str())];
+
+    BOOL restoredFrame = NO;
+    if (!mOptions.frameAutosaveName.empty()) {
+      NSString* autosave = [NSString stringWithUTF8String:mOptions.frameAutosaveName.c_str()];
+      (void)[mWindow setFrameAutosaveName:autosave];
+      restoredFrame = [mWindow setFrameUsingName:autosave];
+    }
+    if (restoredFrame) {
+      // AppKit restored the user's last frame; do not override it with a centred default.
+    } else if (mOptions.position.has_value()) {
       const NSScreen* targetScreen = mWindow.screen != nil ? mWindow.screen : screen;
       const CGFloat screenHeight = targetScreen != nil ? targetScreen.frame.size.height : 0.0;
       const CGFloat top = static_cast<CGFloat>(mOptions.position->y);
@@ -1359,6 +1384,11 @@ class CocoaPlatform final : public WindowPlatform {
                                           keyEquivalent:@"m"];
     minimize.keyEquivalentModifierMask = NSEventModifierFlagCommand;
     [windowMenu addItemWithTitle:@"Zoom" action:@selector(performZoom:) keyEquivalent:@""];
+    [windowMenu addItem:[NSMenuItem separatorItem]];
+    [windowMenu addItemWithTitle:@"Show Tab Bar" action:@selector(toggleTabBar:)
+                   keyEquivalent:@""];
+    [windowMenu addItemWithTitle:@"Merge All Windows" action:@selector(mergeAllWindows:)
+                   keyEquivalent:@""];
     [windowMenu addItem:[NSMenuItem separatorItem]];
     [windowMenu addItemWithTitle:@"Bring All to Front"
                           action:@selector(arrangeInFront:)

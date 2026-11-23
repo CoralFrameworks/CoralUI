@@ -115,7 +115,8 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 - [ ] SF Symbols、template image、vibrancy/material、系统 focus ring、动态 accent color；
 - [ ] 原生控件外观对齐 HIG：按钮、搜索框、下拉框、日期选择、Stepper、 segmented、color well；
 - [ ] Popover、Sheet、TabView、Outline/Source list、可调整表头；
-- [ ] 窗口 restoration / autosave frame / tabbing / titlebar accessory；
+- [x] 窗口 frame autosave（`Window::Options::frameAutosaveName`）与原生 tabbing 基础（`TabbingMode`、Window 菜单 Show Tab Bar/Merge All Windows）；
+- [ ] 完整窗口 restoration（restorationClass/state restoration）、titlebar accessory；
 - [ ] 键盘输入源/布局变化、死键、secure input；
 - [ ] Trackpad 手势（pinch/rotate/swipe）、Force Touch、pen/pressure；
 - [ ] Scroll phase/momentum；
@@ -156,6 +157,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 | 2026-11-23 | 阶段 1.5：文件对话框 sheet、UTType 过滤（UniformTypeIdentifiers）、默认路径/多选 | 部分完成，NSAlert/accessory/sandbox bookmark 待补 |
 | 2026-11-23 | 阶段 1.6：`CORAL_MACOS_CODE_SIGN_IDENTITY` / `CORAL_MACOS_HARDENED_RUNTIME` / entitlements 签名钩子；ad-hoc 签名实测通过 | 签名钩子完成，notarization/sandbox/universal preset 待补 |
 | 2026-11-23 | 新增 macOS native smoke：`ui_native_ax_smoke`（AX role/tree/AXPress + NSTextInputClient marked/commit） | 已加入 CTest native label |
+| 2026-11-23 | 阶段 2 起步：`Window::Options::frameAutosaveName`/`TabbingMode`、AppKit frame autosave、tabbingIdentifier、Window 菜单 tab 项 | 基础完成，完整 restoration/titlebar accessory 待补 |
 
 ## 5. 问题记录
 
@@ -181,6 +183,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 - 文件对话框 sheet 的 parent 通过当前 `NSApp.keyWindow`/`mainWindow` 解析，`FileDialogOptions.parent` 还没有直接映射到对应 `NSWindow`；非活动 app 会回退 `runModal`。`NSOpenPanel.canChooseDirectories` 仍固定 false，需要扩展 `FileDialogOptions`。
 - 拖放 source 的拖拽图像对文件使用 `NSWorkspace iconForFile`，文本使用自绘标签；file promise、拖拽取消反馈、真实 Finder 多文件拖出尚未验收。
 - 代码签名钩子只在显式传入 `CORAL_MACOS_CODE_SIGN_IDENTITY` 时执行；默认不签名。ad-hoc 签名已验证，Developer ID 证书与 notarization 需要真实账号。
+- 窗口 autosave/tabbing 目前是 AppKit 原生基础：`frameAutosaveName` 恢复 frame，`TabbingMode` 设置 `NSWindow.tabbingMode`；还没有 Apple 的 state restoration（`restorationClass`/`encodeRestorableState`），也没有 tab 内容/新 tab 的 Window API。
 
 - 全量 UI target + blit 每帧，Cocoa 未启用 damage/retained/frame-plan。
 - 无 CVDisplayLink，`refreshHertz` 来自 `PresentFrameClock`，不代表真实显示刷新。
