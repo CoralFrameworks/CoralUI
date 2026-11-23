@@ -27,12 +27,20 @@ git submodule update --init --recursive
 Then configure either the examples project or the framework root; both build the examples:
 
 ```sh
-# Standalone examples project (what an IDE opens when working on a demo)
+# Windows: the standalone examples project (what an IDE opens when working on a demo)
 cmake -S examples -B out/examples -G "Visual Studio 17 2022" -A x64
 
 # Or the framework root: libraries, tests and examples in one tree
 cmake -S . -B out/ui -G "Visual Studio 17 2022" -A x64
 cmake --build out/ui
+
+# macOS: the stand-alone examples project
+cmake -S examples -B out/examples -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
+cmake --build out/examples -j8
+
+# macOS: the framework root
+cmake -S . -B out/ui -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
+cmake --build out/ui -j8
 ```
 
 The examples project configures the framework with `CORAL_BUILD_TESTS=OFF`: it links `ui`/`mvvm` but
@@ -46,21 +54,27 @@ checkouts in the frameworks/workgroup layout.
 ## Building and running
 
 ```sh
+# Windows
 cmake --build out/examples --config Release
-
-# Headless: writes a PNG and reports the frame count, platform and DPR
 out/examples/ui/Release/ui_demo --headless --frames 2 --out out/ui_demo.png
 
-# Native window: Esc closes it; the title bar exercises move/maximize/minimize/close
-out/examples/ui/Release/ui_demo --frames 0 --width 960 --height 540
+# macOS/Linux single-config generators put the executables under out/examples/ui/
+cmake --build out/examples -j8
+out/examples/ui/ui_demo --headless --frames 2 --out out/ui_demo.png
+
+# Native window: Esc (or Cmd+W on macOS) closes it; the title bar exercises
+# move/maximize/minimize/close
+out/examples/ui/ui_demo --frames 0 --width 960 --height 540
 
 # The declarative reference page (headless by default)
-out/examples/ui/Release/ui_mvvm_demo --out out/ui_mvvm_demo.png --frames 1
+out/examples/ui/ui_mvvm_demo --out out/ui_mvvm_demo.png --frames 1
 ```
 
-`ui_demo` also accepts `--platform auto|x11|wayland`, `--render-host same-thread|render-thread`,
-`--theme dark|light`, `--scale S`, `--focus-input` and `--frames N`. `--frames 0` keeps a native
-window open until it is closed.
+`ui_demo` also accepts `--platform auto|cocoa|x11|wayland`,
+`--render-host same-thread|render-thread`, `--theme dark|light`, `--scale S`, `--focus-input` and
+`--frames N`. `--frames 0` keeps a native window open until it is closed. On macOS the window opens
+at the requested point size (a 960x540 request is a 960x540-point window, 1920x1080 backing pixels on
+a Retina display) and presents through Metal.
 
 ## Verification
 
@@ -71,6 +85,9 @@ registered:
 |---|---|
 | `example_ui_demo_headless` | an offscreen window lays out, renders and snapshots the layer showcase |
 | `example_ui_mvvm_headless` | the Element/Reconciler page mounts, patches from a Command and renders |
+
+The native window path is the manual check; `ui_demo --frames N --out frame.png` also snapshots the
+presented frame, so a macOS or Windows run can be verified without a screenshot.
 
 ```sh
 ctest --test-dir out/examples -C Release -L examples --output-on-failure

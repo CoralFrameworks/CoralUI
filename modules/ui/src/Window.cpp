@@ -1060,7 +1060,9 @@ struct WindowImpl final : detail::WindowHost {
       return;
     }
     markFrameNeeded();
-    renderFrame();
+    // The caller is a platform loop the user is interacting with (Win32's resize timer, AppKit's
+    // live resize): draw immediately rather than sleeping for the display deadline.
+    renderFrame(false);
   }
 
   void requestFrame() override {
@@ -1076,14 +1078,21 @@ struct WindowImpl final : detail::WindowHost {
   }
 
   WindowHit dispatchHitTest(const Point point) override {
+    // The platform boundary is device pixels, the same unit as `width`/`height`: a backend converts
+    // its native coordinates once (Cocoa points * dpiScale, X11/Win32 raw client pixels) and every
+    // backend then agrees with the metric-free geometry here. The chrome metrics are scaled with
+    // `uiScale`, so the hit test runs in logical space and converts the point back.
+    const float ui = uiScale > 0.0f ? uiScale : 1.0f;
+    const float logicalWidth = static_cast<float>(width) / ui;
+    const float logicalHeight = static_cast<float>(height) / ui;
+    const Point logical{ point.x / ui, point.y / ui };
     if (decorations == Window::Decorations::System) {
-      return point.x >= 0.0f && point.y >= 0.0f && point.x < static_cast<float>(width) &&
-               point.y < static_cast<float>(height)
+      return logical.x >= 0.0f && logical.y >= 0.0f && logical.x < logicalWidth &&
+               logical.y < logicalHeight
                ? WindowHit::Client
                : WindowHit::None;
     }
-    return hitTestWindowChrome(
-      Size{ static_cast<float>(width), static_cast<float>(height) }, point, chromeMetrics);
+    return hitTestWindowChrome(Size{ logicalWidth, logicalHeight }, logical, chromeMetrics);
   }
 
   bool surroundingText(std::string* text, size_t* cursor, size_t* anchor) override {
@@ -1450,7 +1459,15 @@ struct WindowImpl final : detail::WindowHost {
     return true;
   }
 
-  bool renderFrame() {
+  /**
+   * Records and presents one frame.
+   *
+   * @param pace false for a frame the user is actively waiting on (a live-resize tick). The frame
+   *        clock's normal job is to start a frame just before its display deadline; during a resize
+   *        that wait serialises the window server's own loop, so an interactive frame is drawn as
+   *        soon as it is asked for. `renderFrameNow` is the only caller allowed to skip it.
+   */
+  bool renderFrame(const bool pace = true) {
     uiAffinity.assertCurrentThread("Window::renderFrame");
     if (platform == nullptr || !running || inFrame) return false;
     if (threadedHost != nullptr) return renderThreadedFrame();
@@ -1464,8 +1481,18 @@ struct WindowImpl final : detail::WindowHost {
     Layer::resetCulledLayers();
     Layer::resetFrameListBytes();
     const auto frameStart = std::chrono::steady_clock::now();
-    clock->requestFrame(std::max(clock->expectedPresentTime(), frameStart));
-    if (!clock->waitForFrame()) return false;
+    const auto deadline = std::max(clock->expectedPresentTime(), frameStart);
+    clock->requestFrame(deadline);
+    bool waitForDisplay = pace;
+    // Diagnostic switch for A/B profiling: `CORAL_UI_NO_FRAME_PACING=1` removes the display-deadline
+    // wait so a frame's own cost can be measured without the clock's pacing.
+    if (const char* noPacing = std::getenv("CORAL_UI_NO_FRAME_PACING");
+        noPacing != nullptr && std::strcmp(noPacing, "0") != 0) {
+      waitForDisplay = false;
+    }
+    if (waitForDisplay) {
+      if (!clock->waitForFrame()) return false;
+    }
     clock->onFrameStarted();
     countDirtyNodes();
 
@@ -2051,15 +2078,16 @@ const WindowChromeMetrics& Window::chromeMetrics() const noexcept {
 
 WindowHit Window::hitTest(const Point point) const {
   if (mImpl == nullptr) return WindowHit::None;
+  const float scale = mImpl->uiScale > 0.0f ? mImpl->uiScale : 1.0f;
+  const float logicalWidth = static_cast<float>(mImpl->width) / scale;
+  const float logicalHeight = static_cast<float>(mImpl->height) / scale;
   if (mImpl->decorations == Decorations::System) {
-    return point.x >= 0.0f && point.y >= 0.0f && point.x < static_cast<float>(mImpl->width) &&
-             point.y < static_cast<float>(mImpl->height)
+    return point.x >= 0.0f && point.y >= 0.0f && point.x < logicalWidth &&
+             point.y < logicalHeight
              ? WindowHit::Client
              : WindowHit::None;
   }
-  return hitTestWindowChrome(
-    Size{ static_cast<float>(mImpl->width), static_cast<float>(mImpl->height) }, point,
-    mImpl->chromeMetrics);
+  return hitTestWindowChrome(Size{ logicalWidth, logicalHeight }, point, mImpl->chromeMetrics);
 }
 void Window::setCursor(const Cursor cursor) {
   if (mImpl == nullptr || mImpl->cursor == cursor) return;

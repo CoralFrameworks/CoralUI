@@ -9,8 +9,8 @@ CoralUI is the cross-platform GUI framework of the Coral project. It is one repo
 
 The toolkit is a retained-mode UI framework: a `Layer` tree with layout, painting, input and focus;
 a declarative `Element`/`Reconciler` layer; a widget set; Unicode text layout and shaping; theming,
-animation, i18n and accessibility; and native Windows/Linux windows plus headless and raster
-targets. It sits on CoralGraphics and owns no renderer of its own. Public entry points are
+animation, i18n and accessibility; and native Windows, Linux and macOS windows plus headless and
+raster targets. It sits on CoralGraphics and owns no renderer of its own. Public entry points are
 `<ui/UI.h>`, `<ui/Window.h>` and `<ui/Application.h>`.
 
 ## Layout
@@ -41,9 +41,9 @@ third_party/        the shared libz / libyuv / libgtest submodules
 - **Text** — UAX #9 bidi, UAX #14 line breaking, UAX #29 grapheme/word boundaries, hyphenation,
   justify/vertical/RTL text, rich text, DPI-aware subpixel rendering, font fallback, IME and
   grapheme-aware editing.
-- **Windowing** — native Win32 and Linux X11/Wayland windows, fractional/high-DPI scaling,
-  multi-window `Application`/`WindowManager`, layout capture/restore, same-thread and threaded render
-  hosts, device recovery, snapshots and frame statistics.
+- **Windowing** — native Win32, Linux X11/Wayland and macOS Cocoa windows, fractional/high-DPI
+  scaling, multi-window `Application`/`WindowManager`, layout capture/restore, same-thread and
+  threaded render hosts, device recovery, snapshots and frame statistics.
 - **Platform integration** — multi-MIME clipboard (text/HTML/PNG/files, PRIMARY), drag and drop,
   native file dialogs, IME and system appearance.
 - **Styling and motion** — theme tokens, theme files with hot reload, light/dark, control states and
@@ -55,18 +55,19 @@ third_party/        the shared libz / libyuv / libgtest submodules
 
 ## Supported platforms
 
-| Capability | Windows | Linux X11 | Linux Wayland |
-|---|---|---|---|
-| Native window and GPU surface | Yes | Yes | Yes |
-| High-DPI scaling | Per-monitor v2 | Global DPI | Per-output scale, including fractional |
-| IME | IMM32 | IBus/XIM | `text-input` v1/v3 |
-| Clipboard | Multi-MIME, files, PNG | Multi-MIME, PRIMARY, INCR | Per-MIME, PRIMARY |
-| Drag and drop | OLE | XDND | Not yet |
-| File dialogs | Native | Portal, `zenity`/`kdialog` | Portal |
-| Accessibility | UI Automation | AT-SPI | AT-SPI |
+| Capability | Windows | Linux X11 | Linux Wayland | macOS |
+|---|---|---|---|---|
+| Native window and GPU surface | Yes | Yes | Yes | Yes, titled `NSWindow` + `CAMetalLayer` content view |
+| High-DPI scaling | Per-monitor v2 | Global DPI | Per-output scale, including fractional | Backing scale, per screen |
+| IME | IMM32 | IBus/XIM | `text-input` v1/v3 | Not yet (key events and text dispatch only) |
+| Clipboard | Multi-MIME, files, PNG | Multi-MIME, PRIMARY, INCR | Per-MIME, PRIMARY | Multi-MIME, HTML, PNG, file URLs |
+| Drag and drop | OLE | XDND | Not yet | Not yet |
+| File dialogs | Native | Portal, `zenity`/`kdialog` | Portal | `NSOpenPanel`/`NSSavePanel` |
+| Accessibility | UI Automation | AT-SPI | AT-SPI | Not yet |
 
 Headless and software-raster targets work on every platform and are what the tests and examples
-use. macOS and Android have no native window backend yet.
+use. The macOS window backend presents through Metal using the same `graphics::gpu::WindowSurface`
+path as the other native backends; Android has no native window backend yet.
 
 ## Building standalone
 
@@ -79,9 +80,15 @@ targets instead of initializing another copy. GoogleTest is needed only when the
 ```sh
 git submodule update --init --recursive
 
+# Windows
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
+
+# macOS (Command Line Tools; Ninja is optional)
+cmake -S . -B build -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j8
+ctest --test-dir build --output-on-failure
 ```
 
 Useful switches:
@@ -101,9 +108,15 @@ which keeps the framework build to libraries and tests. The reference fonts are 
 `examples/fonts/`, so this project needs no external assets:
 
 ```sh
+# Windows
 cmake -S examples -B out/examples -G "Visual Studio 17 2022" -A x64
 cmake --build out/examples --config Release
 ctest --test-dir out/examples -C Release -L examples --output-on-failure
+
+# macOS
+cmake -S examples -B out/examples -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
+cmake --build out/examples -j8
+ctest --test-dir out/examples -L examples --output-on-failure
 ```
 
 The examples are built only for a standalone checkout; an application that embeds CoralUI as a

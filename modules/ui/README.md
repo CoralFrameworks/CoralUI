@@ -63,9 +63,9 @@ separate `modules/mvvm` library; `modules/ui` is the toolkit.
 
 ### Application and windowing
 
-- `Window`: native Win32, X11 and Wayland windows plus headless and raster targets; logical-unit
-  layout with per-monitor DPI scaling; fullscreen, minimum size, title/position, close interception
-  and runtime theme updates.
+- `Window`: native Win32, X11, Wayland and macOS Cocoa windows plus headless and raster targets;
+  logical-unit layout with per-monitor DPI scaling; fullscreen, minimum size, title/position, close
+  interception and runtime theme updates.
 - `Application` and `WindowManager`: multi-window management, activation and window-layout
   capture/restore.
 - On-demand frame scheduling, frame callbacks, same-thread and threaded render hosts, device
@@ -112,23 +112,24 @@ separate `modules/mvvm` library; `modules/ui` is the toolkit.
 
 ## Supported platforms
 
-| Capability | Windows | Linux X11 | Linux Wayland |
-|---|---|---|---|
-| Native window and GPU surface | Yes | Yes | Yes |
-| High-DPI scaling | Per-monitor v2 | Global DPI | Per-output scale, including fractional |
-| Client-side title bar | Yes | Yes | Yes; server-side `xdg-decoration` when offered |
-| IME | IMM32 | IBus/XIM | `text-input` v1/v3 |
-| Clipboard | Multi-MIME, files, PNG | Multi-MIME, PRIMARY, INCR | Per-MIME, PRIMARY |
-| Drag and drop | OLE | XDND | Not yet |
-| File dialogs | Native | Portal, `zenity`/`kdialog` | Portal |
-| Accessibility | UI Automation | AT-SPI | AT-SPI |
-| Maximize/minimize | Yes | Yes | Yes |
-| Always-on-top | Yes | X11 only | No |
-| Threaded render host | Yes | Yes | Rejected with a diagnostic |
+| Capability | Windows | Linux X11 | Linux Wayland | macOS |
+|---|---|---|---|---|
+| Native window and GPU surface | Yes | Yes | Yes | Yes, Cocoa + `CAMetalLayer` |
+| High-DPI scaling | Per-monitor v2 | Global DPI | Per-output scale, including fractional | Backing scale, per screen |
+| Client-side title bar | Yes | Yes | Yes; server-side `xdg-decoration` when offered | System frame only (`Client` maps to `System`) |
+| IME | IMM32 | IBus/XIM | `text-input` v1/v3 | Not yet |
+| Clipboard | Multi-MIME, files, PNG | Multi-MIME, PRIMARY, INCR | Per-MIME, PRIMARY | Multi-MIME, HTML, PNG, file URLs |
+| Drag and drop | OLE | XDND | Not yet | Not yet |
+| File dialogs | Native | Portal, `zenity`/`kdialog` | Portal | `NSOpenPanel`/`NSSavePanel` |
+| Accessibility | UI Automation | AT-SPI | AT-SPI | Not yet |
+| Maximize/minimize | Yes | Yes | Yes | Yes (zoom/miniaturize) |
+| Always-on-top | Yes | X11 only | No | Yes |
+| Threaded render host | Yes | Yes | Rejected with a diagnostic | Yes |
 
 Headless and software-raster targets work on every platform and are what the test suite and the
-examples use. macOS and Android have no native window backend yet; the desktop Windows and Linux
-backends are the supported product targets.
+examples use. The macOS backend presents through Metal and drains AppKit's event queue from
+CoralUI's own frame loop, so it does not call `[NSApp run]`. Android has no native window backend
+yet; Windows, Linux and macOS are the supported desktop product targets.
 
 ## Building
 
@@ -140,8 +141,19 @@ GoogleTest is needed only when the tests are built:
 ```sh
 git submodule update --init --recursive
 
+# Windows
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Release
+ctest --test-dir build -C Release --output-on-failure
+
+# Linux
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build
+ctest --test-dir build --output-on-failure
+
+# macOS
+cmake -S . -B build -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j8
 ctest --test-dir build --output-on-failure
 ```
 
@@ -157,8 +169,14 @@ The examples build with the framework (`cmake --build build`, one tree for libra
 examples) or as their own project:
 
 ```sh
+# Linux
 cmake -S examples -B out/examples -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build out/examples
+ctest --test-dir out/examples -L examples --output-on-failure
+
+# macOS
+cmake -S examples -B out/examples -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
+cmake --build out/examples -j8
 ctest --test-dir out/examples -L examples --output-on-failure
 ```
 
@@ -192,5 +210,6 @@ window->run();
 
 CoralUI is a GUI toolkit, not a product shell or an application framework: application-level
 widgets, navigation and product pages live in the application. It does not provide a CSS selector
-engine, an ABI-stable binary interface yet, or macOS/Android window backends. The source-level API
-is the supported contract; rebuild against the matching CoralCore/CoralGraphics revisions.
+engine, an ABI-stable binary interface yet, or an Android window backend, and macOS IME,
+accessibility and drag-and-drop are not implemented yet. The source-level API is the supported
+contract; rebuild against the matching CoralCore/CoralGraphics revisions.

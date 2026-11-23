@@ -24,6 +24,7 @@
  */
 
 #include <ui/Button.h>
+#include <ui/Command.h>
 #include <ui/ColorLayer.h>
 #include <ui/Flex.h>
 #include <ui/ScrollView.h>
@@ -88,7 +89,9 @@ int main(int argc, char** argv) {
     if (argument == "--headless") {
       headless = true;
     } else if (argument == "--frames") {
-      frames = std::max(1, std::atoi(next().c_str()));
+      // `--frames 0` is the interactive mode: run until the window closes. Only a negative value is
+      // meaningless here.
+      frames = std::max(0, std::atoi(next().c_str()));
     } else if (argument == "--out") {
       output = next();
     } else if (argument == "--width") {
@@ -98,7 +101,8 @@ int main(int argc, char** argv) {
     } else if (argument == "--platform") {
       const std::string value = next();
       platform = value == "wayland" ? Window::NativePlatform::Wayland
-        : (value == "x11" ? Window::NativePlatform::X11 : Window::NativePlatform::Auto);
+        : (value == "x11" ? Window::NativePlatform::X11
+        : (value == "cocoa" ? Window::NativePlatform::Cocoa : Window::NativePlatform::Auto));
     } else if (argument == "--focus-input") {
       focusInput = true;
     } else if (argument == "--render-host") {
@@ -110,7 +114,7 @@ int main(int argc, char** argv) {
       themeName = next();
     } else if (argument == "--help") {
       std::printf("usage: ui_demo [--headless] [--frames N] [--out FILE] [--width W] [--height H] "
-        "[--platform auto|x11|wayland] [--render-host same-thread|render-thread] "
+        "[--platform auto|cocoa|x11|wayland] [--render-host same-thread|render-thread] "
         "[--scale S] [--theme dark|light] [--focus-input]\n");
       return 0;
     }
@@ -132,6 +136,12 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  // Esc and Cmd+W close the demo on every platform. The focused control gets the key first, so a
+  // text field can consume Esc to cancel its composition without the window disappearing.
+  window->commands().bind(Shortcut{ Key::Escape, false, false, false, false }, "window.close",
+    [w = window.get()] { w->requestClose(); });
+  window->commands().bindAlias(Shortcut::command(Key::W), "window.close");
+
   const auto typeface = graphics::Typeface::fromFile(std::string(CORAL_ASSETS_DIR) +
     "/fonts/NotoSansSC-Regular.otf");
   Theme theme = themeName == "light" ? Theme::light() : Theme::dark();
@@ -146,10 +156,13 @@ int main(int argc, char** argv) {
   root->setCrossAlign(Align::Stretch);
   std::shared_ptr<TextInput> inputField;
 
-  if (!headless) {
-    // GNOME's Wayland compositor does not implement xdg-decoration. Drawing the frame in the
-    // product is the supported path (the same one Windows uses); the title bar is placed at y = 0 so
-    // `Window::hitTest` maps its caption band and buttons onto the native move/maximize/minimize.
+  // macOS keeps the standard titled NSWindow: its title bar, edge resize, zoom, Spaces and window
+  // drag are owned by the window server, and the layer tree lives in the content view. The custom
+  // title bar stays for Windows and for compositors such as GNOME's Wayland that do not implement
+  // server-side decorations.
+  const bool clientChrome = !headless &&
+    window->nativePlatform() != Window::NativePlatform::Cocoa;
+  if (clientChrome) {
     auto titleBar = std::make_shared<TitleBar>("Coral UI", theme.body, theme.text);
     titleBar->setOnMinimize([w = window.get()] { w->minimize(); });
     titleBar->setOnMaximize([w = window.get()] {
@@ -178,20 +191,20 @@ int main(int argc, char** argv) {
   }
 
   auto toolbar = std::make_shared<ColorLayer>(theme.surface);
-  toolbar->setBounds(Rect::MakeWH(static_cast<float>(width - 48), 56.0f));
+  // Cross-axis stretch gives these panels the current page width; the bound only supplies height.
+  toolbar->setBounds(Rect::MakeWH(0.0f, 56.0f));
   page->addChild(toolbar);
 
   auto button = std::make_shared<Button>("Focusable button", theme.body);
   page->addChild(button);
 
   auto content = std::make_shared<ColorLayer>(theme.surfaceRaised);
-  content->setBounds(Rect::MakeWH(static_cast<float>(width - 48), 120.0f));
+  content->setBounds(Rect::MakeWH(0.0f, 120.0f));
   page->addChild(content);
 
   if (theme.body != nullptr) {
     auto input = std::make_shared<TextInput>("", theme.body);
     input->setPlaceholder("type here - focus with a click, edit with the keyboard");
-    input->setPreferredWidth(static_cast<float>(width - 48));
     page->addChild(input);
     inputField = input;
 
@@ -201,12 +214,12 @@ int main(int argc, char** argv) {
     for (int row = 0; row < 8; ++row) {
       auto entry = std::make_shared<ColorLayer>(
         row % 2 == 0 ? theme.surface : theme.surfaceRaised);
-      entry->setBounds(Rect::MakeWH(static_cast<float>(width - 64), 28.0f));
+      entry->setBounds(Rect::MakeWH(0.0f, 28.0f));
       listContent->addChild(entry);
     }
     auto list = std::make_shared<ScrollView>();
     list->setPreferredHeight(100.0f);
-    list->setBounds(Rect::MakeWH(static_cast<float>(width - 48), 100.0f));
+    list->setBounds(Rect::MakeWH(0.0f, 100.0f));
     list->setContent(listContent);
     page->addChild(list);
   }
@@ -251,6 +264,7 @@ const char* platformName(const coral::ui::Window::NativePlatform platform) {
     case coral::ui::Window::NativePlatform::Win32: return "win32";
     case coral::ui::Window::NativePlatform::X11: return "x11";
     case coral::ui::Window::NativePlatform::Wayland: return "wayland";
+    case coral::ui::Window::NativePlatform::Cocoa: return "cocoa";
     case coral::ui::Window::NativePlatform::Auto: return "headless";
   }
   return "unknown";

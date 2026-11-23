@@ -226,12 +226,19 @@ class Window final : public Renderer {
     Win32,
     X11,
     Wayland,
+    Cocoa,
   };
 
   struct Options {
-    /** Initial client size in device pixels. */
+    /**
+     * Initial client size.
+     *
+     * Native Windows and Linux windows interpret it as device pixels; a macOS window interprets it
+     * as points, because AppKit's window geometry is point-based. The layer tree still lays out at
+     * `width() / uiScale()` logical units on every platform.
+     */
     int width = 1280;
-    /** Initial client size in device pixels. */
+    /** Initial client size (device pixels; points on macOS). */
     int height = 720;
     std::string title = "Coral UI";
     /** Desktop application id: Wayland `app_id`, X11 `WM_CLASS`, used for grouping and the task bar. */
@@ -260,8 +267,11 @@ class Window final : public Renderer {
     /** Headless runs stop after this many frames; 0 means no limit. */
     int frameLimit = 0;
     /**
-     * Linux only. Auto prefers Wayland when WAYLAND_DISPLAY is set and falls back to X11 when the
-     * Wayland connection or surface creation fails; X11/Wayland force one native backend.
+     * Native backend preference.
+     *
+     * Linux only: Auto prefers Wayland when WAYLAND_DISPLAY is set and falls back to X11 when the
+     * Wayland connection or surface creation fails; X11/Wayland force one native backend. On macOS
+     * `Cocoa` is the only native backend and `Auto` selects it; Windows ignores the field.
      */
     NativePlatform platform = NativePlatform::Auto;
     Color clearColor = Color::MakeRGBA8(24, 26, 32, 255);
@@ -396,7 +406,12 @@ class Window final : public Renderer {
   void setCursor(Cursor cursor);
   [[nodiscard]] Cursor cursor() const noexcept;
 
-  /** Whether the OS (system) or the framework (client) draws the title bar and border. */
+  /**
+   * Whether the OS (system) or the framework (client) draws the title bar and border.
+   *
+   * The macOS backend always keeps the system frame: `Client` is accepted for API compatibility but
+   * maps to `System`, because the window server owns drag, edge resize and zoom there.
+   */
   enum class Decorations : uint8_t { System, Client };
   void setDecorations(Decorations decorations);
   [[nodiscard]] Decorations decorations() const noexcept;

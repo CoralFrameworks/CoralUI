@@ -8,13 +8,13 @@ implementation.
 |---|---|
 | `linux/` | X11 and Wayland windows (including fractional scale via viewporter), X11 and Wayland clipboards, xdg-desktop-portal file dialog with `zenity`/`kdialog` fallback. |
 | `win32/` | Win32 window, native clipboard and `IFileOpenDialog`/`IFileSaveDialog`. |
-| `darwin/` | Reserved for the Cocoa backend; no implementation yet. |
+| `darwin/` | Cocoa `NSWindow` + `CAMetalLayer` window, `NSPasteboard` clipboard, `NSOpenPanel`/`NSSavePanel` file dialogs. |
 | `android/` | Reserved for the Android backend; no implementation yet. |
 
 Files at the root are platform-neutral:
 
 - `WindowPlatform.h` — the `WindowPlatform`/`WindowHost` interfaces and factories.
-- `WindowPlatform.cpp` — runtime Linux backend selection.
+- `WindowPlatform.cpp` — native backend selection (`Win32`, `Cocoa`, or Linux X11/Wayland choice).
 - `WindowHeadless.cpp` — the headless window.
 - `ClipboardPlatform.h` / `ClipboardPlatformFallback.cpp` — the native clipboard factory; the
   fallback returns null so `Clipboard::system()` installs `MemoryClipboard`.

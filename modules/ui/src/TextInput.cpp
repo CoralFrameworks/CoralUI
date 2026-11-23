@@ -119,6 +119,10 @@ TextInput::TextInput(std::string text, std::shared_ptr<const graphics::Font> fon
   // The editor has no horizontal scrollbar: wrap overlong words. Callers can
   // replace the whole policy with setLineBreakPolicy().
   mPolicy.overflowWrap = OverflowWrap::BreakWord;
+  // The editor draws its placeholder and selection without wrapping them to the field's own
+  // bounds; clipping here is what stops a long placeholder from painting past the border when the
+  // window is narrower than the text.
+  setClip(true);
   setAccessibleRole(AccessibilityRole::TextField);
   setAccessibleEditable(true);
 

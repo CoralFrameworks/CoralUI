@@ -1670,9 +1670,10 @@ const wl_pointer_listener WaylandPlatform::kPointerListener = {
     // Client-side decorations: the caption band and the resize border are not native pixels, so a
     // press there has to start the compositor's interactive move/resize with this button's serial.
     if (state == WL_POINTER_BUTTON_STATE_PRESSED && button == 0x110 && platform->mToplevel != nullptr) {
-      const Point local{ platform->mPointerPosition.x / platform->mScale,
-        platform->mPointerPosition.y / platform->mScale };
-      const WindowHit hit = platform->mHost->dispatchHitTest(local);
+      // The host hit test boundary is device pixels; `mPointerPosition` was already multiplied by
+      // the compositor scale when it was recorded, so it is used directly here. Dividing it by the
+      // scale again made caption/resize hit testing disagree with a fractional-scaled window.
+      const WindowHit hit = platform->mHost->dispatchHitTest(platform->mPointerPosition);
       uint32_t edge = 0;
       switch (hit) {
         case WindowHit::Caption:

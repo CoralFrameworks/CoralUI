@@ -136,7 +136,13 @@ class WindowHost {
     (void)anchor;
     return false;
   }
-  /** Client-decoration hit test at a window-local logical point (Win32 WM_NCHITTEST uses it). */
+  /**
+   * Client-decoration hit test at a window-local point in **device pixels**.
+   *
+   * `WindowImpl` divides by `uiScale` before it runs `hitTestWindowChrome`, so `WindowChromeMetrics`
+   * keeps its logical units. A backend converts its native coordinate once: Cocoa points are
+   * multiplied by the backing scale, Win32 `WM_NCHITTEST` and X11 already hand over client pixels.
+   */
   virtual WindowHit dispatchHitTest(const Point point) {
     (void)point;
     return WindowHit::Client;
@@ -415,6 +421,9 @@ class WindowPlatform {
 
 #if defined(_WIN32)
 [[nodiscard]] std::unique_ptr<WindowPlatform> createWin32Platform(const Window::Options& options,
+  backend::Device* sharedDevice, std::string* diagnostics);
+#elif defined(CORAL_UI_COCOA)
+[[nodiscard]] std::unique_ptr<WindowPlatform> createCocoaPlatform(const Window::Options& options,
   backend::Device* sharedDevice, std::string* diagnostics);
 #elif defined(CORAL_UI_X11)
 [[nodiscard]] std::unique_ptr<WindowPlatform> createX11Platform(const Window::Options& options,

@@ -32,6 +32,8 @@ std::unique_ptr<WindowPlatform> createWindowPlatform(const Window::Options& opti
 
 #if defined(_WIN32)
   return createWin32Platform(options, sharedDevice, diagnostics);
+#elif defined(CORAL_UI_COCOA)
+  return createCocoaPlatform(options, sharedDevice, diagnostics);
 #elif defined(CORAL_UI_X11) || defined(CORAL_UI_WAYLAND)
   std::string waylandError;
 #if defined(CORAL_UI_WAYLAND)
