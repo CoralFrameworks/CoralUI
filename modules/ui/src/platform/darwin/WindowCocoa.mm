@@ -32,6 +32,7 @@
  */
 
 #include "../../WindowPlatform.h"
+#include "../../ApplicationLifecycleInternal.h"
 
 #include <gpu/WindowSurface.h>
 
@@ -1626,6 +1627,40 @@ coral::ui::DragPayload payloadFromPasteboard(NSPasteboard* pasteboard) {
   // window close would cut a multi-window session short while another window is being recreated.
   (void)sender;
   return NO;
+}
+
+- (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication*)sender {
+  (void)sender;
+  return coral::ui::detail::dispatchShouldTerminate() ? NSTerminateNow : NSTerminateCancel;
+}
+
+- (BOOL)applicationShouldHandleReopen:(NSApplication*)sender hasVisibleWindows:(BOOL)flag {
+  (void)sender;
+  (void)flag;
+  (void)coral::ui::detail::dispatchReopen();
+  return YES;
+}
+
+- (void)application:(NSApplication*)sender openFiles:(NSArray<NSString*>*)filenames {
+  std::vector<std::string> paths;
+  paths.reserve(filenames.count);
+  for (NSString* filename in filenames) {
+    const char* path = filename.UTF8String;
+    if (path != nullptr) paths.emplace_back(path);
+  }
+  (void)coral::ui::detail::dispatchOpenFiles(std::move(paths));
+  [sender replyToOpenOrPrint:NSApplicationDelegateReplySuccess];
+}
+
+- (void)application:(NSApplication*)sender openURLs:(NSArray<NSURL*>*)urls {
+  std::vector<std::string> paths;
+  paths.reserve(urls.count);
+  for (NSURL* url in urls) {
+    const char* path = url.path.UTF8String;
+    if (path != nullptr) paths.emplace_back(path);
+  }
+  (void)coral::ui::detail::dispatchOpenFiles(std::move(paths));
+  (void)sender;
 }
 
 @end

@@ -67,7 +67,8 @@
 - [x] Window menu（Minimize / Zoom / Bring All to Front）和 File > Close；
 - [ ] `CommandRegistry` → `NSMenu` 的映射（需要命令显示名/分组 API；目前只发布标准菜单）；
 - [x] 基础菜单状态校验：Edit 项按 `hasTextFocus()` 启用，其余始终可用；
-- [ ] `applicationShouldTerminate` / 完整 last-window/reopen/open-files 策略；
+- [x] `applicationShouldTerminate` / reopen / open files 回调（`ui/ApplicationLifecycle.h`，进程级 handler，可 veto termination）；
+- [ ] 自动把 quit 映射到窗口 close 拦截器；多 Application 实例的进程级 handler 冲突；
 - [ ] 原生右键菜单（`NSMenu`）接入 `Menu`/`ContextMenu`；
 - [x] Cmd+W / Cmd+Q / Cmd+M / Cmd+Z / Cmd+X/C/V/A 等标准快捷键；
 - [ ] 自动化测试：菜单项触发与禁用态（目前手工/代码路径验证）。
@@ -154,6 +155,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 | 2026-11-23 | macOS 原生窗口、系统 chrome、clipboard、file dialog、live resize 基线（`1a6a656`） | 已完成 |
 | 2026-11-23 | 创建 `feature/macos-gui-capabilities` 与本文档；阶段一任务拆解 | 已完成 |
 | 2026-11-23 | 阶段 1.3：`CoralAppDelegate`、App/File/Edit/Window 菜单、Edit 命令转译、基础菜单校验 | 已完成（CommandRegistry/右键菜单/完整生命周期待补） |
+| 2026-11-23 | 阶段 1.3：`ApplicationLifecycle` openURLs/reopen/shouldTerminate handler，native smoke 校验 | 回调完成，自动 quit→close 拦截与多 Application 待补 |
 | 2026-11-23 | 阶段 1.6：`ui_demo.app` bundle、Info.plist、版本/标识；headless CTest 从 bundle 内可执行文件运行 | 已完成（签名/公证/universal 待补） |
 | 2026-11-23 | 阶段 1.1：`NSTextInputClient`、interpretKeyEvents、marked/commit、候选窗 anchor、doCommandBySelector、UTF-16 selectedRange | 代码完成，待真实中日韩输入法手工验收 |
 | 2026-11-23 | 阶段 1.4：`NSDraggingDestination` 外部文件/文本落入、effect 映射、drag cursor | destination 完成，source/file promise 待补 |
@@ -185,7 +187,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 
 - 原生菜单目前是标准 App/File/Edit/Window；`CommandRegistry` 命令还未生成菜单项，需要“命令显示名/分组/排序”的公开元数据。
 - 菜单编辑动作通过转译成 `KeyEvent` 走 `TextInput`，没有基于 responder 的文本编辑器；撤销/重做等只对焦点控件有效。
-- `CoralAppDelegate` 目前只实现 secure restorable state 和 last-window 策略；open files、reopen、termination 拦截仍待补。
+- `CoralAppDelegate` 已转发 secure restorable state、last-window、open files/open URLs、reopen 和 termination veto；handler 是进程级（AppKit 只有一个 application 对象），多 `Application` 实例会共享。默认 quit 仍直接终止，不会自动经过窗口的 close interceptor。
 - IME：`setMarkedText` 忽略 marked text 内部的 selection 和 replacementRange；`selectedRange` 只做 UTF-8→UTF-16 的 caret/selection 映射；尚未验证真实中文/日文/韩文候选窗和死键。CJK 输入法需要在真实前台会话中手工测试。
 - IME 的 `validAttributesForMarkedText` 只声明了下划线，marked text 仍由 CoralUI 的 composition 绘制；没有使用 AppKit 的 attributed marked text 渲染。
 - 拖放目前只实现 destination；`NSDraggingSource`（从 layer 拖到 Finder/其他 app）和 file promise 未实现。外部拖放的 UI 光标/落点需要真实 Finder 手工验收。

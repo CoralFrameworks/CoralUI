@@ -20,6 +20,7 @@
 
 #import <Cocoa/Cocoa.h>
 
+#include <ui/ApplicationLifecycle.h>
 #include <ui/Button.h>
 #include <ui/Flex.h>
 #include <ui/NativeAlert.h>
@@ -116,8 +117,33 @@ int main() {
       std::fprintf(stderr, "FAIL: the Cocoa backend does not advertise native alerts\n");
       return 1;
     }
-    std::printf("native AX/IME/symbol/alert smoke: roles, AXPress, IME commit, %dx%d SF Symbol, "
-                "native alerts\n", symbol.width(), symbol.height());
+
+    // AppKit lifecycle callbacks: open URLs, Dock reopen, and a vetoed termination must reach the
+    // process-wide handlers rather than being swallowed by the delegate.
+    std::vector<std::string> opened;
+    bool reopened = false;
+    coral::ui::setOpenFilesHandler([&opened](std::vector<std::string> paths) {
+      opened = std::move(paths);
+    });
+    coral::ui::setReopenHandler([&reopened] { reopened = true; });
+    coral::ui::setShouldTerminateHandler([] { return false; });
+    id delegate = NSApp.delegate;
+    [delegate application:NSApp openURLs:@[ [NSURL fileURLWithPath:@"/tmp/coral-open-test"] ]];
+    [delegate applicationShouldHandleReopen:NSApp hasVisibleWindows:NO];
+    const NSApplicationTerminateReply reply = [delegate applicationShouldTerminate:NSApp];
+    const bool lifecycleOk = opened.size() == 1 && opened[0] == "/tmp/coral-open-test" &&
+      reopened && reply == NSTerminateCancel;
+    coral::ui::setOpenFilesHandler({});
+    coral::ui::setReopenHandler({});
+    coral::ui::setShouldTerminateHandler({});
+    if (!lifecycleOk) {
+      std::fprintf(stderr, "FAIL: lifecycle callbacks opened=%zu reopened=%d terminate=%ld\n",
+        opened.size(), reopened ? 1 : 0, static_cast<long>(reply));
+      return 1;
+    }
+
+    std::printf("native AX/IME/symbol/alert/lifecycle smoke: roles, AXPress, IME commit, %dx%d "
+                "SF Symbol, native alerts, lifecycle\n", symbol.width(), symbol.height());
     return 0;
   }
 }

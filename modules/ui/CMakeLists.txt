@@ -31,6 +31,7 @@ set(PUBLIC_HDRS
     include/ui/ContentHost.h
     include/ui/ContentView.h
     include/ui/Application.h
+    include/ui/ApplicationLifecycle.h
     include/ui/CandidateListView.h
     include/ui/ColorButton.h
     include/ui/ColorDialog.h
@@ -126,6 +127,7 @@ set(SRCS
     src/Curve.cpp
     src/DateFormat.cpp
     src/Application.cpp
+    src/ApplicationLifecycle.cpp
     src/Binding.cpp
     src/Button.cpp
     src/CandidateListView.cpp
