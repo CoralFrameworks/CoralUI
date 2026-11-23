@@ -22,6 +22,7 @@
 
 #include <ui/Button.h>
 #include <ui/Flex.h>
+#include <ui/NativeAlert.h>
 #include <ui/SystemImage.h>
 #include <ui/TextInput.h>
 #include <ui/Window.h>
@@ -111,8 +112,12 @@ int main() {
       return 1;
     }
 
-    std::printf("native AX/IME/symbol smoke: roles, AXPress, IME commit and %dx%d SF Symbol passed\n",
-      symbol.width(), symbol.height());
+    if (!coral::ui::supportsNativeAlerts()) {
+      std::fprintf(stderr, "FAIL: the Cocoa backend does not advertise native alerts\n");
+      return 1;
+    }
+    std::printf("native AX/IME/symbol/alert smoke: roles, AXPress, IME commit, %dx%d SF Symbol, "
+                "native alerts\n", symbol.width(), symbol.height());
     return 0;
   }
 }

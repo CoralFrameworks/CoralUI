@@ -58,6 +58,7 @@ set(PUBLIC_HDRS
     include/ui/IconTheme.h
     include/ui/FramePlan.h
     include/ui/Layer.h
+    include/ui/NativeAlert.h
     include/ui/LineBreakPolicy.h
     include/ui/ListView.h
     include/ui/Menu.h
@@ -264,6 +265,7 @@ endif ()
 
 if (NOT APPLE OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
   target_sources(${TARGET} PRIVATE src/platform/SystemImageFallback.cpp)
+  target_sources(${TARGET} PRIVATE src/platform/NativeAlertFallback.cpp)
 endif ()
 
 if (APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
@@ -276,10 +278,10 @@ if (APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   find_library(UNIFORMTYPEIDENTIFIERS_FRAMEWORK UniformTypeIdentifiers REQUIRED)
   target_sources(${TARGET} PRIVATE src/platform/darwin/WindowCocoa.mm
       src/platform/darwin/ClipboardCocoa.mm src/platform/darwin/FileDialogCocoa.mm
-      src/platform/darwin/SystemImageCocoa.mm)
+      src/platform/darwin/SystemImageCocoa.mm src/platform/darwin/NativeAlertCocoa.mm)
   set_source_files_properties(src/platform/darwin/WindowCocoa.mm
       src/platform/darwin/ClipboardCocoa.mm src/platform/darwin/FileDialogCocoa.mm
-      src/platform/darwin/SystemImageCocoa.mm
+      src/platform/darwin/SystemImageCocoa.mm src/platform/darwin/NativeAlertCocoa.mm
       PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
   target_link_libraries(${TARGET} PRIVATE $<BUILD_INTERFACE:${COCOA_FRAMEWORK}>
       $<BUILD_INTERFACE:${METAL_FRAMEWORK}> $<BUILD_INTERFACE:${QUARTZCORE_FRAMEWORK}>
