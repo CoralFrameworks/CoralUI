@@ -193,6 +193,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 | 2026-11-23 | macOS libc++ 兼容：浮点 `from_chars` 改为 `strtof`（ElementSpec/ThemeFile），整数 from_chars 显式 base；parser 测试 23/23 | CI 编译修复 |
 | 2026-11-23 | Xcode 16.4 SDK 兼容：`NSAccessibilityScrollToVisibleAction`（macOS 26）改为稳定的 `@"AXScrollToVisible"` 字符串；修复 SpellCheck 源码中的 NUL 字面量 | CI 编译修复 |
 | 2026-11-23 | CoralGraphics Metal fallback texture：`replaceRegion:` 需要 CPU 可见存储，改为 `MTLStorageModeShared`，修复 GitHub macOS 15 paravirtual Metal 上所有 Metal 初始化的 SIGSEGV | CoralGraphics main `dca68f7` |
+| 2026-11-23 | Unicode 性能门禁从 `test_ui` 正确性 suite 分离（保留 `unicode_perf_gate`），流式预算放宽到 10x；paravirtual CI 上 1 个性能测试误报 | CI 绿色化，性能门禁已独立 |
 | 2026-11-23 | 阶段 1.6 sandbox：entitlements 模板 + security-scoped bookmark API；非 sandbox 环境下创建 bookmark 按预期失败 | API/模板完成，sandbox 签名实测待补 |
 | 2026-11-23 | 新增 macOS native smoke：`ui_native_ax_smoke`（AX role/tree/AXPress + NSTextInputClient marked/commit） | 已加入 CTest native label |
 | 2026-11-23 | 阶段 2 起步：`Window::Options::frameAutosaveName`/`TabbingMode`、AppKit frame autosave、tabbingIdentifier、Window 菜单 tab 项 | 基础完成，完整 restoration/titlebar accessory 待补 |

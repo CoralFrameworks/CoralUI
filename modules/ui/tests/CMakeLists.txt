@@ -66,8 +66,12 @@ add_test(NAME test_ui COMMAND test_ui)
 # The shared-device native-window case gets a fresh process. An X11 resize test that ran earlier in
 # the same process can leave the thread's GL/EGL binding in a state the next Wayland device cannot
 # acquire from; a process boundary is the isolation the platform actually guarantees.
+#
+# The Unicode line-break performance gate is timing-sensitive and is run as its own `unicode_perf_gate`
+# target; keep it out of the correctness suite so a shared/paravirtual CI runner does not turn a
+# scheduler hiccup into a red test_ui.
 set_tests_properties(test_ui PROPERTIES ENVIRONMENT
-  "GTEST_FILTER=-UiWindow.AnApplicationSharesTheDeviceBetweenNativeWindows")
+  "GTEST_FILTER=-UiWindow.AnApplicationSharesTheDeviceBetweenNativeWindows:UnicodeLineBreakPerformanceGate.*")
 add_test(NAME test_ui_shared_device COMMAND test_ui
   --gtest_filter=UiWindow.AnApplicationSharesTheDeviceBetweenNativeWindows)
 add_test(NAME unicode_perf_gate COMMAND test_ui
