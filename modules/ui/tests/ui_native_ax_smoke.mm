@@ -198,6 +198,14 @@ int main() {
         [[axButton accessibilityRole] UTF8String], [[axInput accessibilityRole] UTF8String]);
       return 1;
     }
+    const NSRect axButtonFrame = [axButton accessibilityFrame];
+    id hit = [view accessibilityHitTest:NSMakePoint(NSMidX(axButtonFrame),
+      NSMidY(axButtonFrame))];
+    if (hit == nil || ![[hit accessibilityLabel] isEqualToString:@"Press me"]) {
+      std::fprintf(stderr, "FAIL: AX hit test did not find the button\n");
+      return 1;
+    }
+
     if (![axInput accessibilityEditable] ||
         ![[axInput accessibilityValue] isEqualToString:@"hello world"]) {
       std::fprintf(stderr, "FAIL: AX text value/editability not exposed\n");

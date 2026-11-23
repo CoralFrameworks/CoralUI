@@ -2205,9 +2205,9 @@ NSString* accessibilityRoleFor(const coral::ui::AccessibilityRole role) {
     case coral::ui::AccessibilityRole::Menu: return NSAccessibilityMenuRole;
     case coral::ui::AccessibilityRole::Table: return NSAccessibilityTableRole;
     case coral::ui::AccessibilityRole::ScrollView: return NSAccessibilityScrollAreaRole;
+    case coral::ui::AccessibilityRole::ListItem: return NSAccessibilityRowRole;
     case coral::ui::AccessibilityRole::Dialog:
     case coral::ui::AccessibilityRole::Group:
-    case coral::ui::AccessibilityRole::ListItem:
     case coral::ui::AccessibilityRole::Generic:
     default: return NSAccessibilityGroupRole;
   }
@@ -2243,7 +2243,14 @@ CoralAXElement* makeCoralAXElement(const coral::ui::AccessibilityNode& node, NSR
 
 - (NSString*)accessibilityRole {
   const auto* payload = static_cast<const CoralAXPayload*>(_coralPayload);
-  return payload != nullptr ? accessibilityRoleFor(payload->node.role) : NSAccessibilityGroupRole;
+  if (payload == nullptr) return NSAccessibilityGroupRole;
+  // A layer inside a grid/table carries its cell coordinates in the snapshot; that is more specific
+  // than its paint role (usually a generic container or label).
+  if (payload->node.grid.has_value() && payload->node.grid->row >= 0 &&
+      payload->node.grid->column >= 0) {
+    return NSAccessibilityCellRole;
+  }
+  return accessibilityRoleFor(payload->node.role);
 }
 
 - (NSString*)accessibilitySubrole {
@@ -2902,6 +2909,21 @@ CoralAXElement* makeCoralAXElement(const coral::ui::AccessibilityNode& node, NSR
   if (snapshot.name.empty() && snapshot.description.empty() && snapshot.children.empty()) return @[];
   const NSRect logical = NSMakeRect(0.0, 0.0, self.bounds.size.width, self.bounds.size.height);
   return @[ makeCoralAXElement(snapshot, logical, self, self) ];
+}
+
+- (id)accessibilityHitTest:(NSPoint)point {
+  NSArray* roots = [self accessibilityChildren];
+  id best = nil;
+  NSMutableArray* pending = [NSMutableArray arrayWithArray:roots];
+  while (pending.count > 0) {
+    id element = pending.firstObject;
+    [pending removeObjectAtIndex:0];
+    if (!NSPointInRect(point, [element accessibilityFrame])) continue;
+    best = element;
+    NSArray* children = [element accessibilityChildren];
+    if (children.count > 0) [pending addObjectsFromArray:children];
+  }
+  return best != nil ? best : (id)self;
 }
 
 - (id)accessibilityFocusedUIElement {
