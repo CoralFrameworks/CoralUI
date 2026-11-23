@@ -128,7 +128,8 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 
 ### 阶段三：性能、画质与工程化（P2）
 
-- [ ] Cocoa 接入 retained/damage/frame-plan，减少全量 blit；
+- [x] Cocoa 接入 retained frames 与 damage rects（`presentRetained`/`presentDamage`），native smoke 验证 clean frame 不重新录制、damage 后 snapshot 正确；
+- [ ] Cocoa 接入 frame-plan/boundary submission，减少多边界全量 blit；
 - [ ] CVDisplayLink / CAMetalDisplayLink vblank 调度，ProMotion/120Hz；
 - [ ] occlusion/最小化暂停渲染，降低能耗；
 - [ ] Display P3 / EDR / HDR10；
@@ -163,6 +164,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 | 2026-11-23 | 阶段 2 起步：`Window::Options::frameAutosaveName`/`TabbingMode`、AppKit frame autosave、tabbingIdentifier、Window 菜单 tab 项 | 基础完成，完整 restoration/titlebar accessory 待补 |
 | 2026-11-23 | 阶段 2 输入：`GestureEvent`/`ScrollPhase`/`onGesture`，Cocoa magnify/rotate/swipe 与 scroll phase/momentum 映射 | 基础完成，Force Touch/pen 与基于 phase 的识别器待补 |
 | 2026-11-23 | 阶段 2 SF Symbols：`ui/SystemImage.h`、NSImage symbol 光栅化、非 Apple fallback、native smoke 40x40 验证 | 基础完成，tinting/accent color 待补 |
+| 2026-11-23 | 阶段 3 渲染：Cocoa `supportsRetainedFrames`/`presentRetained`/`supportsDamageRects`/`presentDamage`；native smoke 验证 retained replay 与 damage snapshot | retained/damage 完成，frame-plan/boundary 待补 |
 
 ## 5. 问题记录
 
@@ -192,7 +194,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 - 手势路由按 pointer 命中层向父链冒泡；没有独立的 gesture recognizer/冲突仲裁，也没有 Force Touch、pen pressure 或 swipe 的完整方向/阶段语义。ScrollView 目前只消费 delta，phase 字段供上层控件使用。
 - SF Symbol 目前以模板黑色/alpha 图像返回，尚未暴露颜色/tint 配置和动态 accent color；SF Symbol 的 symbol configuration（weight/scale/variant）只暴露 pointSize 与 raster scale。
 
-- 全量 UI target + blit 每帧，Cocoa 未启用 damage/retained/frame-plan。
+- 全量 UI target + blit 每帧；Cocoa 已接入 retained/damage，但 frame-plan/boundary submission 仍未接入，复杂页面仍可能录制/提交整棵内容。
 - 无 CVDisplayLink，`refreshHertz` 来自 `PresentFrameClock`，不代表真实显示刷新。
 - `screenBounds`/`setPosition` 对副屏 origin 处理不完整。
 - 无 IME、Accessibility、拖放、原生菜单、应用生命周期。

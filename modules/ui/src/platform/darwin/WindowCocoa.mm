@@ -541,6 +541,22 @@ class CocoaPlatform final : public WindowPlatform {
     return ok;
   }
 
+  [[nodiscard]] bool supportsRetainedFrames() const override {
+    return true;
+  }
+
+  bool presentRetained() override {
+    return mSurface != nullptr && mSurface->presentRetained();
+  }
+
+  [[nodiscard]] bool supportsDamageRects() const override {
+    return true;
+  }
+
+  bool presentDamage(const Rect& damage) override {
+    return mSurface != nullptr && mSurface->presentDamage(damage);
+  }
+
   [[nodiscard]] bool snapshot(graphics::Bitmap* out) override {
     return mSurface != nullptr && mSurface->readback(out);
   }

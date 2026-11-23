@@ -25,6 +25,7 @@
 #include <ui/ColorLayer.h>
 #include <ui/Window.h>
 
+#include <graphics/Bitmap.h>
 #include <graphics/Color.h>
 
 #include <cstdio>
@@ -91,6 +92,50 @@ int main() {
   }
   if (window->frameCount() < 1) {
     std::fprintf(stderr, "FAIL: the native frame loop did not count the first frame\n");
+    return 1;
+  }
+
+  // A clean native window replays the retained recording instead of re-recording the whole tree.
+  // Only the Cocoa backend currently opts into retained frames; the other native backends have
+  // their own suites for this.
+  if (window->nativePlatform() == coral::ui::Window::NativePlatform::Cocoa) {
+    if (!window->renderFrame()) {
+      std::fprintf(stderr, "FAIL: the retained native frame did not render\n");
+      return 1;
+    }
+    if (window->lastFrameTimings().draw != 0.0) {
+      std::fprintf(stderr, "FAIL: a clean native frame recorded %.2fms instead of replaying\n",
+        window->lastFrameTimings().draw);
+      return 1;
+    }
+  }
+
+  // Damage: repaint a small child and let the damage path present it; the snapshot must reflect the
+  // new colour while the untouched area keeps the root colour.
+  auto damaged = std::make_shared<coral::ui::ColorLayer>(graphics::Color::MakeRGBA8(255, 0, 0, 255));
+  damaged->setBounds(coral::ui::Rect::MakeLTRB(0.0f, 0.0f, 40.0f, 40.0f));
+  root->addChild(damaged);
+  if (!window->renderFrame()) {
+    std::fprintf(stderr, "FAIL: the native frame with a damage child did not render\n");
+    return 1;
+  }
+  damaged->setColor(graphics::Color::MakeRGBA8(0, 255, 0, 255));
+  window->invalidate(coral::ui::Rect::MakeLTRB(0.0f, 0.0f, 40.0f, 40.0f));
+  if (!window->renderFrame()) {
+    std::fprintf(stderr, "FAIL: the damaged native frame did not render\n");
+    return 1;
+  }
+  graphics::Bitmap bitmap;
+  if (!window->snapshot(&bitmap)) {
+    std::fprintf(stderr, "FAIL: the damaged native frame could not be snapshotted\n");
+    return 1;
+  }
+  const graphics::Pixmap pixels = bitmap.makePixmap();
+  if (!pixels.isValid() || (pixels.getPixelARGB32(10, 10) & 0x00FFFFFFu) != 0x0000FF00u ||
+      (pixels.getPixelARGB32(200, 100) & 0x00FFFFFFu) != 0x003884DCu) {
+    std::fprintf(stderr, "FAIL: damaged snapshot colours were 0x%08x / 0x%08x\n",
+      pixels.isValid() ? pixels.getPixelARGB32(10, 10) : 0u,
+      pixels.isValid() ? pixels.getPixelARGB32(200, 100) : 0u);
     return 1;
   }
 
