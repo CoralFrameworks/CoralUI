@@ -24,6 +24,7 @@
 #include <ui/Button.h>
 #include <ui/Flex.h>
 #include <ui/NativeAlert.h>
+#include <ui/SpellCheck.h>
 #include <ui/SystemImage.h>
 #include <ui/TextInput.h>
 #include <ui/Window.h>
@@ -96,6 +97,20 @@ int main() {
       return 1;
     }
     window->setToolbarItems({});
+
+    window->setSecureInputEnabled(true);
+    if (!window->isSecureInputEnabled()) {
+      std::fprintf(stderr, "FAIL: secure event input did not enable\n");
+      return 1;
+    }
+    window->setSecureInputEnabled(false);
+
+    const std::vector<coral::ui::SpellIssue> issues = coral::ui::spellCheck("helo wrold");
+    if (!coral::ui::supportsSpellChecking() || issues.empty()) {
+      std::fprintf(stderr, "FAIL: spell checker found no issue in 'helo wrold'\n");
+      return 1;
+    }
+
     id axButton = findElementByLabel(view, "Press me");
     id axInput = findElementByLabel(view, "Search");
     if (axButton == nil || axInput == nil) {
@@ -168,8 +183,9 @@ int main() {
       return 1;
     }
 
-    std::printf("native AX/IME/symbol/alert/lifecycle smoke: roles, AXPress, IME commit, %dx%d "
-                "SF Symbol, native alerts, lifecycle\n", symbol.width(), symbol.height());
+    std::printf("native AX/IME/symbol/alert/lifecycle/spell smoke: roles, AXPress, IME commit, "
+                "%dx%d SF Symbol, native alerts, lifecycle, %zu spell issues\n",
+                symbol.width(), symbol.height(), issues.size());
     return 0;
   }
 }
