@@ -2095,6 +2095,18 @@ void Window::setToolbarItems(std::vector<ToolbarItem> items) {
   }
 }
 
+void Window::setTitlebarAccessoryItems(std::vector<TitlebarAccessoryItem> items) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) {
+    mImpl->platform->setTitlebarAccessoryItems(std::move(items));
+  }
+}
+
+void Window::setTitlebarAccessorySelectionHandler(std::function<void(int)> handler) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) {
+    mImpl->platform->setTitlebarAccessorySelectionHandler(std::move(handler));
+  }
+}
+
 void Window::setSidebarItems(std::vector<SidebarItem> items) {
   if (mImpl != nullptr && mImpl->platform != nullptr) {
     mImpl->platform->setSidebarItems(std::move(items));

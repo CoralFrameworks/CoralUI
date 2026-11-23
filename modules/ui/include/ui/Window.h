@@ -237,6 +237,12 @@ class Window final : public Renderer {
     std::string tooltip;
   };
 
+  /** One native titlebar accessory segment. */
+  struct TitlebarAccessoryItem {
+    std::string label;
+    std::string symbol;
+  };
+
   /** One native sidebar row. */
   struct SidebarItem {
     std::string id;
@@ -464,6 +470,10 @@ class Window final : public Renderer {
   [[nodiscard]] bool isSecureInputEnabled() const noexcept;
   /** Called with the item id when a toolbar item is clicked. */
   void setToolbarActionHandler(std::function<void(std::string_view)> handler);
+
+  /** Replaces the native titlebar accessory segments (macOS `NSTitlebarAccessoryViewController`). */
+  void setTitlebarAccessoryItems(std::vector<TitlebarAccessoryItem> items);
+  void setTitlebarAccessorySelectionHandler(std::function<void(int)> handler);
 
   /** Replaces the native sidebar rows (macOS `NSSplitViewController`); empty removes the sidebar. */
   void setSidebarItems(std::vector<SidebarItem> items);

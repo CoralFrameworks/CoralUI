@@ -319,6 +319,12 @@ class WindowPlatform {
   virtual void setToolbarActionHandler(std::function<void(std::string_view)> handler) {
     (void)handler;
   }
+  virtual void setTitlebarAccessoryItems(std::vector<Window::TitlebarAccessoryItem> items) {
+    (void)items;
+  }
+  virtual void setTitlebarAccessorySelectionHandler(std::function<void(int)> handler) {
+    (void)handler;
+  }
   virtual void setSidebarItems(std::vector<Window::SidebarItem> items) {
     (void)items;
   }

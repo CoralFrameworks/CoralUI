@@ -271,6 +271,12 @@ uint32_t argbFromColor(NSColor* color) {
 @property(nonatomic, assign) NSDragOperation allowed;
 @end
 
+@interface CoralTitlebarAccessoryTarget : NSObject
+@property(nonatomic, assign) void* platform;
+@property(nonatomic, strong) NSSegmentedControl* control;
+- (void)changed:(id)sender;
+@end
+
 @interface CoralSidebarController : NSObject <NSTableViewDataSource, NSTableViewDelegate>
 @property(nonatomic, assign) void* platform;
 @property(nonatomic, strong) NSArray<NSString*>* identifiers;
@@ -339,6 +345,13 @@ class CocoaPlatform final : public WindowPlatform {
     if (mToolbarDelegate != nil) {
       mToolbarDelegate.platform = nullptr;
       mToolbarDelegate.target.platform = nullptr;
+    }
+    if (mTitlebarTarget != nil) mTitlebarTarget.platform = nullptr;
+    if (mTitlebarAccessory != nil && mWindow != nil) {
+      [mWindow removeTitlebarAccessoryViewControllerAtIndex:0];
+      mTitlebarAccessory = nil;
+      mTitlebarControl = nil;
+      mTitlebarTarget = nil;
     }
     if (mSplitController != nil) {
       mSplitController.platform = nullptr;
@@ -678,6 +691,58 @@ class CocoaPlatform final : public WindowPlatform {
     }
     mSurface.reset();
     return createSurface();
+  }
+
+  void setTitlebarAccessoryItems(std::vector<Window::TitlebarAccessoryItem> items) override {
+    mTitlebarItems = std::move(items);
+    applyTitlebarAccessory();
+  }
+
+  void setTitlebarAccessorySelectionHandler(std::function<void(int)> handler) override {
+    mTitlebarAccessorySelection = std::move(handler);
+  }
+
+  void titlebarAccessorySelected(const int index) {
+    if (mTitlebarAccessorySelection) mTitlebarAccessorySelection(index);
+  }
+
+  void applyTitlebarAccessory() {
+    if (mWindow == nil) return;
+    if (mTitlebarAccessory != nil) {
+      [mWindow removeTitlebarAccessoryViewControllerAtIndex:0];
+      mTitlebarAccessory = nil;
+      mTitlebarControl = nil;
+      mTitlebarTarget = nil;
+    }
+    if (mTitlebarItems.empty()) return;
+    CoralTitlebarAccessoryTarget* target = [[CoralTitlebarAccessoryTarget alloc] init];
+    target.platform = this;
+    NSSegmentedControl* control = [[NSSegmentedControl alloc] init];
+    control.segmentCount = static_cast<NSInteger>(mTitlebarItems.size());
+    control.trackingMode = NSSegmentSwitchTrackingSelectOne;
+    control.segmentStyle = NSSegmentStyleTexturedRounded;
+    for (std::size_t index = 0; index < mTitlebarItems.size(); ++index) {
+      const Window::TitlebarAccessoryItem& item = mTitlebarItems[index];
+      const NSInteger segment = static_cast<NSInteger>(index);
+      [control setLabel:item.label.empty()
+        ? [NSString stringWithFormat:@"%zu", index] : [NSString stringWithUTF8String:item.label.c_str()]
+        forSegment:segment];
+      if (!item.symbol.empty() && @available(macOS 11.0, *)) {
+        [control setImage:[NSImage imageWithSystemSymbolName:
+          [NSString stringWithUTF8String:item.symbol.c_str()] accessibilityDescription:nil]
+               forSegment:segment];
+      }
+    }
+    control.target = target;
+    control.action = @selector(changed:);
+    [control sizeToFit];
+    target.control = control;
+    mTitlebarTarget = target;
+    mTitlebarControl = control;
+    mTitlebarAccessory = [[NSTitlebarAccessoryViewController alloc] init];
+    mTitlebarAccessory.view = control;
+    mTitlebarAccessory.layoutAttribute = NSLayoutAttributeTrailing;
+    [mWindow addTitlebarAccessoryViewController:mTitlebarAccessory];
   }
 
   void setSidebarItems(std::vector<Window::SidebarItem> items) override {
@@ -1814,6 +1879,11 @@ class CocoaPlatform final : public WindowPlatform {
   std::function<void(std::string_view)> mToolbarAction;
   bool mToolbarVisible = true;
   bool mSecureInputEnabled = false;
+  std::vector<Window::TitlebarAccessoryItem> mTitlebarItems;
+  NSTitlebarAccessoryViewController* mTitlebarAccessory = nil;
+  NSSegmentedControl* mTitlebarControl = nil;
+  CoralTitlebarAccessoryTarget* mTitlebarTarget = nil;
+  std::function<void(int)> mTitlebarAccessorySelection;
   std::vector<Window::SidebarItem> mSidebarItems;
   CoralSidebarController* mSidebarController = nil;
   NSSplitViewItem* mSidebarSplitItem = nil;
@@ -2040,6 +2110,20 @@ coral::ui::DragPayload payloadFromPasteboard(NSPasteboard* pasteboard) {
   }
   (void)coral::ui::detail::dispatchOpenFiles(std::move(paths));
   (void)sender;
+}
+
+@end
+
+@implementation CoralTitlebarAccessoryTarget
+
+@synthesize platform = _platform;
+@synthesize control = _control;
+
+- (void)changed:(id)sender {
+  (void)sender;
+  if (_platform == nullptr || _control == nil) return;
+  static_cast<coral::ui::detail::CocoaPlatform*>(_platform)->titlebarAccessorySelected(
+    static_cast<int>(_control.selectedSegment));
 }
 
 @end

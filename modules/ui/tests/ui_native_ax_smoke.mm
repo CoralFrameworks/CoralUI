@@ -48,6 +48,15 @@ NSView* findCoralContentView(NSView* root) {
   return nil;
 }
 
+NSSegmentedControl* findSegmentedControl(NSView* root) {
+  if (root == nil) return nil;
+  if ([root isKindOfClass:[NSSegmentedControl class]]) return (NSSegmentedControl*)root;
+  for (NSView* child in root.subviews) {
+    if (NSSegmentedControl* found = findSegmentedControl(child)) return found;
+  }
+  return nil;
+}
+
 NSTableView* findTableView(NSView* root) {
   if (root == nil) return nil;
   if ([root isKindOfClass:[NSTableView class]]) return (NSTableView*)root;
@@ -127,6 +136,29 @@ int main() {
       return 1;
     }
     window->setToolbarItems({});
+
+    int titlebarSelection = -1;
+    window->setTitlebarAccessorySelectionHandler([&titlebarSelection](int index) {
+      titlebarSelection = index;
+    });
+    window->setTitlebarAccessoryItems({ { "One", "" }, { "Two", "" } });
+    NSSegmentedControl* accessory = nil;
+    for (NSTitlebarAccessoryViewController* controller in native.titlebarAccessoryViewControllers) {
+      accessory = findSegmentedControl(controller.view);
+      if (accessory != nil) break;
+    }
+    if (native.titlebarAccessoryViewControllers.count != 1 || accessory == nil ||
+        accessory.segmentCount != 2) {
+      std::fprintf(stderr, "FAIL: native titlebar accessory did not expose its segments\n");
+      return 1;
+    }
+    accessory.selectedSegment = 1;
+    [(id)accessory.target performSelector:accessory.action withObject:accessory];
+    if (titlebarSelection != 1) {
+      std::fprintf(stderr, "FAIL: titlebar accessory selection produced %d\n", titlebarSelection);
+      return 1;
+    }
+    window->setTitlebarAccessoryItems({});
 
     std::string sidebarSelection;
     window->setSidebarSelectionHandler([&sidebarSelection](std::string_view identifier) {
