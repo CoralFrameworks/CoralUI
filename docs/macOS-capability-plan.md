@@ -99,8 +99,9 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 - [x] `ui_demo` 构建 `.app` bundle（`MACOSX_BUNDLE` + Info.plist 模板）；
 - [x] bundle id、版本、display name、`NSHighResolutionCapable`、`NSPrincipalClass`；
 - [ ] 图标、minimum system version；
-- [ ] universal binary（arm64 + x86_64）配置路径；
-- [ ] hardened runtime、代码签名、notarization 的 CMake 钩子；
+- [~] universal binary：通过 `-DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"` 配置，尚未做成默认 preset/CI；
+- [x] 代码签名与 hardened runtime 的 CMake 钩子：`CORAL_MACOS_CODE_SIGN_IDENTITY`、`CORAL_MACOS_HARDENED_RUNTIME`、`CORAL_MACOS_ENTITLEMENTS`；
+- [ ] notarization 的 CI 脚本/命令；
 - [ ] App Sandbox entitlements 模板；
 - [ ] 文档类型 / URL scheme / open files 声明示例。
 
@@ -151,6 +152,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 | 2026-11-23 | 阶段 1.2：`CoralAXElement` 子树、role/value/frame/state 映射、AXPress/Increment/Decrement/ScrollToVisible、通知 | 基础 bridge 完成，VoiceOver/Text AX 待补 |
 | 2026-11-23 | 阶段 1.4 source：`CoralDragSource`、文本/文件/custom MIME、拖拽图像 | 基础 source 完成，file promise/真实 Finder 验收待补 |
 | 2026-11-23 | 阶段 1.5：文件对话框 sheet、UTType 过滤（UniformTypeIdentifiers）、默认路径/多选 | 部分完成，NSAlert/accessory/sandbox bookmark 待补 |
+| 2026-11-23 | 阶段 1.6：`CORAL_MACOS_CODE_SIGN_IDENTITY` / `CORAL_MACOS_HARDENED_RUNTIME` / entitlements 签名钩子；ad-hoc 签名实测通过 | 签名钩子完成，notarization/sandbox/universal preset 待补 |
 
 ## 5. 问题记录
 
@@ -175,6 +177,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 - AX bounds 通过父元素逻辑偏移累加得到屏幕 frame；需要确认多层嵌套/Flex 布局下的偏移和 Retina 取整。
 - 文件对话框 sheet 的 parent 通过当前 `NSApp.keyWindow`/`mainWindow` 解析，`FileDialogOptions.parent` 还没有直接映射到对应 `NSWindow`；非活动 app 会回退 `runModal`。`NSOpenPanel.canChooseDirectories` 仍固定 false，需要扩展 `FileDialogOptions`。
 - 拖放 source 的拖拽图像对文件使用 `NSWorkspace iconForFile`，文本使用自绘标签；file promise、拖拽取消反馈、真实 Finder 多文件拖出尚未验收。
+- 代码签名钩子只在显式传入 `CORAL_MACOS_CODE_SIGN_IDENTITY` 时执行；默认不签名。ad-hoc 签名已验证，Developer ID 证书与 notarization 需要真实账号。
 
 - 全量 UI target + blit 每帧，Cocoa 未启用 damage/retained/frame-plan。
 - 无 CVDisplayLink，`refreshHertz` 来自 `PresentFrameClock`，不代表真实显示刷新。

@@ -39,6 +39,32 @@ if (APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     MACOSX_BUNDLE_BUNDLE_VERSION "${_coral_demo_version}"
     MACOSX_BUNDLE_SHORT_VERSION_STRING "${_coral_demo_version}"
   )
+
+  # Distribution hook: an identity from the login keychain or a Developer ID certificate signs the
+  # bundle after it is built. An empty identity keeps the default unsigned development build.
+  set(CORAL_MACOS_CODE_SIGN_IDENTITY "" CACHE STRING
+      "macOS code-signing identity for ui_demo ('-' for ad-hoc); empty leaves it unsigned")
+  option(CORAL_MACOS_HARDENED_RUNTIME "Sign ui_demo with the hardened runtime" ON)
+  set(CORAL_MACOS_ENTITLEMENTS "" CACHE FILEPATH
+      "Optional entitlements plist used when signing ui_demo")
+  if (CORAL_MACOS_CODE_SIGN_IDENTITY)
+    set(_coral_sign_args --force --sign "${CORAL_MACOS_CODE_SIGN_IDENTITY}")
+    if (CORAL_MACOS_CODE_SIGN_IDENTITY STREQUAL "-")
+      list(APPEND _coral_sign_args --timestamp=none)
+    else ()
+      list(APPEND _coral_sign_args --timestamp)
+    endif ()
+    if (CORAL_MACOS_HARDENED_RUNTIME)
+      list(APPEND _coral_sign_args --options runtime)
+    endif ()
+    if (CORAL_MACOS_ENTITLEMENTS)
+      list(APPEND _coral_sign_args --entitlements "${CORAL_MACOS_ENTITLEMENTS}")
+    endif ()
+    add_custom_command(TARGET ui_demo POST_BUILD
+        COMMAND codesign ${_coral_sign_args} "$<TARGET_BUNDLE_DIR:ui_demo>"
+        COMMENT "Signing ui_demo.app with ${CORAL_MACOS_CODE_SIGN_IDENTITY}"
+        VERBATIM)
+  endif ()
 endif ()
 
 foreach (example ui_demo ui_mvvm_demo)
