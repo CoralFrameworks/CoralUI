@@ -1991,6 +1991,10 @@ bool CocoaPlatform::requestQuit() {
 
 using coral::ui::detail::CocoaPlatform;
 
+// NSAccessibilityScrollToVisibleAction is only declared in the macOS 26 SDK. The action's wire name
+// is stable ("AXScrollToVisible"), and spelling it keeps Xcode 16.4 / macOS 15 SDK builds compiling.
+static NSString* const kCoralScrollToVisibleAction = @"AXScrollToVisible";
+
 namespace {
 
 NSUInteger utf16Length(const std::string& utf8) {
@@ -2531,7 +2535,7 @@ CoralAXElement* makeCoralAXElement(const coral::ui::AccessibilityNode& node, NSR
     [actions addObject:NSAccessibilityDecrementAction];
   }
   if (coral::ui::hasAccessibilityAction(node.actions, coral::ui::AccessibilityAction::Scroll)) {
-    [actions addObject:NSAccessibilityScrollToVisibleAction];
+    [actions addObject:kCoralScrollToVisibleAction];
   }
   return actions;
 }
@@ -2564,7 +2568,7 @@ CoralAXElement* makeCoralAXElement(const coral::ui::AccessibilityNode& node, NSR
       (void)platform->performAccessibilityAction(path,
         coral::ui::AccessibilityAction::SetValue, std::to_string(next));
     }
-  } else if ([action isEqualToString:NSAccessibilityScrollToVisibleAction]) {
+  } else if ([action isEqualToString:kCoralScrollToVisibleAction]) {
     (void)platform->performAccessibilityAction(path, coral::ui::AccessibilityAction::Scroll, {});
   }
 }

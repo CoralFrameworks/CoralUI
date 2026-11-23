@@ -191,6 +191,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 | 2026-11-23 | 阶段 1.6 universal：`CMakePresets.json` arm64/x86_64 preset、host shader compiler 复用、`scripts/make-universal-demo.sh` lipo 验证 dual-arch；notarization 脚本 | universal/notarization 脚本完成，真实公证/sandbox 待补 |
 | 2026-11-23 | 工程化：`scripts/check-macos.sh` 本地 CI（preset 构建 + test_ui/native/example），实测 6/6 | 本地 CI 完成，托管 CI/性能门禁待补 |
 | 2026-11-23 | macOS libc++ 兼容：浮点 `from_chars` 改为 `strtof`（ElementSpec/ThemeFile），整数 from_chars 显式 base；parser 测试 23/23 | CI 编译修复 |
+| 2026-11-23 | Xcode 16.4 SDK 兼容：`NSAccessibilityScrollToVisibleAction`（macOS 26）改为稳定的 `@"AXScrollToVisible"` 字符串；修复 SpellCheck 源码中的 NUL 字面量 | CI 编译修复 |
 | 2026-11-23 | 阶段 1.6 sandbox：entitlements 模板 + security-scoped bookmark API；非 sandbox 环境下创建 bookmark 按预期失败 | API/模板完成，sandbox 签名实测待补 |
 | 2026-11-23 | 新增 macOS native smoke：`ui_native_ax_smoke`（AX role/tree/AXPress + NSTextInputClient marked/commit） | 已加入 CTest native label |
 | 2026-11-23 | 阶段 2 起步：`Window::Options::frameAutosaveName`/`TabbingMode`、AppKit frame autosave、tabbingIdentifier、Window 菜单 tab 项 | 基础完成，完整 restoration/titlebar accessory 待补 |
@@ -251,6 +252,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 - Spell check 现在有查询 API、TextInput 红色下划线和动态右键替换建议；每次文本变化/右键同步调用 `NSSpellChecker`，长文档可能阻塞 UI，后续应做后台/去抖检查。autocorrect、字体面板、上下文菜单键盘导航的完整验收尚未完成。
 - 手势路由按 pointer 命中层向父链冒泡；没有独立的 gesture recognizer/冲突仲裁，也没有 Force Touch、pen pressure 或 swipe 的完整方向/阶段语义。ScrollView 目前只消费 delta，phase 字段供上层控件使用。
 - SF Symbol 目前以模板黑色/alpha 图像返回，尚未暴露颜色/tint 配置和动态 accent color；SF Symbol 的 symbol configuration（weight/scale/variant）只暴露 pointSize 与 raster scale。
+- CI 使用 Xcode 16.4/macOS 15 SDK：`NSAccessibilityScrollToVisibleAction` 是 macOS 26 新增常量，必须用稳定的 `@"AXScrollToVisible"` wire name；新增仅在最新 SDK 可见的 AppKit 常量时需要检查 runner SDK。
 - P3/EDR/HDR 目前只有 `NSScreen` 能力上报：测试机报告 headroom=1.00、wideColor=0（SDR），因此真实 EDR 输出没有被执行验证。CoralGraphics 仍只呈现 SDR sRGB；要真正输出 P3/PQ，需要 CAMetalLayer 10-bit/EDR 配置和 PQ/colour-space 转换阶段。
 - macOS vblank 使用 CoralGraphics 的 `CVDisplayLink` 源（CoralGraphics 分支 `feature/metal-backend`，commit `e4be56e` + `20c1afa`）；plan multi-list 还需要 `b6bb18c`（复用已开启 frame）。`CVDisplayLink` 在新 SDK 已弃用，后续应迁移到 `CADisplayLink`/`CAMetalDisplayLink`；当前 link 基于 active displays，不是 per-window，跨显示器/动态刷新率切换还未处理。首次对齐会等待两个 vblank（约 33ms）。
 - 当前 macOS 测试机 `Window::refreshHertz()` 报告约 74 Hz（真实 display 回调间隔），不是固定的 60/120；UI 动画和 ProMotion 调度应以该值为准。
