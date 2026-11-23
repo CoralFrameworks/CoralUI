@@ -861,6 +861,16 @@ class CocoaPlatform final : public WindowPlatform {
     if (mNativeCursor != nil) [mNativeCursor set];
   }
 
+  static ScrollPhase scrollPhaseFrom(const NSEventPhase phase) {
+    if ((phase & NSEventPhaseBegan) != 0) return ScrollPhase::Began;
+    if ((phase & NSEventPhaseChanged) != 0) return ScrollPhase::Changed;
+    if ((phase & NSEventPhaseEnded) != 0) return ScrollPhase::Ended;
+    if ((phase & NSEventPhaseCancelled) != 0) return ScrollPhase::Cancelled;
+    if ((phase & NSEventPhaseMayBegin) != 0) return ScrollPhase::MayBegin;
+    if ((phase & NSEventPhaseStationary) != 0) return ScrollPhase::Stationary;
+    return ScrollPhase::None;
+  }
+
   void dispatchScrollEvent(NSEvent* event) {
     if (mHost == nullptr) return;
     if (mWindow != nil && mWindow.inLiveResize) return;
@@ -877,7 +887,32 @@ class CocoaPlatform final : public WindowPlatform {
     }
     scroll.deltaX = static_cast<float>(deltaX) * mDpiScale;
     scroll.deltaY = static_cast<float>(deltaY) * mDpiScale;
+    scroll.phase = scrollPhaseFrom(event.phase);
+    scroll.momentumPhase = scrollPhaseFrom(event.momentumPhase);
+    scroll.precise = event.hasPreciseScrollingDeltas != NO;
     mHost->dispatchScroll(scroll);
+  }
+
+  void dispatchGestureEvent(NSEvent* event, const GestureKind kind) {
+    if (mHost == nullptr) return;
+    if (mWindow != nil && mWindow.inLiveResize) return;
+    GestureEvent gesture;
+    gesture.kind = kind;
+    gesture.position = devicePointForEvent(event);
+    const NSEventPhase phase = event.phase;
+    gesture.phase = (phase & NSEventPhaseBegan) != 0 ? GesturePhase::Began
+      : ((phase & NSEventPhaseEnded) != 0 ? GesturePhase::Ended
+      : ((phase & NSEventPhaseCancelled) != 0 ? GesturePhase::Cancelled
+      : GesturePhase::Changed));
+    if (kind == GestureKind::Magnify) {
+      gesture.magnitude = static_cast<float>(event.magnification);
+    } else if (kind == GestureKind::Rotate) {
+      gesture.magnitude = static_cast<float>(event.rotation);
+    } else {
+      gesture.deltaX = static_cast<float>(event.deltaX);
+      gesture.deltaY = static_cast<float>(event.deltaY);
+    }
+    mHost->dispatchGesture(gesture);
   }
 
   KeyEvent keyEvent(NSEvent* event) const {
@@ -2272,6 +2307,21 @@ CoralAXElement* makeCoralAXElement(const coral::ui::AccessibilityNode& node, NSR
 
 - (id)accessibilityParent {
   return self.window != nil ? (id)self.window : (id)[NSNull null];
+}
+
+- (void)magnifyWithEvent:(NSEvent*)event {
+  auto* platform = static_cast<CocoaPlatform*>(self.platform);
+  if (platform != nullptr) platform->dispatchGestureEvent(event, coral::ui::GestureKind::Magnify);
+}
+
+- (void)rotateWithEvent:(NSEvent*)event {
+  auto* platform = static_cast<CocoaPlatform*>(self.platform);
+  if (platform != nullptr) platform->dispatchGestureEvent(event, coral::ui::GestureKind::Rotate);
+}
+
+- (void)swipeWithEvent:(NSEvent*)event {
+  auto* platform = static_cast<CocoaPlatform*>(self.platform);
+  if (platform != nullptr) platform->dispatchGestureEvent(event, coral::ui::GestureKind::Swipe);
 }
 
 - (void)resetCursorRects {

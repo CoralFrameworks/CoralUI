@@ -543,6 +543,8 @@ class Window final : public Renderer {
   [[nodiscard]] size_t imeCandidateCount() const noexcept;
   [[nodiscard]] size_t imeCandidateSelected() const noexcept;
   bool scroll(const ScrollEvent& event);
+  /** Delivers a trackpad gesture to the layer under `event.position`; true when handled. */
+  bool gesture(const GestureEvent& event);
   /** Injects a file drop as if it came from the platform. */
   void drop(const DropEvent& event);
 

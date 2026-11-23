@@ -75,6 +75,11 @@ class WindowHost {
   virtual void dispatchCandidates(std::vector<std::string> candidates, size_t selected) = 0;
   virtual void dispatchDelete(int32_t index, uint32_t length) = 0;
   virtual void dispatchScroll(const ScrollEvent& event) = 0;
+  /** Trackpad magnification/rotation/swipe; platforms without gestures keep the default no-op. */
+  virtual bool dispatchGesture(const GestureEvent& event) {
+    (void)event;
+    return false;
+  }
   virtual void dispatchDrop(const DropEvent& event) = 0;
   /**
    * External (OS) drag routing.

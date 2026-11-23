@@ -842,6 +842,8 @@ public:
   virtual bool onKeyUp(const KeyEvent& event);
   /** Wheel/trackpad scroll at @p event's position. */
   virtual bool onScroll(const ScrollEvent& event);
+  /** Trackpad magnification/rotation/swipe; the first layer that handles it consumes the gesture. */
+  virtual bool onGesture(const GestureEvent& event);
   /** A file drop at @p event's position; return true when the layer consumed it. */
   virtual bool onDrop(const DropEvent& event);
   /**

@@ -1653,6 +1653,11 @@ bool Layer::onScroll(const ScrollEvent& event) {
   return false;
 }
 
+bool Layer::onGesture(const GestureEvent& event) {
+  (void)event;
+  return false;
+}
+
 bool Layer::onDrop(const DropEvent& event) {
   (void)event;
   return false;

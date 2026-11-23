@@ -928,6 +928,18 @@ struct WindowImpl final : detail::WindowHost {
     }
   }
 
+  bool dispatchGesture(const GestureEvent& event) override {
+    markFrameNeeded();
+    GestureEvent logical = event;
+    logical.position = { event.position.x / uiScale, event.position.y / uiScale };
+    Layer* const target = root != nullptr ? root->hitTest(logical.position) : nullptr;
+    if (target != nullptr && !target->inputEnabled()) return false;
+    for (Layer* layer = target; layer != nullptr; layer = layer->parent()) {
+      if (layer->onGesture(logical)) return true;
+    }
+    return false;
+  }
+
   DragEffect routeExternalDrag(const DragEvent& event, const int phase) {
     markFrameNeeded();
     Layer* hit = root != nullptr ? root->hitTest(event.position) : nullptr;
@@ -2678,6 +2690,11 @@ bool Window::scroll(const ScrollEvent& event) {
   if (mImpl == nullptr) return false;
   mImpl->dispatchScroll(event);
   return true;
+}
+
+bool Window::gesture(const GestureEvent& event) {
+  if (mImpl == nullptr) return false;
+  return mImpl->dispatchGesture(event);
 }
 
 void Window::drop(const DropEvent& event) {
