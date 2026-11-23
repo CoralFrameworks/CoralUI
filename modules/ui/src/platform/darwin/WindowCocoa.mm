@@ -257,6 +257,10 @@ uint32_t argbFromColor(NSColor* color) {
 @interface CoralWindow : NSWindow
 @end
 
+/** Process-wide AppKit delegate. Window delegates stay per-window; this one owns the application. */
+@interface CoralAppDelegate : NSObject <NSApplicationDelegate>
+@end
+
 /** The window delegate: resize/DPI/appearance callbacks and close interception. */
 @interface CoralUIWindowDelegate : NSObject <NSWindowDelegate>
 @property(nonatomic, assign) void* platform;
@@ -982,6 +986,35 @@ class CocoaPlatform final : public WindowPlatform {
     updateBackingSize(true);
   }
 
+  // --- Responder-chain entry points used by the native menus ----------------------------------
+  /**
+   * Runs one of the standard editing commands through the same key path the controls use.
+   *
+   * A native Edit menu sends an action down the responder chain rather than a key event; the focused
+   * CoralUI layer only knows `KeyEvent`, so the menu action is translated back into the command chord
+   * that `TextInput` already handles.
+   */
+  void performEditCommand(const Key key, const bool shift = false, const bool meta = true) {
+    if (mHost == nullptr) return;
+    KeyEvent event;
+    event.key = key;
+    event.shift = shift;
+    event.meta = meta;
+    mHost->dispatchKey(event, true);
+  }
+
+  [[nodiscard]] bool hasTextFocus() const {
+    if (mHost == nullptr) return false;
+    std::string text;
+    size_t cursor = 0;
+    size_t anchor = 0;
+    return mHost->surroundingText(&text, &cursor, &anchor);
+  }
+
+  void requestCloseFromMenu() {
+    if (mHost != nullptr) mHost->requestClose();
+  }
+
  private:
   bool createSurface() {
     if (mView == nil || mMetalLayer == nil) {
@@ -1027,21 +1060,118 @@ class CocoaPlatform final : public WindowPlatform {
 
   void installApplication() {
     static bool prepared = false;
+    static CoralAppDelegate* __strong appDelegate = nil;
     [NSApplication sharedApplication];
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
-    if (!prepared) {
-      prepared = true;
-      NSMenu* menuBar = [[NSMenu alloc] init];
-      NSMenuItem* applicationItem = [[NSMenuItem alloc] init];
-      [menuBar addItem:applicationItem];
-      NSMenu* applicationMenu = [[NSMenu alloc] initWithTitle:@"Coral UI"];
-      [applicationMenu addItemWithTitle:@"Quit Coral UI" action:@selector(terminate:)
-                          keyEquivalent:@"q"];
-      applicationItem.submenu = applicationMenu;
-      NSApp.mainMenu = menuBar;
-      [NSApp finishLaunching];
-    }
+    if (prepared) return;
+    prepared = true;
+
+    appDelegate = [[CoralAppDelegate alloc] init];
+    NSApp.delegate = appDelegate;
+
+    NSString* appName = NSProcessInfo.processInfo.processName ?: @"Coral UI";
+
+    NSMenu* menuBar = [[NSMenu alloc] init];
+
+    // ---- Application menu ----
+    NSMenuItem* applicationItem = [[NSMenuItem alloc] init];
+    NSMenu* applicationMenu = [[NSMenu alloc] initWithTitle:appName];
+    [applicationMenu addItemWithTitle:[@"About " stringByAppendingString:appName]
+                              action:@selector(orderFrontStandardAboutPanel:)
+                       keyEquivalent:@""];
+    [applicationMenu addItem:[NSMenuItem separatorItem]];
+
+    NSMenu* servicesMenu = [[NSMenu alloc] initWithTitle:@"Services"];
+    NSMenuItem* servicesItem = [[NSMenuItem alloc] initWithTitle:@"Services"
+                                                         action:nil
+                                                  keyEquivalent:@""];
+    servicesItem.submenu = servicesMenu;
+    [applicationMenu addItem:servicesItem];
+    NSApp.servicesMenu = servicesMenu;
+    [applicationMenu addItem:[NSMenuItem separatorItem]];
+
+    NSMenuItem* hide = [applicationMenu addItemWithTitle:[@"Hide " stringByAppendingString:appName]
+                                                  action:@selector(hide:)
+                                           keyEquivalent:@"h"];
+    hide.keyEquivalentModifierMask = NSEventModifierFlagCommand;
+    NSMenuItem* hideOthers = [applicationMenu addItemWithTitle:@"Hide Others"
+                                                        action:@selector(hideOtherApplications:)
+                                                 keyEquivalent:@"h"];
+    hideOthers.keyEquivalentModifierMask = NSEventModifierFlagCommand | NSEventModifierFlagOption;
+    [applicationMenu addItemWithTitle:@"Show All"
+                               action:@selector(unhideAllApplications:)
+                        keyEquivalent:@""];
+    [applicationMenu addItem:[NSMenuItem separatorItem]];
+    NSMenuItem* quit = [applicationMenu addItemWithTitle:[@"Quit " stringByAppendingString:appName]
+                                                   action:@selector(terminate:)
+                                            keyEquivalent:@"q"];
+    quit.keyEquivalentModifierMask = NSEventModifierFlagCommand;
+    applicationItem.submenu = applicationMenu;
+    [menuBar addItem:applicationItem];
+
+    // ---- File menu ----
+    NSMenuItem* fileItem = [[NSMenuItem alloc] init];
+    NSMenu* fileMenu = [[NSMenu alloc] initWithTitle:@"File"];
+    NSMenuItem* close = [fileMenu addItemWithTitle:@"Close"
+                                            action:@selector(performClose:)
+                                     keyEquivalent:@"w"];
+    close.keyEquivalentModifierMask = NSEventModifierFlagCommand;
+    fileItem.submenu = fileMenu;
+    [menuBar addItem:fileItem];
+
+    // ---- Edit menu ----
+    NSMenuItem* editItem = [[NSMenuItem alloc] init];
+    NSMenu* editMenu = [[NSMenu alloc] initWithTitle:@"Edit"];
+    NSMenuItem* undo = [editMenu addItemWithTitle:@"Undo"
+                                           action:@selector(undo:)
+                                    keyEquivalent:@"z"];
+    undo.keyEquivalentModifierMask = NSEventModifierFlagCommand;
+    NSMenuItem* redo = [editMenu addItemWithTitle:@"Redo"
+                                           action:@selector(redo:)
+                                    keyEquivalent:@"z"];
+    redo.keyEquivalentModifierMask = NSEventModifierFlagCommand | NSEventModifierFlagShift;
+    [editMenu addItem:[NSMenuItem separatorItem]];
+    NSMenuItem* cut = [editMenu addItemWithTitle:@"Cut"
+                                          action:@selector(cut:)
+                                   keyEquivalent:@"x"];
+    cut.keyEquivalentModifierMask = NSEventModifierFlagCommand;
+    NSMenuItem* copy = [editMenu addItemWithTitle:@"Copy"
+                                           action:@selector(copy:)
+                                    keyEquivalent:@"c"];
+    copy.keyEquivalentModifierMask = NSEventModifierFlagCommand;
+    NSMenuItem* paste = [editMenu addItemWithTitle:@"Paste"
+                                            action:@selector(paste:)
+                                     keyEquivalent:@"v"];
+    paste.keyEquivalentModifierMask = NSEventModifierFlagCommand;
+    [editMenu addItemWithTitle:@"Delete" action:@selector(delete:) keyEquivalent:@""];
+    [editMenu addItem:[NSMenuItem separatorItem]];
+    NSMenuItem* selectAll = [editMenu addItemWithTitle:@"Select All"
+                                                action:@selector(selectAll:)
+                                         keyEquivalent:@"a"];
+    selectAll.keyEquivalentModifierMask = NSEventModifierFlagCommand;
+    editItem.submenu = editMenu;
+    [menuBar addItem:editItem];
+
+    // ---- Window menu ----
+    NSMenuItem* windowItem = [[NSMenuItem alloc] init];
+    NSMenu* windowMenu = [[NSMenu alloc] initWithTitle:@"Window"];
+    NSMenuItem* minimize = [windowMenu addItemWithTitle:@"Minimize"
+                                                 action:@selector(performMiniaturize:)
+                                          keyEquivalent:@"m"];
+    minimize.keyEquivalentModifierMask = NSEventModifierFlagCommand;
+    [windowMenu addItemWithTitle:@"Zoom" action:@selector(performZoom:) keyEquivalent:@""];
+    [windowMenu addItem:[NSMenuItem separatorItem]];
+    [windowMenu addItemWithTitle:@"Bring All to Front"
+                          action:@selector(arrangeInFront:)
+                   keyEquivalent:@""];
+    windowItem.submenu = windowMenu;
+    [menuBar addItem:windowItem];
+    NSApp.windowsMenu = windowMenu;
+
+    NSApp.mainMenu = menuBar;
+    [NSApp finishLaunching];
   }
+
 
   static void postWakeEvent() {
     @autoreleasepool {
@@ -1134,6 +1264,22 @@ using coral::ui::detail::CocoaPlatform;
 
 - (BOOL)canBecomeMainWindow {
   return YES;
+}
+
+@end
+
+@implementation CoralAppDelegate
+
+- (BOOL)applicationSupportsSecureRestorableState:(NSApplication*)app {
+  (void)app;
+  return YES;
+}
+
+- (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication*)sender {
+  // The framework's Application/Window loops own termination; letting AppKit terminate on the last
+  // window close would cut a multi-window session short while another window is being recreated.
+  (void)sender;
+  return NO;
 }
 
 @end
@@ -1287,6 +1433,68 @@ using coral::ui::detail::CocoaPlatform;
 - (void)flagsChanged:(NSEvent*)event {
   auto* platform = static_cast<CocoaPlatform*>(self.platform);
   if (platform != nullptr) platform->dispatchModifierEvent(event);
+}
+
+// Standard responder-chain actions sent by the native Edit/File menus.
+- (void)undo:(id)sender {
+  (void)sender;
+  auto* platform = static_cast<CocoaPlatform*>(self.platform);
+  if (platform != nullptr) platform->performEditCommand(coral::ui::Key::Z);
+}
+
+- (void)redo:(id)sender {
+  (void)sender;
+  auto* platform = static_cast<CocoaPlatform*>(self.platform);
+  if (platform != nullptr) platform->performEditCommand(coral::ui::Key::Z, true);
+}
+
+- (void)cut:(id)sender {
+  (void)sender;
+  auto* platform = static_cast<CocoaPlatform*>(self.platform);
+  if (platform != nullptr) platform->performEditCommand(coral::ui::Key::X);
+}
+
+- (void)copy:(id)sender {
+  (void)sender;
+  auto* platform = static_cast<CocoaPlatform*>(self.platform);
+  if (platform != nullptr) platform->performEditCommand(coral::ui::Key::C);
+}
+
+- (void)paste:(id)sender {
+  (void)sender;
+  auto* platform = static_cast<CocoaPlatform*>(self.platform);
+  if (platform != nullptr) platform->performEditCommand(coral::ui::Key::V);
+}
+
+- (void)delete:(id)sender {
+  (void)sender;
+  auto* platform = static_cast<CocoaPlatform*>(self.platform);
+  if (platform != nullptr) platform->performEditCommand(coral::ui::Key::Delete, false, false);
+}
+
+- (void)selectAll:(id)sender {
+  (void)sender;
+  auto* platform = static_cast<CocoaPlatform*>(self.platform);
+  if (platform != nullptr) platform->performEditCommand(coral::ui::Key::A);
+}
+
+- (void)performClose:(id)sender {
+  (void)sender;
+  auto* platform = static_cast<CocoaPlatform*>(self.platform);
+  if (platform != nullptr) platform->requestCloseFromMenu();
+}
+
+- (BOOL)validateMenuItem:(NSMenuItem*)item {
+  auto* platform = static_cast<CocoaPlatform*>(self.platform);
+  if (platform == nullptr) return NO;
+  const SEL action = item.action;
+  if (action == @selector(undo:) || action == @selector(redo:) ||
+      action == @selector(cut:) || action == @selector(copy:) ||
+      action == @selector(paste:) || action == @selector(delete:) ||
+      action == @selector(selectAll:)) {
+    return platform->hasTextFocus();
+  }
+  return YES;
 }
 
 - (void)resetCursorRects {

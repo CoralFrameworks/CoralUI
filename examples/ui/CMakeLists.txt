@@ -22,6 +22,25 @@ add_executable(ui_mvvm_demo ui_mvvm_demo.cpp)
 target_link_libraries(ui_mvvm_demo PRIVATE ui mvvm minilog)
 target_compile_definitions(ui_mvvm_demo PRIVATE CORAL_ASSETS_DIR="${CORALUI_EXAMPLE_ASSETS}")
 
+# On macOS the interactive demo is a real application bundle: Finder launch, Dock identity, a bundle
+# id and version. The headless checks still invoke the executable inside the bundle, so `ctest` needs
+# no separate target.
+if (APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  set(_coral_demo_version "0.0.0")
+  if (EXISTS "${CORALUI_EXAMPLE_ASSETS}/../VERSION")
+    file(STRINGS "${CORALUI_EXAMPLE_ASSETS}/../VERSION" _coral_demo_version LIMIT_COUNT 1)
+    string(STRIP "${_coral_demo_version}" _coral_demo_version)
+  endif ()
+  set_target_properties(ui_demo PROPERTIES
+    MACOSX_BUNDLE TRUE
+    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist.in"
+    MACOSX_BUNDLE_BUNDLE_NAME "Coral UI Demo"
+    MACOSX_BUNDLE_GUI_IDENTIFIER "com.coral.ui.demo"
+    MACOSX_BUNDLE_BUNDLE_VERSION "${_coral_demo_version}"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "${_coral_demo_version}"
+  )
+endif ()
+
 foreach (example ui_demo ui_mvvm_demo)
   if (MSVC)
     target_compile_options(${example} PRIVATE /W4 /utf-8)
