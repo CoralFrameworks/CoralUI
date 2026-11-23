@@ -864,6 +864,21 @@ class CocoaPlatform final : public WindowPlatform {
     (void)modal;
   }
 
+  [[nodiscard]] float displayHeadroom() const override {
+    NSScreen* screen = mWindow != nil && mWindow.screen != nil ? mWindow.screen : [NSScreen mainScreen];
+    return screen != nil
+      ? static_cast<float>(screen.maximumExtendedDynamicRangeColorComponentValue) : 1.0f;
+  }
+
+  [[nodiscard]] bool supportsWideColor() const override {
+    NSScreen* screen = mWindow != nil && mWindow.screen != nil ? mWindow.screen : [NSScreen mainScreen];
+    if (screen == nil || screen.colorSpace == nil) return false;
+    CGColorSpaceRef colorSpace = screen.colorSpace.CGColorSpace;
+    if (colorSpace == nullptr) return false;
+    CFStringRef name = CGColorSpaceGetName(colorSpace);
+    return name != nullptr && CFStringCompare(name, kCGColorSpaceDisplayP3, 0) == kCFCompareEqualTo;
+  }
+
   [[nodiscard]] bool prefersDarkAppearance() const override {
     return systemAppearance().preferDark;
   }

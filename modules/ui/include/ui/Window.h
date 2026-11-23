@@ -468,6 +468,15 @@ class Window final : public Renderer {
    */
   [[nodiscard]] WindowHit hitTest(Point point) const;
 
+  /**
+   * The display's current EDR headroom: 1.0 for SDR, >1 on an EDR-capable display with brightness
+   * headroom. This is reporting/foundation only; the canvas still presents SDR sRGB until the
+   * CoralGraphics PQ/EDR output stage is wired in.
+   */
+  [[nodiscard]] float displayHeadroom() const noexcept;
+  /** True when the window's display advertises a wide-gamut (Display P3) colour space. */
+  [[nodiscard]] bool supportsWideColor() const noexcept;
+
   /** Native maximize/restore/minimize. Fullscreen owns the state while it is active. */
   void maximize();
   void restore();

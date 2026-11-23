@@ -173,6 +173,12 @@ int main() {
         stats.framePlanItems, stats.commandBuffers);
       return 1;
     }
+    std::printf("native display: headroom=%.2f wideColor=%d\n",
+      static_cast<double>(window->displayHeadroom()), window->supportsWideColor() ? 1 : 0);
+    if (window->displayHeadroom() < 1.0f) {
+      std::fprintf(stderr, "FAIL: display headroom is below SDR\n");
+      return 1;
+    }
   }
   return 0;
 }

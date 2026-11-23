@@ -329,6 +329,10 @@ class WindowPlatform {
   virtual void setAlwaysOnTop(bool onTop) { (void)onTop; }
   /** The OS light/dark preference; a platform without one reports light. */
   [[nodiscard]] virtual bool prefersDarkAppearance() const { return false; }
+  /** EDR headroom of the window's display, 1.0 for SDR. */
+  [[nodiscard]] virtual float displayHeadroom() const { return 1.0f; }
+  /** True when the display advertises Display P3 / wide gamut. */
+  [[nodiscard]] virtual bool supportsWideColor() const { return false; }
   /**
    * The system's current appearance: high contrast, the light/dark preference and the animation policy.
    *

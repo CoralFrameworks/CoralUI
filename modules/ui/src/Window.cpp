@@ -2101,6 +2101,16 @@ void Window::setSecureInputEnabled(const bool enabled) {
   }
 }
 
+float Window::displayHeadroom() const noexcept {
+  return mImpl != nullptr && mImpl->platform != nullptr
+    ? mImpl->platform->displayHeadroom() : 1.0f;
+}
+
+bool Window::supportsWideColor() const noexcept {
+  return mImpl != nullptr && mImpl->platform != nullptr &&
+    mImpl->platform->supportsWideColor();
+}
+
 bool Window::isSecureInputEnabled() const noexcept {
   return mImpl != nullptr && mImpl->platform != nullptr &&
     mImpl->platform->isSecureInputEnabled();

@@ -188,6 +188,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 | 2026-11-23 | 阶段 3 渲染：Cocoa `supportsRetainedFrames`/`presentRetained`/`supportsDamageRects`/`presentDamage`；native smoke 验证 retained replay 与 damage snapshot | retained/damage 完成，frame-plan/boundary 待补 |
 | 2026-11-23 | 阶段 3 occlusion：Cocoa occlusionState → platformOcclusionChanged；自动 tick 在隐藏时保留待渲染请求 | 基础完成，手工隐藏/最小化验收待补 |
 | 2026-11-23 | 阶段 3 vblank：CoralGraphics CVDisplayLink `MacVBlankSource` + `NativeDisplayKind::MacOS`；Cocoa 返回真实 display source，native smoke 校验 refreshHertz > 0 | 基础完成，CVDisplayLink 弃用/per-window 显示切换待补 |
+| 2026-11-23 | 阶段 3 HDR 基础：NSScreen `maximumExtendedDynamicRangeColorComponentValue`/Display P3 colour space → `Window::displayHeadroom`/`supportsWideColor` | 上报完成，实际 EDR/PQ 输出待 CoralGraphics |
 | 2026-11-23 | 阶段 3 frame-plan：Cocoa boundary submission、WindowSurface 复用 open frame；native smoke plan items=1/buffers=1 | 基础完成，opt-in 与更多边界场景待补 |
 
 ## 5. 问题记录
@@ -224,6 +225,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 - Spell check 现在有查询 API、TextInput 红色下划线和动态右键替换建议；每次文本变化/右键同步调用 `NSSpellChecker`，长文档可能阻塞 UI，后续应做后台/去抖检查。autocorrect、字体面板、上下文菜单键盘导航的完整验收尚未完成。
 - 手势路由按 pointer 命中层向父链冒泡；没有独立的 gesture recognizer/冲突仲裁，也没有 Force Touch、pen pressure 或 swipe 的完整方向/阶段语义。ScrollView 目前只消费 delta，phase 字段供上层控件使用。
 - SF Symbol 目前以模板黑色/alpha 图像返回，尚未暴露颜色/tint 配置和动态 accent color；SF Symbol 的 symbol configuration（weight/scale/variant）只暴露 pointSize 与 raster scale。
+- P3/EDR/HDR 目前只有 `NSScreen` 能力上报：测试机报告 headroom=1.00、wideColor=0（SDR），因此真实 EDR 输出没有被执行验证。CoralGraphics 仍只呈现 SDR sRGB；要真正输出 P3/PQ，需要 CAMetalLayer 10-bit/EDR 配置和 PQ/colour-space 转换阶段。
 - macOS vblank 使用 CoralGraphics 的 `CVDisplayLink` 源（CoralGraphics 分支 `feature/metal-backend`，commit `e4be56e` + `20c1afa`）；plan multi-list 还需要 `b6bb18c`（复用已开启 frame）。`CVDisplayLink` 在新 SDK 已弃用，后续应迁移到 `CADisplayLink`/`CAMetalDisplayLink`；当前 link 基于 active displays，不是 per-window，跨显示器/动态刷新率切换还未处理。首次对齐会等待两个 vblank（约 33ms）。
 - 当前 macOS 测试机 `Window::refreshHertz()` 报告约 74 Hz（真实 display 回调间隔），不是固定的 60/120；UI 动画和 ProMotion 调度应以该值为准。
 
