@@ -1083,6 +1083,43 @@ class CocoaPlatform final : public WindowPlatform {
     return mHost->dispatchDragDrop(event);
   }
 
+  // --- Accessibility bridge queries (NSAccessibilityElement wrappers live in the view) ----------
+  [[nodiscard]] AccessibilityNode accessibilitySnapshot() const {
+    return mAccessibilityProvider != nullptr ? mAccessibilityProvider() : AccessibilityNode{};
+  }
+
+  [[nodiscard]] bool performAccessibilityAction(const std::string& path,
+      const AccessibilityAction action, const std::string& value) const {
+    return mAccessibilityInvoker != nullptr && mAccessibilityInvoker(path, action, value);
+  }
+
+  void setAccessibilityTreeProvider(std::function<AccessibilityNode()> provider,
+      AccessibilityActionInvoker invoker) override {
+    mAccessibilityProvider = std::move(provider);
+    mAccessibilityInvoker = std::move(invoker);
+  }
+
+  void raiseAccessibilityFocusEvent() override {
+    if (mView == nil) return;
+    NSAccessibilityPostNotification(mView, NSAccessibilityFocusedUIElementChangedNotification);
+  }
+
+  void raiseAccessibilityPropertyEvent(const std::string_view path,
+      const AccessibilityEvent event) override {
+    (void)path;
+    if (mView == nil) return;
+    NSString* notification = NSAccessibilityLayoutChangedNotification;
+    switch (event) {
+      case AccessibilityEvent::ValueChanged: notification = NSAccessibilityValueChangedNotification; break;
+      case AccessibilityEvent::ToggleChanged: notification = NSAccessibilityValueChangedNotification; break;
+      case AccessibilityEvent::Selected: notification = NSAccessibilitySelectedChildrenChangedNotification; break;
+      case AccessibilityEvent::EnabledChanged: notification = NSAccessibilityValueChangedNotification; break;
+      case AccessibilityEvent::ChildrenAdded:
+      case AccessibilityEvent::ChildrenRemoved: notification = NSAccessibilityLayoutChangedNotification; break;
+    }
+    NSAccessibilityPostNotification(mView, notification);
+  }
+
  private:
   bool createSurface() {
     if (mView == nil || mMetalLayer == nil) {
@@ -1309,6 +1346,8 @@ class CocoaPlatform final : public WindowPlatform {
   CoralUIWindowDelegate* mDelegate = nil;
   CAMetalLayer* mMetalLayer = nil;
   WindowHost* mHost = nullptr;
+  std::function<AccessibilityNode()> mAccessibilityProvider;
+  AccessibilityActionInvoker mAccessibilityInvoker;
   std::unique_ptr<graphics::gpu::WindowSurface> mSurface;
   std::unique_ptr<backend::Device> mDeviceOwner;
   std::string mDiagnostics;
@@ -1411,6 +1450,210 @@ coral::ui::DragPayload payloadFromPasteboard(NSPasteboard* pasteboard) {
 }
 
 @end
+
+// ==================================================================================================
+// NSAccessibility bridge
+// ==================================================================================================
+
+@class CoralUIView;
+
+namespace {
+
+struct CoralAXPayload {
+  coral::ui::AccessibilityNode node;
+  NSRect logicalBounds = NSZeroRect;
+};
+
+NSString* accessibilityRoleFor(const coral::ui::AccessibilityRole role) {
+  switch (role) {
+    case coral::ui::AccessibilityRole::Button: return NSAccessibilityButtonRole;
+    case coral::ui::AccessibilityRole::CheckBox: return NSAccessibilityCheckBoxRole;
+    case coral::ui::AccessibilityRole::Radio: return NSAccessibilityRadioButtonRole;
+    case coral::ui::AccessibilityRole::Slider: return NSAccessibilitySliderRole;
+    case coral::ui::AccessibilityRole::TextField: return NSAccessibilityTextFieldRole;
+    case coral::ui::AccessibilityRole::Label: return NSAccessibilityStaticTextRole;
+    case coral::ui::AccessibilityRole::List: return NSAccessibilityListRole;
+    case coral::ui::AccessibilityRole::Tree: return NSAccessibilityOutlineRole;
+    case coral::ui::AccessibilityRole::Menu: return NSAccessibilityMenuRole;
+    case coral::ui::AccessibilityRole::Table: return NSAccessibilityTableRole;
+    case coral::ui::AccessibilityRole::ScrollView: return NSAccessibilityScrollAreaRole;
+    case coral::ui::AccessibilityRole::Dialog:
+    case coral::ui::AccessibilityRole::Group:
+    case coral::ui::AccessibilityRole::ListItem:
+    case coral::ui::AccessibilityRole::Generic:
+    default: return NSAccessibilityGroupRole;
+  }
+}
+
+} // namespace
+
+@interface CoralAXElement : NSAccessibilityElement
+@property(nonatomic, assign) void* coralPayload;
+@property(nonatomic, weak) CoralUIView* coralOwner;
+@property(nonatomic, weak) id coralParent;
+@end
+
+CoralAXElement* makeCoralAXElement(const coral::ui::AccessibilityNode& node, NSRect logicalBounds,
+    CoralUIView* owner, id parent) {
+  CoralAXElement* element = [[CoralAXElement alloc] init];
+  element.coralPayload = new CoralAXPayload{ node, logicalBounds };
+  element.coralOwner = owner;
+  element.coralParent = parent;
+  return element;
+}
+
+@implementation CoralAXElement
+
+- (void)dealloc {
+  delete static_cast<CoralAXPayload*>(_coralPayload);
+  _coralPayload = nullptr;
+}
+
+- (BOOL)isAccessibilityElement {
+  return YES;
+}
+
+- (NSString*)accessibilityRole {
+  const auto* payload = static_cast<const CoralAXPayload*>(_coralPayload);
+  return payload != nullptr ? accessibilityRoleFor(payload->node.role) : NSAccessibilityGroupRole;
+}
+
+- (NSString*)accessibilitySubrole {
+  const auto* payload = static_cast<const CoralAXPayload*>(_coralPayload);
+  return payload != nullptr && payload->node.role == coral::ui::AccessibilityRole::Dialog
+    ? NSAccessibilityDialogSubrole : nil;
+}
+
+- (NSString*)accessibilityLabel {
+  const auto* payload = static_cast<const CoralAXPayload*>(_coralPayload);
+  if (payload == nullptr) return nil;
+  if (!payload->node.name.empty()) {
+    return [NSString stringWithUTF8String:payload->node.name.c_str()];
+  }
+  if (!payload->node.description.empty()) {
+    return [NSString stringWithUTF8String:payload->node.description.c_str()];
+  }
+  return nil;
+}
+
+- (NSString*)accessibilityHelp {
+  const auto* payload = static_cast<const CoralAXPayload*>(_coralPayload);
+  return payload != nullptr && !payload->node.description.empty()
+    ? [NSString stringWithUTF8String:payload->node.description.c_str()] : nil;
+}
+
+- (id)accessibilityValue {
+  const auto* payload = static_cast<const CoralAXPayload*>(_coralPayload);
+  if (payload == nullptr) return nil;
+  switch (payload->node.role) {
+    case coral::ui::AccessibilityRole::CheckBox:
+    case coral::ui::AccessibilityRole::Radio:
+      return @(payload->node.selected);
+    case coral::ui::AccessibilityRole::Slider:
+      return payload->node.range.has_value() ? @(payload->node.range->value) : nil;
+    case coral::ui::AccessibilityRole::TextField:
+    case coral::ui::AccessibilityRole::Label:
+      return payload->node.value.empty() ? nil
+        : [NSString stringWithUTF8String:payload->node.value.c_str()];
+    default:
+      return payload->node.selected ? @YES : nil;
+  }
+}
+
+- (BOOL)accessibilityEnabled {
+  const auto* payload = static_cast<const CoralAXPayload*>(_coralPayload);
+  return payload == nullptr ? NO : payload->node.enabled;
+}
+
+- (BOOL)isAccessibilityFocused {
+  const auto* payload = static_cast<const CoralAXPayload*>(_coralPayload);
+  return payload != nullptr && payload->node.focused;
+}
+
+- (id)accessibilityParent {
+  return _coralParent;
+}
+
+- (NSRect)accessibilityFrame {
+  const auto* payload = static_cast<const CoralAXPayload*>(_coralPayload);
+  CoralUIView* owner = _coralOwner;
+  if (payload == nullptr || owner == nil || owner.window == nil) return NSZeroRect;
+  const NSRect logical = payload->logicalBounds;
+  const NSPoint point = [owner convertPoint:NSMakePoint(logical.origin.x,
+    owner.bounds.size.height - NSMaxY(logical)) toView:nil];
+  const NSRect windowRect = NSMakeRect(point.x, point.y, logical.size.width, logical.size.height);
+  return [owner.window convertRectToScreen:windowRect];
+}
+
+- (NSArray*)accessibilityChildren {
+  const auto* payload = static_cast<const CoralAXPayload*>(_coralPayload);
+  if (payload == nullptr) return @[];
+  NSMutableArray* children = [NSMutableArray arrayWithCapacity:payload->node.children.size()];
+  for (const coral::ui::AccessibilityNode& child: payload->node.children) {
+    const NSRect childBounds = NSMakeRect(
+      payload->logicalBounds.origin.x + child.bounds.getLeft(),
+      payload->logicalBounds.origin.y + child.bounds.getTop(),
+      std::max(1.0f, child.bounds.getWidth()), std::max(1.0f, child.bounds.getHeight()));
+    [children addObject:makeCoralAXElement(child, childBounds, _coralOwner, self)];
+  }
+  return children;
+}
+
+- (NSArray<NSString*>*)accessibilityActionNames {
+  const auto* payload = static_cast<const CoralAXPayload*>(_coralPayload);
+  if (payload == nullptr) return @[];
+  NSMutableArray<NSString*>* actions = [NSMutableArray array];
+  const auto& node = payload->node;
+  if (coral::ui::hasAccessibilityAction(node.actions, coral::ui::AccessibilityAction::Invoke) ||
+      coral::ui::hasAccessibilityAction(node.actions, coral::ui::AccessibilityAction::Toggle) ||
+      coral::ui::hasAccessibilityAction(node.actions, coral::ui::AccessibilityAction::Select)) {
+    [actions addObject:NSAccessibilityPressAction];
+  }
+  if (node.range.has_value()) {
+    [actions addObject:NSAccessibilityIncrementAction];
+    [actions addObject:NSAccessibilityDecrementAction];
+  }
+  if (coral::ui::hasAccessibilityAction(node.actions, coral::ui::AccessibilityAction::Scroll)) {
+    [actions addObject:NSAccessibilityScrollToVisibleAction];
+  }
+  return actions;
+}
+
+- (void)accessibilityPerformAction:(NSString*)action {
+  const auto* payload = static_cast<const CoralAXPayload*>(_coralPayload);
+  CoralUIView* owner = _coralOwner;
+  if (payload == nullptr || owner == nil) return;
+  auto* platform = static_cast<coral::ui::detail::CocoaPlatform*>(owner.platform);
+  if (platform == nullptr) return;
+  const std::string path = payload->node.path;
+  if ([action isEqualToString:NSAccessibilityPressAction]) {
+    coral::ui::AccessibilityAction kind = coral::ui::AccessibilityAction::Invoke;
+    if (coral::ui::hasAccessibilityAction(payload->node.actions,
+          coral::ui::AccessibilityAction::Toggle)) {
+      kind = coral::ui::AccessibilityAction::Toggle;
+    } else if (coral::ui::hasAccessibilityAction(payload->node.actions,
+                 coral::ui::AccessibilityAction::Select)) {
+      kind = coral::ui::AccessibilityAction::Select;
+    }
+    (void)platform->performAccessibilityAction(path, kind, {});
+  } else if ([action isEqualToString:NSAccessibilityIncrementAction] ||
+             [action isEqualToString:NSAccessibilityDecrementAction]) {
+    if (payload->node.range.has_value()) {
+      const auto& range = *payload->node.range;
+      const double step = range.step > 0.0 ? range.step : std::max(0.01, (range.maximum - range.minimum) / 100.0);
+      const double next = std::clamp(range.value +
+        ([action isEqualToString:NSAccessibilityIncrementAction] ? step : -step),
+        range.minimum, range.maximum);
+      (void)platform->performAccessibilityAction(path,
+        coral::ui::AccessibilityAction::SetValue, std::to_string(next));
+    }
+  } else if ([action isEqualToString:NSAccessibilityScrollToVisibleAction]) {
+    (void)platform->performAccessibilityAction(path, coral::ui::AccessibilityAction::Scroll, {});
+  }
+}
+
+@end
+
 
 @implementation CoralUIView
 
@@ -1835,6 +2078,45 @@ coral::ui::DragPayload payloadFromPasteboard(NSPasteboard* pasteboard) {
 
 - (BOOL)wantsPeriodicDraggingUpdates {
   return NO;
+}
+
+// ==================================================================================================
+// NSAccessibility root: expose the layer tree as one group per window
+// ==================================================================================================
+
+- (BOOL)isAccessibilityElement {
+  // The root is a container; the generated CoralAXElement tree carries the roles and values.
+  return NO;
+}
+
+- (NSString*)accessibilityRole {
+  return NSAccessibilityGroupRole;
+}
+
+- (NSArray*)accessibilityChildren {
+  auto* platform = static_cast<CocoaPlatform*>(self.platform);
+  if (platform == nullptr) return @[];
+  const coral::ui::AccessibilityNode snapshot = platform->accessibilitySnapshot();
+  if (snapshot.name.empty() && snapshot.description.empty() && snapshot.children.empty()) return @[];
+  const NSRect logical = NSMakeRect(0.0, 0.0, self.bounds.size.width, self.bounds.size.height);
+  return @[ makeCoralAXElement(snapshot, logical, self, self) ];
+}
+
+- (id)accessibilityFocusedUIElement {
+  NSArray* children = [self accessibilityChildren];
+  NSMutableArray* pending = [NSMutableArray arrayWithArray:children];
+  while (pending.count > 0) {
+    id element = pending.firstObject;
+    [pending removeObjectAtIndex:0];
+    if ([element isAccessibilityFocused]) return element;
+    NSArray* nested = [element accessibilityChildren];
+    if (nested.count > 0) [pending addObjectsFromArray:nested];
+  }
+  return children.firstObject;
+}
+
+- (id)accessibilityParent {
+  return self.window != nil ? (id)self.window : (id)[NSNull null];
 }
 
 - (void)resetCursorRects {

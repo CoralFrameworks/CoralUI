@@ -45,12 +45,15 @@
 
 #### 1.2 Accessibility（NSAccessibility / AXUIElement）
 
-- [ ] `CoralUIView` 实现 `NSAccessibility` 协议或提供 `NSAccessibilityElement` 子树；
-- [ ] 把 `AccessibilityNode`（role/name/value/state/actions/bounds）映射到 AX 属性；
-- [ ] 焦点、值变化、选中变化、结构变化事件；
-- [ ] 动作回传：AXPress/AXIncrement/AXDecrement/AXConfirm/AXCancel 等；
+- [x] `CoralUIView` 提供 `CoralAXElement`（`NSAccessibilityElement` 子类）子树；
+- [x] 把 `AccessibilityNode` 的 role/name/description/value/state/actions/bounds 映射到 AX 属性；
+- [x] 焦点、值变化、选中变化、结构变化事件（`NSAccessibilityPostNotification`，节点路径粒度待细化）；
+- [x] 动作回传：AXPress、AXIncrement/AXDecrement、AXScrollToVisible；AXConfirm/AXCancel 待补；
 - [ ] VoiceOver 手工验证；
-- [ ] 开启/关闭 accessibility bridge 的策略（类似 `CORAL_UI_UIA=0`）。
+- [ ] 开启/关闭 accessibility bridge 的策略（类似 `CORAL_UI_UIA=0`）；
+- [ ] AXSetValue / 文本编辑动作、AX 行列/表格语义、hit test 与 AXFocus 的完整映射。
+
+基础树已验证：`AXGroup` → `AXButton`/`AXTextField`，frame 为屏幕坐标，AXPress 能触发按钮回调。
 
 验收：VoiceOver 能读出 `ui_demo` 的按钮、输入框、列表项，并执行按下/输入焦点跳转。
 
@@ -144,6 +147,7 @@
 | 2026-11-23 | 阶段 1.6：`ui_demo.app` bundle、Info.plist、版本/标识；headless CTest 从 bundle 内可执行文件运行 | 已完成（签名/公证/universal 待补） |
 | 2026-11-23 | 阶段 1.1：`NSTextInputClient`、interpretKeyEvents、marked/commit、候选窗 anchor、doCommandBySelector、UTF-16 selectedRange | 代码完成，待真实中日韩输入法手工验收 |
 | 2026-11-23 | 阶段 1.4：`NSDraggingDestination` 外部文件/文本落入、effect 映射、drag cursor | destination 完成，source/file promise 待补 |
+| 2026-11-23 | 阶段 1.2：`CoralAXElement` 子树、role/value/frame/state 映射、AXPress/Increment/Decrement/ScrollToVisible、通知 | 基础 bridge 完成，VoiceOver/Text AX 待补 |
 
 ## 5. 问题记录
 
@@ -164,6 +168,8 @@
 - IME：`setMarkedText` 忽略 marked text 内部的 selection 和 replacementRange；`selectedRange` 只做 UTF-8→UTF-16 的 caret/selection 映射；尚未验证真实中文/日文/韩文候选窗和死键。CJK 输入法需要在真实前台会话中手工测试。
 - IME 的 `validAttributesForMarkedText` 只声明了下划线，marked text 仍由 CoralUI 的 composition 绘制；没有使用 AppKit 的 attributed marked text 渲染。
 - 拖放目前只实现 destination；`NSDraggingSource`（从 layer 拖到 Finder/其他 app）和 file promise 未实现。外部拖放的 UI 光标/落点需要真实 Finder 手工验收。
+- AX 目前是查询时重建整棵 `NSAccessibilityElement` 树；没有稳定的 element 身份，也没有 AXSetValue/文本编辑/表格行列的完整映射。焦点/值通知目前 post 到根 view，VoiceOver 可能需要更细的 element 通知。
+- AX bounds 通过父元素逻辑偏移累加得到屏幕 frame；需要确认多层嵌套/Flex 布局下的偏移和 Retina 取整。
 
 - 全量 UI target + blit 每帧，Cocoa 未启用 damage/retained/frame-plan。
 - 无 CVDisplayLink，`refreshHertz` 来自 `PresentFrameClock`，不代表真实显示刷新。
