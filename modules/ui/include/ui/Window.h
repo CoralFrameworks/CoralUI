@@ -229,6 +229,36 @@ class Window final : public Renderer {
     Cocoa,
   };
 
+  /** One native toolbar item; `symbol` is an SF Symbol name on macOS. */
+  struct ToolbarItem {
+    std::string id;
+    std::string label;
+    std::string symbol;
+    std::string tooltip;
+  };
+
+  /** One native titlebar accessory segment. */
+  struct TitlebarAccessoryItem {
+    std::string label;
+    std::string symbol;
+  };
+
+  /** One native sidebar row. */
+  struct SidebarItem {
+    std::string id;
+    std::string label;
+    std::string symbol;
+    /** A non-selectable section header in the native source list. */
+    bool group = false;
+  };
+
+  /** macOS native window tabbing preference; ignored by the other backends. */
+  enum class TabbingMode : uint8_t {
+    Automatic,
+    Preferred,
+    Disallowed,
+  };
+
   struct Options {
     /**
      * Initial client size.
@@ -318,6 +348,15 @@ class Window final : public Renderer {
     float uiScale = 0.0f;
     /** When false, an automatic scale stays 1.0 even on a high-DPI display. */
     bool useDpiScale = true;
+
+    /**
+     * macOS only: AppKit frame autosave name, so the window restores its frame across launches.
+     * Empty disables frame saving; the position is centred as before.
+     */
+    std::string frameAutosaveName;
+
+    /** macOS only: native window tabbing preference. */
+    TabbingMode tabbingMode = TabbingMode::Automatic;
   };
 
   ~Window();
@@ -416,6 +455,32 @@ class Window final : public Renderer {
   void setDecorations(Decorations decorations);
   [[nodiscard]] Decorations decorations() const noexcept;
 
+  /**
+   * Replaces the native toolbar items (macOS `NSToolbar`); an empty list removes the toolbar.
+   * Other backends currently ignore it.
+   */
+  void setToolbarItems(std::vector<ToolbarItem> items);
+  /** Shows or hides the native toolbar without discarding its items. */
+  void setToolbarVisible(bool visible);
+  /**
+   * Enables macOS secure event input for password fields. Process-wide and reference-counted by the
+   * OS; the backend balances its own enable. Other platforms ignore it.
+   */
+  void setSecureInputEnabled(bool enabled);
+  [[nodiscard]] bool isSecureInputEnabled() const noexcept;
+  /** Called with the item id when a toolbar item is clicked. */
+  void setToolbarActionHandler(std::function<void(std::string_view)> handler);
+
+  /** Replaces the native titlebar accessory segments (macOS `NSTitlebarAccessoryViewController`). */
+  void setTitlebarAccessoryItems(std::vector<TitlebarAccessoryItem> items);
+  void setTitlebarAccessorySelectionHandler(std::function<void(int)> handler);
+
+  /** Replaces the native sidebar rows (macOS `NSSplitViewController`); empty removes the sidebar. */
+  void setSidebarItems(std::vector<SidebarItem> items);
+  void setSidebarVisible(bool visible);
+  void setSidebarSelectionHandler(std::function<void(std::string_view)> handler);
+  [[nodiscard]] std::string selectedSidebarItem() const;
+
   /** Chrome geometry used by client-side decorations; ignored in system-decoration mode. */
   void setChromeMetrics(WindowChromeMetrics metrics);
   [[nodiscard]] const WindowChromeMetrics& chromeMetrics() const noexcept;
@@ -427,6 +492,15 @@ class Window final : public Renderer {
    * its native hit-test constants; the framework itself only needs it for the client-drawn buttons.
    */
   [[nodiscard]] WindowHit hitTest(Point point) const;
+
+  /**
+   * The display's current EDR headroom: 1.0 for SDR, >1 on an EDR-capable display with brightness
+   * headroom. This is reporting/foundation only; the canvas still presents SDR sRGB until the
+   * CoralGraphics PQ/EDR output stage is wired in.
+   */
+  [[nodiscard]] float displayHeadroom() const noexcept;
+  /** True when the window's display advertises a wide-gamut (Display P3) colour space. */
+  [[nodiscard]] bool supportsWideColor() const noexcept;
 
   /** Native maximize/restore/minimize. Fullscreen owns the state while it is active. */
   void maximize();
@@ -527,6 +601,8 @@ class Window final : public Renderer {
   [[nodiscard]] size_t imeCandidateCount() const noexcept;
   [[nodiscard]] size_t imeCandidateSelected() const noexcept;
   bool scroll(const ScrollEvent& event);
+  /** Delivers a trackpad gesture to the layer under `event.position`; true when handled. */
+  bool gesture(const GestureEvent& event);
   /** Injects a file drop as if it came from the platform. */
   void drop(const DropEvent& event);
 

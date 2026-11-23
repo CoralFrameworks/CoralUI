@@ -16,9 +16,10 @@
 
 #include <ui/ElementSpec.h>
 
-#include <charconv>
+#include <cerrno>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <optional>
 #include <string>
 
@@ -60,10 +61,16 @@ std::optional<Color> parseColor(std::string_view value) {
 }
 
 std::optional<float> parseNumber(std::string_view value) {
-  float result = 0.0f;
-  const auto parsed = std::from_chars(value.data(), value.data() + value.size(), result);
-  if (parsed.ec != std::errc() || parsed.ptr != value.data() + value.size()) return std::nullopt;
-  if (!std::isfinite(result)) return std::nullopt;
+  if (value.empty()) return std::nullopt;
+  // Apple's libc++ does not provide the floating-point from_chars overload. strtof is available on
+  // every target; the explicit end-pointer check keeps the same full-consumption contract.
+  const std::string text(value);
+  char* end = nullptr;
+  errno = 0;
+  const float result = std::strtof(text.c_str(), &end);
+  if (end != text.c_str() + text.size() || errno == ERANGE || !std::isfinite(result)) {
+    return std::nullopt;
+  }
   return result;
 }
 

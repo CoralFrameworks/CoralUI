@@ -60,6 +60,60 @@ class ButtonLayer final : public Layer {
   int keys = 0;
 };
 
+class GestureLayer final : public Layer {
+ public:
+  bool onGesture(const GestureEvent& value) override {
+    gesture = value;
+    return true;
+  }
+
+  bool onScroll(const ScrollEvent& value) override {
+    scroll = value;
+    return true;
+  }
+
+  GestureEvent gesture;
+  ScrollEvent scroll;
+};
+
+TEST(UiInput, GesturesAndScrollPhasesReachTheLayerUnderThePointer) {
+  Window::Options options;
+  options.headless = true;
+  options.width = 100;
+  options.height = 100;
+  options.frameLimit = 1;
+  auto window = Window::create(options);
+  if (window == nullptr) {
+    GTEST_SKIP() << "no GPU device is available for the headless surface";
+  }
+  auto root = std::make_shared<Layer>();
+  root->setBounds(Rect::MakeWH(100.0f, 100.0f));
+  auto target = std::make_shared<GestureLayer>();
+  target->setBounds(Rect::MakeLTRB(10.0f, 10.0f, 80.0f, 80.0f));
+  root->addChild(target);
+  window->setRoot(root);
+
+  GestureEvent gesture;
+  gesture.kind = GestureKind::Magnify;
+  gesture.phase = GesturePhase::Changed;
+  gesture.position = { 30.0f, 30.0f };
+  gesture.magnitude = 0.25f;
+  EXPECT_TRUE(window->gesture(gesture));
+  EXPECT_EQ(target->gesture.kind, GestureKind::Magnify);
+  EXPECT_FLOAT_EQ(target->gesture.magnitude, 0.25f);
+
+  ScrollEvent scroll;
+  scroll.position = { 30.0f, 30.0f };
+  scroll.deltaY = -12.0f;
+  scroll.phase = ScrollPhase::Began;
+  scroll.momentumPhase = ScrollPhase::Stationary;
+  scroll.precise = true;
+  EXPECT_TRUE(window->scroll(scroll));
+  EXPECT_EQ(target->scroll.phase, ScrollPhase::Began);
+  EXPECT_EQ(target->scroll.momentumPhase, ScrollPhase::Stationary);
+  EXPECT_TRUE(target->scroll.precise);
+}
+
 TEST(UiInput, AClickFocusesTheFocusableLayerAndKeysReachIt) {
   Window::Options options;
   options.headless = true;

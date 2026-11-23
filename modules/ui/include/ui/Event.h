@@ -220,12 +220,57 @@ struct KeyEvent {
   char32_t character = 0;
 };
 
+enum class ScrollPhase : uint8_t {
+  None,
+  Began,
+  Changed,
+  Ended,
+  Cancelled,
+  MayBegin,
+  Stationary,
+};
+
 struct ScrollEvent {
   Point position;
   float deltaX = 0.0f;
   float deltaY = 0.0f;
+  /** Trackpad/wheel gesture phase when the platform reports one. */
+  ScrollPhase phase = ScrollPhase::None;
+  /** Momentum/inertia phase, separate from the finger-driven `phase`. */
+  ScrollPhase momentumPhase = ScrollPhase::None;
+  /** True for a trackpad/precise device, false for a line-based wheel. */
+  bool precise = false;
   /** Platform wheel timestamp; zero falls back to the delivery time. */
   std::chrono::steady_clock::time_point timestamp{};
+};
+
+enum class GestureKind : uint8_t {
+  Magnify,
+  Rotate,
+  Swipe,
+};
+
+enum class GesturePhase : uint8_t {
+  Began,
+  Changed,
+  Ended,
+  Cancelled,
+};
+
+/**
+ * A trackpad/gesture event.
+ *
+ * `magnitude` is magnification for Magnify and degrees for Rotate; Swipe uses `deltaX`/`deltaY`
+ * (-1, 0 or 1). `position` is in device pixels at the platform boundary and is converted to logical
+ * units by `WindowImpl`, exactly like PointerEvent/ScrollEvent.
+ */
+struct GestureEvent {
+  GestureKind kind = GestureKind::Magnify;
+  GesturePhase phase = GesturePhase::Changed;
+  Point position;
+  float magnitude = 0.0f;
+  float deltaX = 0.0f;
+  float deltaY = 0.0f;
 };
 
 } // namespace coral::ui

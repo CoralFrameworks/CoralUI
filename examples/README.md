@@ -58,12 +58,17 @@ checkouts in the frameworks/workgroup layout.
 cmake --build out/examples --config Release
 out/examples/ui/Release/ui_demo --headless --frames 2 --out out/ui_demo.png
 
-# macOS/Linux single-config generators put the executables under out/examples/ui/
+# Linux single-config generators put the executables under out/examples/ui/
 cmake --build out/examples -j8
 out/examples/ui/ui_demo --headless --frames 2 --out out/ui_demo.png
 
-# Native window: Esc (or Cmd+W on macOS) closes it; the title bar exercises
-# move/maximize/minimize/close
+# macOS builds ui_demo as an application bundle (Finder launch, Dock identity, Info.plist).
+# The executable inside it takes the same arguments:
+out/examples/ui/ui_demo.app/Contents/MacOS/ui_demo --headless --frames 2 --out out/ui_demo.png
+open out/examples/ui/ui_demo.app
+out/examples/ui/ui_demo.app/Contents/MacOS/ui_demo --frames 0 --width 960 --height 540
+
+# Linux native window (the macOS equivalent is the bundle executable above)
 out/examples/ui/ui_demo --frames 0 --width 960 --height 540
 
 # The declarative reference page (headless by default)

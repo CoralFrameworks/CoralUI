@@ -107,6 +107,8 @@ struct WindowImpl final : detail::WindowHost {
   SystemAppearance systemAppearance;
   /** True while the high-contrast palette is the theme in use. */
   bool highContrast = false;
+  /** True while the platform reports the window hidden; automatic frames pause. */
+  bool occluded = false;
   /** The theme the application installed, kept while high contrast overrides it. */
   std::shared_ptr<const Theme> baseTheme;
   std::shared_ptr<const StyleSheet> styleSheet;
@@ -928,6 +930,18 @@ struct WindowImpl final : detail::WindowHost {
     }
   }
 
+  bool dispatchGesture(const GestureEvent& event) override {
+    markFrameNeeded();
+    GestureEvent logical = event;
+    logical.position = { event.position.x / uiScale, event.position.y / uiScale };
+    Layer* const target = root != nullptr ? root->hitTest(logical.position) : nullptr;
+    if (target != nullptr && !target->inputEnabled()) return false;
+    for (Layer* layer = target; layer != nullptr; layer = layer->parent()) {
+      if (layer->onGesture(logical)) return true;
+    }
+    return false;
+  }
+
   DragEffect routeExternalDrag(const DragEvent& event, const int phase) {
     markFrameNeeded();
     Layer* hit = root != nullptr ? root->hitTest(event.position) : nullptr;
@@ -1031,6 +1045,18 @@ struct WindowImpl final : detail::WindowHost {
     self->applySystemAppearance(platform != nullptr ? platform->systemAppearance() : SystemAppearance{});
   }
 
+  void platformOcclusionChanged(const bool visible) override {
+    const bool nextOccluded = !visible;
+    if (occluded == nextOccluded) return;
+    occluded = nextOccluded;
+    if (!occluded) {
+      // The last presented frame may be arbitrarily old; a hidden window that comes back redraws.
+      damageAll();
+      markFrameNeeded();
+      if (platform != nullptr) platform->wake();
+    }
+  }
+
   void platformResized(const int newWidth, const int newHeight) override {
     if (newWidth <= 0 || newHeight <= 0) return;
     markFrameNeeded();
@@ -1048,8 +1074,16 @@ struct WindowImpl final : detail::WindowHost {
     layoutRoot();
   }
 
+  [[nodiscard]] bool canClose() const override {
+    return !closeRequested || closeRequested();
+  }
+
   void requestClose() override {
-    if (closeRequested && !closeRequested()) return;
+    if (!canClose()) return;
+    closeWindow();
+  }
+
+  void closeWindow() override {
     running = false;
   }
 
@@ -1149,6 +1183,11 @@ struct WindowImpl final : detail::WindowHost {
           break;
         case graphics::gpu::NativeDisplayKind::Wayland:
           hostOptions.nativeWindowKind = host::ThreadedRenderHost::NativeWindowKind::Wayland;
+          break;
+        case graphics::gpu::NativeDisplayKind::MacOS:
+          // The Metal WindowSurface accepts an unknown/portable window system and uses the
+          // CAMetalLayer handle from `nativeWindow`.
+          hostOptions.nativeWindowKind = host::ThreadedRenderHost::NativeWindowKind::Unknown;
           break;
         case graphics::gpu::NativeDisplayKind::Unknown:
         default:
@@ -2050,6 +2089,76 @@ int Window::minimumHeight() const noexcept {
   return mImpl != nullptr ? mImpl->minHeight : 0;
 }
 
+void Window::setToolbarItems(std::vector<ToolbarItem> items) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) {
+    mImpl->platform->setToolbarItems(std::move(items));
+  }
+}
+
+void Window::setTitlebarAccessoryItems(std::vector<TitlebarAccessoryItem> items) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) {
+    mImpl->platform->setTitlebarAccessoryItems(std::move(items));
+  }
+}
+
+void Window::setTitlebarAccessorySelectionHandler(std::function<void(int)> handler) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) {
+    mImpl->platform->setTitlebarAccessorySelectionHandler(std::move(handler));
+  }
+}
+
+void Window::setSidebarItems(std::vector<SidebarItem> items) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) {
+    mImpl->platform->setSidebarItems(std::move(items));
+  }
+}
+
+void Window::setSidebarVisible(const bool visible) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) mImpl->platform->setSidebarVisible(visible);
+}
+
+void Window::setSidebarSelectionHandler(std::function<void(std::string_view)> handler) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) {
+    mImpl->platform->setSidebarSelectionHandler(std::move(handler));
+  }
+}
+
+std::string Window::selectedSidebarItem() const {
+  return mImpl != nullptr && mImpl->platform != nullptr
+    ? mImpl->platform->selectedSidebarItem() : std::string();
+}
+
+void Window::setSecureInputEnabled(const bool enabled) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) {
+    mImpl->platform->setSecureInputEnabled(enabled);
+  }
+}
+
+float Window::displayHeadroom() const noexcept {
+  return mImpl != nullptr && mImpl->platform != nullptr
+    ? mImpl->platform->displayHeadroom() : 1.0f;
+}
+
+bool Window::supportsWideColor() const noexcept {
+  return mImpl != nullptr && mImpl->platform != nullptr &&
+    mImpl->platform->supportsWideColor();
+}
+
+bool Window::isSecureInputEnabled() const noexcept {
+  return mImpl != nullptr && mImpl->platform != nullptr &&
+    mImpl->platform->isSecureInputEnabled();
+}
+
+void Window::setToolbarVisible(const bool visible) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) mImpl->platform->setToolbarVisible(visible);
+}
+
+void Window::setToolbarActionHandler(std::function<void(std::string_view)> handler) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) {
+    mImpl->platform->setToolbarActionHandler(std::move(handler));
+  }
+}
+
 void Window::setDecorations(const Decorations decorations) {
   if (mImpl == nullptr || mImpl->decorations == decorations) return;
   mImpl->decorations = decorations;
@@ -2268,9 +2377,13 @@ bool Window::tick(const bool blockOnIdle) {
   // the limit at 0, so OnDemand still renders only when something asks.
   const bool limitPending = mImpl->options.frameLimit > 0 &&
     mImpl->frameCount < mImpl->options.frameLimit;
-  const bool wanted = mImpl->policy == FramePolicy::Continuous || animating || limitPending ||
-                      mImpl->frameWanted.exchange(false, std::memory_order_acq_rel);
-  if (wanted) {
+  // An occluded window keeps its pending request (do not exchange it away): the first visible tick
+  // then renders, while the idle loop can stay parked without a full repaint per animation tick.
+  bool wanted = mImpl->policy == FramePolicy::Continuous || animating || limitPending;
+  if (!wanted && !mImpl->occluded) {
+    wanted = mImpl->frameWanted.exchange(false, std::memory_order_acq_rel);
+  }
+  if (wanted && !mImpl->occluded) {
     if (!mImpl->renderFrame()) {
       if (mImpl->recoveryCount < 1 && recoverDevice()) return true;
       return false;
@@ -2678,6 +2791,11 @@ bool Window::scroll(const ScrollEvent& event) {
   if (mImpl == nullptr) return false;
   mImpl->dispatchScroll(event);
   return true;
+}
+
+bool Window::gesture(const GestureEvent& event) {
+  if (mImpl == nullptr) return false;
+  return mImpl->dispatchGesture(event);
 }
 
 void Window::drop(const DropEvent& event) {

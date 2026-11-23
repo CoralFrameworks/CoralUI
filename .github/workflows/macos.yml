@@ -1,0 +1,117 @@
+name: macOS
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# CoralGraphics' macOS vblank/plan changes are on its main branch now. Checkout main beside
+# CoralUI and point CORAL_GRAPHICS_DIR at it so CoralUI does not use the older submodule pin.
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Checkout CoralUI
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Checkout CoralGraphics
+        uses: actions/checkout@v4
+        with:
+          repository: CoralFrameworks/CoralGraphics
+          ref: main
+          path: CoralGraphics
+          submodules: recursive
+
+      # external/CoralCore has `update = none` in CoralUI's .gitmodules, so actions/checkout's
+      # recursive submodule pass does not fetch it. Fetch it explicitly and point CMake at it.
+      - name: Checkout CoralCore
+        uses: actions/checkout@v4
+        with:
+          repository: CoralFrameworks/CoralCore
+          ref: main
+          path: CoralCore
+          submodules: recursive
+
+      # GoogleTest is listed in .gitmodules but has no gitlink in this branch's tree, so
+      # actions/checkout cannot materialize it. Fetch it at the fallback location CoralUI probes.
+      - name: Checkout GoogleTest
+        uses: actions/checkout@v4
+        with:
+          repository: CoralFrameworks/libgtest
+          ref: main
+          path: third_party/libgtest
+          submodules: recursive
+
+      - name: Initialize GoogleTest sources
+        run: git -C third_party/libgtest submodule update --init --recursive
+
+      # CoralGraphics' bundled zlib/libyuv are not gitlinks in its checkout; libz (and its zlib
+      # submodule) is required by libpng even with the effect module off.
+      - name: Checkout zlib
+        uses: actions/checkout@v4
+        with:
+          repository: CoralFrameworks/libz
+          ref: main
+          path: CoralGraphics/third_party/libz
+          submodules: recursive
+
+      - name: Checkout libyuv
+        uses: actions/checkout@v4
+        with:
+          repository: CoralFrameworks/libyuv
+          ref: main
+          path: CoralGraphics/third_party/libyuv
+          submodules: recursive
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -G "Unix Makefiles"
+          -DCMAKE_BUILD_TYPE=Release
+          -DCORAL_BUILD_TESTS=ON
+          -DCORAL_CORE_DIR="${{ github.workspace }}/CoralCore"
+          -DCORAL_GRAPHICS_DIR="${{ github.workspace }}/CoralGraphics"
+
+      - name: Build
+        run: >
+          cmake --build build -j 4
+          --target test_ui ui_native_smoke ui_native_ax_smoke ui_demo ui_mvvm_demo
+
+      - name: Test
+        run: >
+          ctest --test-dir build --output-on-failure
+          -R "^(test_ui|test_ui_shared_device|ui_native_smoke|ui_native_ax_smoke|example_ui_demo_headless|example_ui_mvvm_headless)$"
+
+      - name: Runner diagnostics
+        if: failure()
+        run: |
+          uname -a
+          system_profiler SPDisplaysDataType || true
+          xcodebuild -version || true
+
+      - name: Backtrace failures
+        if: failure()
+        run: |
+          set +e
+          # macOS images do not ship GNU timeout; lldb exits after the crash and the bt/quit commands.
+          run_lldb() {
+            echo "===== $* ====="
+            lldb --batch -o run -o "thread backtrace all" -o quit -- "$@" 2>&1 | tail -120
+          }
+          run_lldb build/modules/ui/tests/test_ui
+          run_lldb build/modules/ui/tests/ui_native_smoke
+          run_lldb build/modules/ui/tests/ui_native_ax_smoke
+          run_lldb build/examples/ui/ui_demo.app/Contents/MacOS/ui_demo --headless --frames 2
+          run_lldb build/examples/ui/ui_mvvm_demo
+
+      - name: Collect crash reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-crash-reports
+          path: |
+            ~/Library/Logs/DiagnosticReports/**
+            build/**/*.crash
+          if-no-files-found: ignore
+          retention-days: 7

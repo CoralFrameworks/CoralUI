@@ -25,12 +25,17 @@
 #include <ui/ColorLayer.h>
 #include <ui/Window.h>
 
+#include <graphics/Bitmap.h>
 #include <graphics/Color.h>
 
 #include <cstdio>
+#include <cstdlib>
 #include <memory>
 
 int main() {
+#if defined(__APPLE__)
+  (void)setenv("CORAL_UI_FRAME_PLAN_WINDOW", "1", 1);
+#endif
   coral::ui::Window::Options options;
   options.headless = false;
   options.width = 320;
@@ -81,6 +86,7 @@ int main() {
   auto root = std::make_shared<coral::ui::ColorLayer>(graphics::Color::MakeRGBA8(56, 132, 220, 255));
   auto focusable = std::make_shared<coral::ui::Button>("Focus", nullptr);
   focusable->setBounds(coral::ui::Rect::MakeLTRB(8.0f, 8.0f, 80.0f, 40.0f));
+  focusable->setRepaintBoundary(true);
   root->addChild(focusable);
   window->setRoot(root);
   window->focusLayer(focusable.get());
@@ -91,6 +97,55 @@ int main() {
   }
   if (window->frameCount() < 1) {
     std::fprintf(stderr, "FAIL: the native frame loop did not count the first frame\n");
+    return 1;
+  }
+
+  // A clean native window replays the retained recording instead of re-recording the whole tree.
+  // Only the Cocoa backend currently opts into retained frames; the other native backends have
+  // their own suites for this.
+  if (window->nativePlatform() == coral::ui::Window::NativePlatform::Cocoa) {
+    if (!window->renderFrame()) {
+      std::fprintf(stderr, "FAIL: the retained native frame did not render\n");
+      return 1;
+    }
+    if (window->lastFrameTimings().draw != 0.0) {
+      std::fprintf(stderr, "FAIL: a clean native frame recorded %.2fms instead of replaying\n",
+        window->lastFrameTimings().draw);
+      return 1;
+    }
+    if (!(window->refreshHertz() > 0.0)) {
+      std::fprintf(stderr, "FAIL: CVDisplayLink did not report a refresh rate\n");
+      return 1;
+    }
+  }
+
+  // Damage: repaint a small child and let the damage path present it; the snapshot must reflect the
+  // new colour while the untouched area keeps the root colour.
+  auto damaged = std::make_shared<coral::ui::ColorLayer>(graphics::Color::MakeRGBA8(255, 0, 0, 255));
+  damaged->setBounds(coral::ui::Rect::MakeLTRB(0.0f, 0.0f, 40.0f, 40.0f));
+  damaged->setRepaintBoundary(true);
+  root->addChild(damaged);
+  if (!window->renderFrame()) {
+    std::fprintf(stderr, "FAIL: the native frame with a damage child did not render\n");
+    return 1;
+  }
+  damaged->setColor(graphics::Color::MakeRGBA8(0, 255, 0, 255));
+  window->invalidate(coral::ui::Rect::MakeLTRB(0.0f, 0.0f, 40.0f, 40.0f));
+  if (!window->renderFrame()) {
+    std::fprintf(stderr, "FAIL: the damaged native frame did not render\n");
+    return 1;
+  }
+  graphics::Bitmap bitmap;
+  if (!window->snapshot(&bitmap)) {
+    std::fprintf(stderr, "FAIL: the damaged native frame could not be snapshotted\n");
+    return 1;
+  }
+  const graphics::Pixmap pixels = bitmap.makePixmap();
+  if (!pixels.isValid() || (pixels.getPixelARGB32(10, 10) & 0x00FFFFFFu) != 0x0000FF00u ||
+      (pixels.getPixelARGB32(200, 100) & 0x00FFFFFFu) != 0x003884DCu) {
+    std::fprintf(stderr, "FAIL: damaged snapshot colours were 0x%08x / 0x%08x\n",
+      pixels.isValid() ? pixels.getPixelARGB32(10, 10) : 0u,
+      pixels.isValid() ? pixels.getPixelARGB32(200, 100) : 0u);
     return 1;
   }
 
@@ -109,5 +164,21 @@ int main() {
     static_cast<double>(window->uiScale()), window->frameCount(),
     appearance.valid ? "valid" : "unavailable", appearance.preferDark ? 1 : 0,
     appearance.highContrast ? 1 : 0, parentHandle.empty() ? "none" : parentHandle.c_str());
+  if (window->nativePlatform() == coral::ui::Window::NativePlatform::Cocoa) {
+    const coral::ui::FrameStatistics stats = window->frameStatistics();
+    std::printf("native refresh: %.1f Hz, plan items=%u, buffers=%u\n",
+      static_cast<double>(window->refreshHertz()), stats.framePlanItems, stats.commandBuffers);
+    if (stats.framePlanItems == 0 || stats.commandBuffers != 1) {
+      std::fprintf(stderr, "FAIL: Cocoa plan frame was flattened (items=%u buffers=%u)\n",
+        stats.framePlanItems, stats.commandBuffers);
+      return 1;
+    }
+    std::printf("native display: headroom=%.2f wideColor=%d\n",
+      static_cast<double>(window->displayHeadroom()), window->supportsWideColor() ? 1 : 0);
+    if (window->displayHeadroom() < 1.0f) {
+      std::fprintf(stderr, "FAIL: display headroom is below SDR\n");
+      return 1;
+    }
+  }
   return 0;
 }

@@ -25,6 +25,7 @@
 #include "../../FileDialogPlatform.h"
 
 #import <Cocoa/Cocoa.h>
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
 #include <string>
 #include <vector>
@@ -50,15 +51,24 @@ void applyFilters(NSSavePanel* panel, const FileDialogOptions& options) {
       if (value != nil) [extensions addObject:value];
     }
   }
-  if (extensions.count > 0) {
-    // `allowedFileTypes` is deprecated in favour of UTType on newer SDKs, but it is still the one
-    // API that turns a filter's extensions into an NSSavePanel restriction without a UTType mapping
-    // table per extension.
+  if (extensions.count == 0) return;
+  if (@available(macOS 11.0, *)) {
+    NSMutableArray<UTType*>* types = [NSMutableArray arrayWithCapacity:extensions.count];
+    for (NSString* extension in extensions) {
+      UTType* type = [UTType typeWithFilenameExtension:extension];
+      if (type != nil) [types addObject:type];
+    }
+    if (types.count > 0) {
+      panel.allowedContentTypes = types;
+      return;
+    }
+  }
+  // Older systems: `allowedFileTypes` is the only extension-based API. Kept as the fallback rather
+  // than dropping the filter on a deployment target below macOS 11.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    panel.allowedFileTypes = extensions;
+  panel.allowedFileTypes = extensions;
 #pragma clang diagnostic pop
-  }
 }
 
 /** Splits a default path into its parent directory and the file name, which the panels expect. */
@@ -107,7 +117,33 @@ FileDialogResult showPlatformFileDialog(const FileDialogKind kind,
     if (!options.defaultPath.empty()) applyDefaultPath(panel, options.defaultPath);
     applyFilters(panel, options);
 
-    const NSModalResponse response = [panel runModal];
+    // If the caller named a parent and that window is the active one, run the panel as a sheet:
+    // the dialog stays attached to its window like every other macOS document panel. The public
+    // API is synchronous, so this waits for the completion handler on the main run loop; a detached
+    // app-modal panel remains the fallback for a hidden/inactive parent.
+    NSWindow* parent = nil;
+    if (options.parent != nullptr && NSApp.isActive) {
+      parent = [NSApp keyWindow] != nil ? [NSApp keyWindow] : [NSApp mainWindow];
+      if (parent != nil && !parent.isVisible) parent = nil;
+    }
+    NSModalResponse response = NSModalResponseCancel;
+    if (parent != nil) {
+      __block BOOL finished = NO;
+      __block NSModalResponse sheetResponse = NSModalResponseCancel;
+      [panel beginSheetModalForWindow:parent completionHandler:^(NSModalResponse value) {
+        sheetResponse = value;
+        finished = YES;
+      }];
+      while (!finished) {
+        @autoreleasepool {
+          [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode
+                                   beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
+        }
+      }
+      response = sheetResponse;
+    } else {
+      response = [panel runModal];
+    }
     if (response != NSModalResponseOK) return result;
 
     result.accepted = true;

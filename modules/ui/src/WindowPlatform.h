@@ -75,6 +75,11 @@ class WindowHost {
   virtual void dispatchCandidates(std::vector<std::string> candidates, size_t selected) = 0;
   virtual void dispatchDelete(int32_t index, uint32_t length) = 0;
   virtual void dispatchScroll(const ScrollEvent& event) = 0;
+  /** Trackpad magnification/rotation/swipe; platforms without gestures keep the default no-op. */
+  virtual bool dispatchGesture(const GestureEvent& event) {
+    (void)event;
+    return false;
+  }
   virtual void dispatchDrop(const DropEvent& event) = 0;
   /**
    * External (OS) drag routing.
@@ -97,11 +102,22 @@ class WindowHost {
     return DragEffect::None;
   }
   virtual void platformResized(int width, int height) = 0;
+  /**
+   * The OS hid the window (occluded by another app, app hidden, minimised on a platform that reports
+   * it this way). An automatic loop stops producing frames until it is visible again; an explicit
+   * `Window::renderFrame()` still renders, which snapshot and export code relies on.
+   */
+  virtual void platformOcclusionChanged(bool visible) {
+    (void)visible;
+  }
   /** Runs one frame from inside a platform modal loop (Win32 live resize). */
   virtual void renderFrameNow() = 0;
   /** Requests a frame for the next UI-loop iteration. */
   virtual void requestFrame() = 0;
+  virtual bool canClose() const = 0;
   virtual void requestClose() = 0;
+  /** Closes without consulting the interceptor; only call after `canClose()` returned true. */
+  virtual void closeWindow() = 0;
   /**
    * The system appearance settings changed (high contrast, theme, animation policy).
    *
@@ -298,10 +314,43 @@ class WindowPlatform {
    */
   virtual void setPointerCapture(bool captured) { (void)captured; }
   virtual void setDecorations(Window::Decorations decorations) { (void)decorations; }
+  virtual void setToolbarItems(std::vector<Window::ToolbarItem> items) { (void)items; }
+  virtual void setToolbarVisible(bool visible) { (void)visible; }
+  virtual void setToolbarActionHandler(std::function<void(std::string_view)> handler) {
+    (void)handler;
+  }
+  virtual void setTitlebarAccessoryItems(std::vector<Window::TitlebarAccessoryItem> items) {
+    (void)items;
+  }
+  virtual void setTitlebarAccessorySelectionHandler(std::function<void(int)> handler) {
+    (void)handler;
+  }
+  virtual void setSidebarItems(std::vector<Window::SidebarItem> items) {
+    (void)items;
+  }
+  virtual void setSidebarVisible(bool visible) {
+    (void)visible;
+  }
+  virtual void setSidebarSelectionHandler(std::function<void(std::string_view)> handler) {
+    (void)handler;
+  }
+  [[nodiscard]] virtual std::string selectedSidebarItem() const {
+    return {};
+  }
+  virtual void setSecureInputEnabled(bool enabled) {
+    (void)enabled;
+  }
+  [[nodiscard]] virtual bool isSecureInputEnabled() const {
+    return false;
+  }
   virtual void setOpacity(float opacity) { (void)opacity; }
   virtual void setAlwaysOnTop(bool onTop) { (void)onTop; }
   /** The OS light/dark preference; a platform without one reports light. */
   [[nodiscard]] virtual bool prefersDarkAppearance() const { return false; }
+  /** EDR headroom of the window's display, 1.0 for SDR. */
+  [[nodiscard]] virtual float displayHeadroom() const { return 1.0f; }
+  /** True when the display advertises Display P3 / wide gamut. */
+  [[nodiscard]] virtual bool supportsWideColor() const { return false; }
   /**
    * The system's current appearance: high contrast, the light/dark preference and the animation policy.
    *

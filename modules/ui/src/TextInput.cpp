@@ -125,6 +125,7 @@ TextInput::TextInput(std::string text, std::shared_ptr<const graphics::Font> fon
   setClip(true);
   setAccessibleRole(AccessibilityRole::TextField);
   setAccessibleEditable(true);
+  setAccessibleValue(mText);
 
   // Dragging a press that lands inside an existing selection out of the field starts a platform drag
   // carrying the marked text. The press captures the text because it collapses the selection.
@@ -620,6 +621,29 @@ void TextInput::drawSelectionForLine(RenderContext& context, const TextLine& lin
   }
 }
 
+void TextInput::drawSpellIssuesForLine(RenderContext& context, const TextLine& line,
+    const float left, const float top, const float height) {
+  if (!mSpellCheckEnabled || mSpellIssues.empty() || line.start >= line.end) return;
+  graphics::Paint paint;
+  paint.color = Color::MakeRGBA8(220, 80, 80, 230);
+  paint.style = graphics::Paint::Style::kFill;
+  for (const SpellIssue& issue: mSpellIssues) {
+    const size_t begin = std::max(issue.begin, line.start);
+    const size_t end = std::min(issue.end, line.end);
+    if (begin >= end) continue;
+    const float firstX = left + xForIndexInLine(begin, line);
+    const float secondX = left + xForIndexInLine(end, line);
+    context.canvas().drawRect(Rect::MakeXYWH(std::min(firstX, secondX), top + height - 2.0f,
+      std::max(1.0f, std::abs(secondX - firstX)), 1.5f), paint);
+  }
+}
+
+void TextInput::setSpellCheckEnabled(const bool enabled) {
+  if (mSpellCheckEnabled == enabled) return;
+  mSpellCheckEnabled = enabled;
+  refreshSpellIssues();
+}
+
 void TextInput::drawSelf(RenderContext& context) {
   auto& canvas = context.canvas();
   if (mBordered) {
@@ -666,6 +690,7 @@ void TextInput::drawSelf(RenderContext& context) {
           std::max(selectionBegin, line.start), std::min(selectionEndValue, line.end));
       }
       drawLine(context, line, left, baseline, text, index);
+      drawSpellIssuesForLine(context, line, left, lineTop + 3.0f, lineHeightValue - 6.0f);
     }
     if (mText.empty() && !mPlaceholder.empty()) {
       if (mPlaceholderPainter == nullptr) mPlaceholderPainter = std::make_unique<TextPainter>();
@@ -744,6 +769,10 @@ void TextInput::drawSelf(RenderContext& context) {
   } else {
     if (mTextPainter == nullptr) mTextPainter = std::make_unique<TextPainter>();
     mTextPainter->draw(context, mText, left, baseline, *mFont, text);
+  }
+  if (!mLayout.lines.empty()) {
+    drawSpellIssuesForLine(context, mLayout.lines.front(), left, bounds().getTop() + 6.0f,
+      bounds().getHeight() - 12.0f);
   }
   if (mFocused) {
     const float caretX = left + xForIndex(mCursor);
@@ -1166,29 +1195,62 @@ void TextInput::scrollBy(const float delta) {
 
 void TextInput::ensureContextMenu() {
   if (mContextMenu != nullptr || mFont == nullptr) return;
-  // Built on first use rather than in the constructor: the labels come from the theme's translator,
-  // and a control is theme-less until it is added to a tree.
+  // Created on first use; the items are rebuilt on every open because spelling suggestions depend on
+  // the word under the pointer.
   mContextMenu = std::make_shared<Menu>(mFont);
-  mContextMenu->addItem(tr("ui.textinput.cut", "Cut"), [this] { cutSelection(); });
-  mContextMenu->addItem(tr("ui.textinput.copy", "Copy"), [this] { copySelection(); });
-  mContextMenu->addItem(tr("ui.textinput.paste", "Paste"), [this] { paste(); });
-  mContextMenu->addSeparator();
-  mContextMenu->addItem(tr("ui.textinput.selectAll", "Select All"), [this] { selectAll(); });
   addChild(mContextMenu);
 }
 
 void TextInput::showContextMenu(const Point& position) {
   ensureContextMenu();
   if (mContextMenu == nullptr) return;
+  const auto range = wordRangeAt(mCursor);
+  mContextWordBegin = range.first;
+  mContextWordEnd = range.second;
+  std::vector<std::string> suggestions;
+  if (mContextWordEnd > mContextWordBegin) {
+    const std::string word = mText.substr(mContextWordBegin, mContextWordEnd - mContextWordBegin);
+    // Only offer replacements for a word the checker actually flags; guesses for a correct word are
+    // noise in a text-field context menu.
+    if (!spellCheck(word).empty()) suggestions = spellSuggestions(word);
+  }
+
+  mContextMenu->clear();
+  int index = 0;
+  for (const std::string& suggestion: suggestions) {
+    mContextMenu->addItem(suggestion, [this, suggestion] { replaceContextWord(suggestion); });
+    ++index;
+  }
+  if (index > 0) {
+    mContextMenu->addSeparator();
+    ++index;
+  }
+  mContextCutIndex = index;
+  mContextMenu->addItem(tr("ui.textinput.cut", "Cut"), [this] { cutSelection(); });
+  ++index;
+  mContextCopyIndex = index;
+  mContextMenu->addItem(tr("ui.textinput.copy", "Copy"), [this] { copySelection(); });
+  ++index;
+  mContextPasteIndex = index;
+  mContextMenu->addItem(tr("ui.textinput.paste", "Paste"), [this] { paste(); });
+  mContextMenu->addSeparator();
+  mContextMenu->addItem(tr("ui.textinput.selectAll", "Select All"), [this] { selectAll(); });
   updateContextMenu();
   mContextMenu->showAt(position);
 }
 
+void TextInput::replaceContextWord(const std::string& word) {
+  if (mContextWordEnd <= mContextWordBegin || mContextWordEnd > mText.size()) return;
+  mSelectionAnchor = mContextWordBegin;
+  mCursor = mContextWordEnd;
+  replaceSelection(word);
+}
+
 void TextInput::updateContextMenu() {
   if (mContextMenu == nullptr) return;
-  mContextMenu->setItemEnabled(0, hasSelection());
-  mContextMenu->setItemEnabled(1, hasSelection());
-  mContextMenu->setItemEnabled(2, !Clipboard::system()->getText().empty());
+  mContextMenu->setItemEnabled(mContextCutIndex, hasSelection());
+  mContextMenu->setItemEnabled(mContextCopyIndex, hasSelection());
+  mContextMenu->setItemEnabled(mContextPasteIndex, !Clipboard::system()->getText().empty());
 }
 
 void TextInput::copySelection() const {
@@ -1337,7 +1399,21 @@ void TextInput::applyTheme(const Theme& theme) {
   setNeedsPaint();
 }
 
+void TextInput::refreshSpellIssues() {
+  if (!mSpellCheckEnabled) {
+    if (!mSpellIssues.empty()) {
+      mSpellIssues.clear();
+      setNeedsPaint();
+    }
+    return;
+  }
+  mSpellIssues = spellCheck(mText);
+  setNeedsPaint();
+}
+
 void TextInput::notifyChanged() {
+  setAccessibleValue(mText);
+  refreshSpellIssues();
   mChanged.emit(mText);
 }
 

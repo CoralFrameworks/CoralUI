@@ -21,6 +21,7 @@
 
 #include <ui/Layer.h>
 #include <ui/Undo.h>
+#include <ui/SpellCheck.h>
 #include <ui/TextLayout.h>
 
 
@@ -85,6 +86,19 @@ class TextInput final : public Layer {
    * Composite fields (NumberField, SearchField) embed a TextInput and draw one border around the
    * whole control, so the inner field turns this off.
    */
+  /**
+   * Enables platform spell checking and paints a red underline under each misspelled byte range.
+   * Runs synchronously on text changes; a large document should use `spellCheck()` off the UI thread
+   * and set `spellIssues` through the app, which this convenience API does not model yet.
+   */
+  void setSpellCheckEnabled(bool enabled);
+  [[nodiscard]] bool spellCheckEnabled() const noexcept {
+    return mSpellCheckEnabled;
+  }
+  [[nodiscard]] const std::vector<SpellIssue>& spellIssues() const noexcept {
+    return mSpellIssues;
+  }
+
   void setBordered(bool bordered) {
     mBordered = bordered;
     setNeedsPaint();
@@ -218,6 +232,7 @@ class TextInput final : public Layer {
   void ensureContextMenu();
   void showContextMenu(const Point& position);
   void updateContextMenu();
+  void replaceContextWord(const std::string& word);
   [[nodiscard]] std::pair<size_t, size_t> wordRangeAt(size_t index) const;
   [[nodiscard]] std::pair<size_t, size_t> lineRangeAt(size_t index) const;
   void eraseWordBefore();
@@ -234,6 +249,9 @@ class TextInput final : public Layer {
     const Paint& paint, size_t painterIndex);
   void drawSelectionForLine(RenderContext& context, const TextLine& line, float left, float top,
     float height, size_t begin, size_t end);
+  void drawSpellIssuesForLine(RenderContext& context, const TextLine& line, float left, float top,
+    float height);
+  void refreshSpellIssues();
   [[nodiscard]] size_t lineIndexForCursor(size_t cursor) const;
   [[nodiscard]] size_t lineStart(int line) const;
   [[nodiscard]] size_t lineEnd(int line) const;
@@ -250,6 +268,8 @@ class TextInput final : public Layer {
   std::shared_ptr<const FontFallback> mFallback;
   bool mSystemFallback = false;
   LineBreakPolicy mPolicy;
+  bool mSpellCheckEnabled = false;
+  std::vector<SpellIssue> mSpellIssues;
   bool mPolicyExplicit = false;
   Color mBackground = Color::MakeRGBA8(24, 26, 32, 255);
   Color mBorder = Color::MakeRGBA8(62, 67, 78, 255);
@@ -269,6 +289,11 @@ class TextInput final : public Layer {
   std::vector<std::string> mUndo;
   std::vector<std::string> mRedo;
   std::shared_ptr<Menu> mContextMenu;
+  std::size_t mContextWordBegin = 0;
+  std::size_t mContextWordEnd = 0;
+  int mContextCutIndex = 0;
+  int mContextCopyIndex = 1;
+  int mContextPasteIndex = 2;
   std::chrono::steady_clock::time_point mLastClick{};
   Point mLastClickPosition{};
   int mClickCount = 0;
