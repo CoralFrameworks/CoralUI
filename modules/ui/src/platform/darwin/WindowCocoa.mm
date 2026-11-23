@@ -247,10 +247,12 @@ uint32_t argbFromColor(NSColor* color) {
 
 } // namespace coral::ui::detail
 
-/** The content view: first responder, pointer tracking and AppKit event translation. */
-@interface CoralUIView : NSView
+/** The content view: first responder, pointer tracking, AppKit event translation and IME. */
+@interface CoralUIView : NSView <NSTextInputClient>
 @property(nonatomic, assign) void* platform;
 @property(nonatomic, strong) NSTrackingArea* coralTrackingArea;
+/** The marked (composing) text's range in UTF-16 units of the surrounding text. */
+@property(nonatomic) NSRange coralMarkedRange;
 @end
 
 /** A borderless window still has to accept key/main status, or client-decorated windows lose input. */
@@ -359,6 +361,11 @@ class CocoaPlatform final : public WindowPlatform {
                                                    contentPoints.height)];
     mView.platform = this;
     mView.wantsLayer = YES;
+    // Finder files, plain text and URL strings. The view implements the destination side;
+    // NSDraggingSource is a later phase.
+    [mView registerForDraggedTypes:@[
+      NSPasteboardTypeFileURL, NSPasteboardTypeString, NSPasteboardTypeURL
+    ]];
     if (![mView.layer isKindOfClass:[CAMetalLayer class]]) {
       if (diagnostics != nullptr) *diagnostics = "the Cocoa content view has no CAMetalLayer";
       return false;
@@ -897,6 +904,11 @@ class CocoaPlatform final : public WindowPlatform {
   }
 
   /** Called by the window delegate when AppKit changed the content size or backing scale. */
+  void onFocusChanged(Layer* focused) override {
+    (void)focused;
+    if (mView != nil) [mView.inputContext invalidateCharacterCoordinates];
+  }
+
   void windowDidChangeGeometry() {
     if (mWindow == nil) return;
     const bool changed = updateBackingSize(true);
@@ -1013,6 +1025,62 @@ class CocoaPlatform final : public WindowPlatform {
 
   void requestCloseFromMenu() {
     if (mHost != nullptr) mHost->requestClose();
+  }
+
+  // --- IME / text-service entry points -------------------------------------------------------
+  void imeSetComposition(const std::string& text) {
+    if (mHost != nullptr) mHost->dispatchComposition(text);
+  }
+
+  void imeCommit(const std::string& text) {
+    if (mHost != nullptr) mHost->dispatchCommit(text);
+  }
+
+  void imeDelete(const int32_t index, const uint32_t length) {
+    if (mHost != nullptr) mHost->dispatchDelete(index, length);
+  }
+
+  [[nodiscard]] bool imeSurroundingText(std::string* text, size_t* cursor, size_t* anchor) const {
+    return mHost != nullptr && mHost->surroundingText(text, cursor, anchor);
+  }
+
+  [[nodiscard]] Rect imeCursorRect() const {
+    return mHost != nullptr ? mHost->imeCursorRect() : Rect{};
+  }
+
+  void performKeyCommand(const Key key, const bool shift = false, const bool control = false,
+      const bool alt = false, const bool meta = false) {
+    if (mHost == nullptr) return;
+    KeyEvent event;
+    event.key = key;
+    event.shift = shift;
+    event.control = control;
+    event.alt = alt;
+    event.meta = meta;
+    mHost->dispatchKey(event, true);
+  }
+
+  /**
+   * Routes one AppKit external drag callback into the window's layer tree.
+   *
+   * @param phase 0 enter, 1 over, 2 drop, 3 leave.
+   * @return the effect the tree accepted, for the drag cursor / drop result.
+   */
+  DragEffect externalDrag(const DragPayload& payload, const Point position,
+      const DragEffect allowed, const int phase) {
+    if (mHost == nullptr) return DragEffect::None;
+    if (phase == 3) {
+      mHost->dispatchDragLeave();
+      return DragEffect::None;
+    }
+    DragEvent event;
+    event.position = position;
+    event.payload = payload;
+    event.effect = allowed;
+    event.external = true;
+    if (phase == 0) return mHost->dispatchDragEnter(event);
+    if (phase == 1) return mHost->dispatchDragOver(event);
+    return mHost->dispatchDragDrop(event);
   }
 
  private:
@@ -1254,6 +1322,66 @@ class CocoaPlatform final : public WindowPlatform {
 
 using coral::ui::detail::CocoaPlatform;
 
+namespace {
+
+NSUInteger utf16Length(const std::string& utf8) {
+  if (utf8.empty()) return 0;
+  NSString* string = [[NSString alloc] initWithBytes:utf8.data() length:utf8.size()
+                                            encoding:NSUTF8StringEncoding];
+  return string != nil ? string.length : 0;
+}
+
+std::string utf8String(NSString* string) {
+  if (string == nil) return {};
+  const char* utf8 = string.UTF8String;
+  return utf8 != nullptr ? std::string(utf8) : std::string();
+}
+
+coral::ui::DragEffect effectFromOperation(const NSDragOperation operation) {
+  if ((operation & NSDragOperationCopy) != 0) return coral::ui::DragEffect::Copy;
+  if ((operation & NSDragOperationMove) != 0) return coral::ui::DragEffect::Move;
+  if ((operation & NSDragOperationLink) != 0) return coral::ui::DragEffect::Link;
+  if ((operation & NSDragOperationGeneric) != 0) return coral::ui::DragEffect::Copy;
+  return coral::ui::DragEffect::None;
+}
+
+NSDragOperation operationFromEffect(const coral::ui::DragEffect effect) {
+  switch (effect) {
+    case coral::ui::DragEffect::Copy: return NSDragOperationCopy;
+    case coral::ui::DragEffect::Move: return NSDragOperationMove;
+    case coral::ui::DragEffect::Link: return NSDragOperationLink;
+    case coral::ui::DragEffect::None:
+    default: return NSDragOperationNone;
+  }
+}
+
+coral::ui::DragPayload payloadFromPasteboard(NSPasteboard* pasteboard) {
+  if (pasteboard == nil) return {};
+  NSArray<NSURL*>* urls = [pasteboard readObjectsForClasses:@[ [NSURL class] ]
+                                                     options:@{
+                                                       NSPasteboardURLReadingFileURLsOnlyKey: @YES
+                                                     }];
+  if (urls.count > 0) {
+    std::vector<std::string> paths;
+    paths.reserve(urls.count);
+    for (NSURL* url in urls) {
+      const char* path = url.path.UTF8String;
+      if (path != nullptr) paths.emplace_back(path);
+    }
+    if (!paths.empty()) {
+      coral::ui::DragPayload payload = coral::ui::DragPayload::files(std::move(paths));
+      NSString* text = [pasteboard stringForType:NSPasteboardTypeString];
+      if (text.length > 0) payload.setSecondary("text/plain", utf8String(text));
+      return payload;
+    }
+  }
+  NSString* text = [pasteboard stringForType:NSPasteboardTypeString];
+  if (text.length > 0) return coral::ui::DragPayload::text(utf8String(text));
+  return {};
+}
+
+} // namespace
+
 @implementation CoralWindow
 
 - (BOOL)canBecomeKeyWindow {
@@ -1288,6 +1416,7 @@ using coral::ui::detail::CocoaPlatform;
 
 @synthesize platform = _platform;
 @synthesize coralTrackingArea = _coralTrackingArea;
+@synthesize coralMarkedRange = _coralMarkedRange;
 
 - (BOOL)isFlipped {
   // Kept unflipped: a flipped content view makes its backing CAMetalLayer geometry-flipped too, and
@@ -1421,6 +1550,15 @@ using coral::ui::detail::CocoaPlatform;
 - (void)keyDown:(NSEvent*)event {
   auto* platform = static_cast<CocoaPlatform*>(self.platform);
   if (platform == nullptr) return;
+  // Text entry goes through AppKit's input context so an IME can compose, while shortcuts and
+  // non-text focus keep the direct KeyEvent path. `interpretKeyEvents:` then calls insertText: or
+  // doCommandBySelector:, which this view maps back into the same TextInput operations.
+  const NSEventModifierFlags flags = event.modifierFlags;
+  const bool shortcut = (flags & (NSEventModifierFlagCommand | NSEventModifierFlagControl)) != 0;
+  if (!shortcut && platform->hasTextFocus()) {
+    [self interpretKeyEvents:@[ event ]];
+    return;
+  }
   platform->dispatchKeyEvent(event, true);
   platform->dispatchTextEvent(event);
 }
@@ -1495,6 +1633,208 @@ using coral::ui::detail::CocoaPlatform;
     return platform->hasTextFocus();
   }
   return YES;
+}
+
+// ==================================================================================================
+// NSTextInputClient: AppKit IME / marked text, mapped onto WindowHost's text hooks
+// ==================================================================================================
+
+- (BOOL)hasMarkedText {
+  return _coralMarkedRange.length > 0;
+}
+
+- (NSRange)markedRange {
+  return _coralMarkedRange.length > 0 ? _coralMarkedRange : NSMakeRange(NSNotFound, 0);
+}
+
+- (NSRange)selectedRange {
+  auto* platform = static_cast<CocoaPlatform*>(self.platform);
+  if (platform == nullptr) return NSMakeRange(NSNotFound, 0);
+  std::string text;
+  size_t cursor = 0;
+  size_t anchor = 0;
+  if (!platform->imeSurroundingText(&text, &cursor, &anchor)) return NSMakeRange(NSNotFound, 0);
+  const size_t start = std::min(cursor, anchor);
+  const size_t end = std::max(cursor, anchor);
+  const size_t clampedStart = std::min(start, text.size());
+  const size_t clampedEnd = std::min(end, text.size());
+  const NSUInteger location = utf16Length(text.substr(0, clampedStart));
+  const NSUInteger length = utf16Length(text.substr(0, clampedEnd)) - location;
+  return NSMakeRange(location, length);
+}
+
+- (void)setMarkedText:(id)string selectedRange:(NSRange)selectedRange
+    replacementRange:(NSRange)replacementRange {
+  (void)selectedRange;
+  (void)replacementRange;
+  auto* platform = static_cast<CocoaPlatform*>(self.platform);
+  if (platform == nullptr) return;
+  NSString* text = [string isKindOfClass:[NSAttributedString class]]
+    ? [(NSAttributedString*)string string] : (NSString*)string;
+  if (text.length == 0) {
+    [self unmarkText];
+    return;
+  }
+  const NSRange selection = [self selectedRange];
+  const NSUInteger base = selection.location != NSNotFound ? selection.location : 0;
+  _coralMarkedRange = NSMakeRange(base, utf16Length(utf8String(text)));
+  platform->imeSetComposition(utf8String(text));
+}
+
+- (void)unmarkText {
+  auto* platform = static_cast<CocoaPlatform*>(self.platform);
+  if (platform != nullptr) platform->imeSetComposition(std::string());
+  _coralMarkedRange = NSMakeRange(NSNotFound, 0);
+}
+
+- (void)insertText:(id)string replacementRange:(NSRange)replacementRange {
+  (void)replacementRange;
+  auto* platform = static_cast<CocoaPlatform*>(self.platform);
+  if (platform == nullptr) return;
+  NSString* text = [string isKindOfClass:[NSAttributedString class]]
+    ? [(NSAttributedString*)string string] : (NSString*)string;
+  _coralMarkedRange = NSMakeRange(NSNotFound, 0);
+  if (text.length == 0) {
+    platform->imeSetComposition(std::string());
+    return;
+  }
+  platform->imeCommit(utf8String(text));
+}
+
+- (NSAttributedString*)attributedSubstringForProposedRange:(NSRange)range
+                                               actualRange:(NSRangePointer)actualRange {
+  auto* platform = static_cast<CocoaPlatform*>(self.platform);
+  std::string text;
+  size_t cursor = 0;
+  size_t anchor = 0;
+  if (platform == nullptr || !platform->imeSurroundingText(&text, &cursor, &anchor)) return nil;
+  NSString* surrounding = [[NSString alloc] initWithBytes:text.data() length:text.size()
+                                                 encoding:NSUTF8StringEncoding];
+  if (surrounding == nil || range.location == NSNotFound ||
+      NSMaxRange(range) > surrounding.length) {
+    return nil;
+  }
+  if (actualRange != nullptr) *actualRange = range;
+  return [[NSAttributedString alloc] initWithString:[surrounding substringWithRange:range]];
+}
+
+- (NSArray<NSString*>*)validAttributesForMarkedText {
+  return @[ NSUnderlineStyleAttributeName ];
+}
+
+- (NSRect)firstRectForCharacterRange:(NSRange)range actualRange:(NSRangePointer)actualRange {
+  (void)range;
+  auto* platform = static_cast<CocoaPlatform*>(self.platform);
+  if (platform == nullptr || self.window == nil) return NSZeroRect;
+  const coral::ui::Rect caret = platform->imeCursorRect();
+  if (caret.getWidth() <= 0.0f && caret.getHeight() <= 0.0f) return NSZeroRect;
+  if (actualRange != nullptr) *actualRange = NSMakeRange(NSNotFound, 0);
+  // imeCursorRect is top-left logical; the view is unflipped.
+  const NSPoint viewPoint = NSMakePoint(caret.getLeft(),
+    self.bounds.size.height - caret.getBottom());
+  const NSPoint windowPoint = [self convertPoint:viewPoint toView:nil];
+  const NSRect windowRect = NSMakeRect(windowPoint.x, windowPoint.y,
+    std::max(1.0f, caret.getWidth()), std::max(1.0f, caret.getHeight()));
+  return [self.window convertRectToScreen:windowRect];
+}
+
+- (NSUInteger)characterIndexForPoint:(NSPoint)point {
+  (void)point;
+  return NSNotFound;
+}
+
+- (void)doCommandBySelector:(SEL)selector {
+  auto* platform = static_cast<CocoaPlatform*>(self.platform);
+  if (platform == nullptr) {
+    [super doCommandBySelector:selector];
+    return;
+  }
+  if (selector == @selector(deleteBackward:)) {
+    platform->performKeyCommand(coral::ui::Key::Backspace);
+  } else if (selector == @selector(deleteForward:)) {
+    platform->performKeyCommand(coral::ui::Key::Delete);
+  } else if (selector == @selector(deleteWordBackward:)) {
+    platform->performKeyCommand(coral::ui::Key::Backspace, false, false, true);
+  } else if (selector == @selector(deleteWordForward:)) {
+    platform->performKeyCommand(coral::ui::Key::Delete, false, false, true);
+  } else if (selector == @selector(moveLeft:)) {
+    platform->performKeyCommand(coral::ui::Key::Left);
+  } else if (selector == @selector(moveRight:)) {
+    platform->performKeyCommand(coral::ui::Key::Right);
+  } else if (selector == @selector(moveUp:)) {
+    platform->performKeyCommand(coral::ui::Key::Up);
+  } else if (selector == @selector(moveDown:)) {
+    platform->performKeyCommand(coral::ui::Key::Down);
+  } else if (selector == @selector(moveWordLeft:)) {
+    platform->performKeyCommand(coral::ui::Key::Left, false, false, true);
+  } else if (selector == @selector(moveWordRight:)) {
+    platform->performKeyCommand(coral::ui::Key::Right, false, false, true);
+  } else if (selector == @selector(moveToBeginningOfLine:)) {
+    platform->performKeyCommand(coral::ui::Key::Home);
+  } else if (selector == @selector(moveToEndOfLine:)) {
+    platform->performKeyCommand(coral::ui::Key::End);
+  } else if (selector == @selector(moveToBeginningOfDocument:)) {
+    platform->performKeyCommand(coral::ui::Key::Home);
+  } else if (selector == @selector(moveToEndOfDocument:)) {
+    platform->performKeyCommand(coral::ui::Key::End);
+  } else if (selector == @selector(pageUp:) || selector == @selector(scrollPageUp:)) {
+    platform->performKeyCommand(coral::ui::Key::PageUp);
+  } else if (selector == @selector(pageDown:) || selector == @selector(scrollPageDown:)) {
+    platform->performKeyCommand(coral::ui::Key::PageDown);
+  } else if (selector == @selector(insertNewline:)) {
+    platform->performKeyCommand(coral::ui::Key::Enter);
+  } else if (selector == @selector(insertTab:)) {
+    platform->performKeyCommand(coral::ui::Key::Tab);
+  } else if (selector == @selector(insertBacktab:)) {
+    platform->performKeyCommand(coral::ui::Key::Tab, true);
+  } else if (selector == @selector(cancelOperation:)) {
+    platform->performKeyCommand(coral::ui::Key::Escape);
+  } else {
+    [super doCommandBySelector:selector];
+  }
+}
+
+// ==================================================================================================
+// NSDraggingDestination: external files/text into the layer tree
+// ==================================================================================================
+
+- (coral::ui::DragEffect)coralDrag:(id<NSDraggingInfo>)sender phase:(int)phase {
+  auto* platform = static_cast<CocoaPlatform*>(self.platform);
+  if (platform == nullptr) return coral::ui::DragEffect::None;
+  const NSPoint windowPoint = [sender draggingLocation];
+  const NSPoint viewPoint = [self convertPoint:windowPoint fromView:nil];
+  const coral::ui::Point logical{ static_cast<float>(viewPoint.x),
+    static_cast<float>(self.bounds.size.height - viewPoint.y) };
+  coral::ui::DragPayload payload = phase == 3
+    ? coral::ui::DragPayload{} : payloadFromPasteboard([sender draggingPasteboard]);
+  const coral::ui::DragEffect allowed =
+    effectFromOperation([sender draggingSourceOperationMask]);
+  return platform->externalDrag(payload, logical, allowed, phase);
+}
+
+- (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender {
+  return operationFromEffect([self coralDrag:sender phase:0]);
+}
+
+- (NSDragOperation)draggingUpdated:(id<NSDraggingInfo>)sender {
+  return operationFromEffect([self coralDrag:sender phase:1]);
+}
+
+- (void)draggingExited:(id<NSDraggingInfo>)sender {
+  (void)[self coralDrag:sender phase:3];
+}
+
+- (BOOL)prepareForDragOperation:(id<NSDraggingInfo>)sender {
+  (void)sender;
+  return YES;
+}
+
+- (BOOL)performDragOperation:(id<NSDraggingInfo>)sender {
+  return [self coralDrag:sender phase:2] != coral::ui::DragEffect::None;
+}
+
+- (BOOL)wantsPeriodicDraggingUpdates {
+  return NO;
 }
 
 - (void)resetCursorRects {

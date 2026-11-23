@@ -31,14 +31,15 @@
 
 #### 1.1 输入法 / 文本服务（`NSTextInputClient`）
 
-- [ ] `CoralUIView` 实现 `NSTextInputClient`；
-- [ ] `interpretKeyEvents:` 接入 AppKit 文本系统；
-- [ ] marked text / unmark / commit 映射到 `WindowHost::dispatchComposition/Commit`；
-- [ ] 候选窗定位：`firstRectForCharacterRange:` 使用 `WindowHost::imeCursorRect()`；
-- [ ] `doCommandBySelector:` 把方向键、退格、删除、回车等翻译成 `KeyEvent`；
-- [ ] surrounding text / selected range（可选，按 IME 需要逐步补齐）；
+- [x] `CoralUIView` 实现 `NSTextInputClient`；
+- [x] `interpretKeyEvents:` 接入 AppKit 文本系统（文本焦点走 IME，非文本焦点/快捷键走原 KeyEvent 路径）；
+- [x] marked text / unmark / commit 映射到 `WindowHost::dispatchComposition/Commit`；
+- [x] 候选窗定位：`firstRectForCharacterRange:` 使用 `WindowHost::imeCursorRect()` 并转换到屏幕坐标；
+- [x] `doCommandBySelector:` 把方向键、退格、删除、回车、Tab、PageUp/Down 等翻译成 `KeyEvent`；
+- [x] surrounding text / selected range：UTF-8 字节偏移转换为 UTF-16 范围，供 IME 查询；
 - [ ] 中文、日文、韩文输入法手工验证；
-- [ ] 死键、Option 变音、emoji picker 验证。
+- [ ] 死键、Option 变音、emoji picker 验证；
+- [ ] marked text 内部 selection / replacementRange / secure input / spell check 仍待补。
 
 验收：在 `ui_demo` 的 `TextInput` 中可以用 macOS 简体中文输入法输入、选择候选词、删除组合文本；`NSTextInputClient` 的标记文本与 CoralUI 的 composition 显示一致。
 
@@ -70,13 +71,15 @@
 
 #### 1.4 拖放（NSDraggingSource / NSDraggingDestination）
 
-- [ ] 注册 `NSPasteboardTypeFileURL` / `NSURL` / `NSString`；
-- [ ] `draggingEntered/Updated/Exited/performDragOperation` → `DragEvent`/`DropEvent`；
-- [ ] 外部落入路径、位置、effect、拖拽光标；
-- [ ] 内部 drag 与外部 drag 的统一；
+- [x] 注册 `NSPasteboardTypeFileURL` / `NSPasteboardTypeURL` / `NSPasteboardTypeString`；
+- [x] `draggingEntered/Updated/Exited/performDragOperation` → `DragEvent`/`DropEvent`；
+- [x] 外部落入路径、位置、effect、拖拽光标（文件 URL 主类型 + text/plain secondary）；
+- [x] 外部 drag 进入 `WindowImpl::routeExternalDrag()`，与内部 drag 共用目标命中；
 - [ ] 从 CoralUI 拖出到 Finder（`NSDraggingSource` + `NSPasteboardWriting`）；
-- [ ] file promise / 多文件；
-- [ ] 验收 demo：把文件拖进窗口，拖出文本/文件。
+- [ ] file promise / 多文件（多文件 URL 已解析，promise 未支持）；
+- [ ] 验收 demo：把文件拖进窗口，拖出文本/文件（需要真实 Finder 手工测试）。
+
+当前只实现了 **destination**（接收外部拖放）；**source**（从 CoralUI 拖出）仍缺。
 
 #### 1.5 Sheet、原生弹窗与文件对话框增强
 
@@ -139,6 +142,8 @@
 | 2026-11-23 | 创建 `feature/macos-gui-capabilities` 与本文档；阶段一任务拆解 | 已完成 |
 | 2026-11-23 | 阶段 1.3：`CoralAppDelegate`、App/File/Edit/Window 菜单、Edit 命令转译、基础菜单校验 | 已完成（CommandRegistry/右键菜单/完整生命周期待补） |
 | 2026-11-23 | 阶段 1.6：`ui_demo.app` bundle、Info.plist、版本/标识；headless CTest 从 bundle 内可执行文件运行 | 已完成（签名/公证/universal 待补） |
+| 2026-11-23 | 阶段 1.1：`NSTextInputClient`、interpretKeyEvents、marked/commit、候选窗 anchor、doCommandBySelector、UTF-16 selectedRange | 代码完成，待真实中日韩输入法手工验收 |
+| 2026-11-23 | 阶段 1.4：`NSDraggingDestination` 外部文件/文本落入、effect 映射、drag cursor | destination 完成，source/file promise 待补 |
 
 ## 5. 问题记录
 
@@ -156,6 +161,9 @@
 - 原生菜单目前是标准 App/File/Edit/Window；`CommandRegistry` 命令还未生成菜单项，需要“命令显示名/分组/排序”的公开元数据。
 - 菜单编辑动作通过转译成 `KeyEvent` 走 `TextInput`，没有基于 responder 的文本编辑器；撤销/重做等只对焦点控件有效。
 - `CoralAppDelegate` 目前只实现 secure restorable state 和 last-window 策略；open files、reopen、termination 拦截仍待补。
+- IME：`setMarkedText` 忽略 marked text 内部的 selection 和 replacementRange；`selectedRange` 只做 UTF-8→UTF-16 的 caret/selection 映射；尚未验证真实中文/日文/韩文候选窗和死键。CJK 输入法需要在真实前台会话中手工测试。
+- IME 的 `validAttributesForMarkedText` 只声明了下划线，marked text 仍由 CoralUI 的 composition 绘制；没有使用 AppKit 的 attributed marked text 渲染。
+- 拖放目前只实现 destination；`NSDraggingSource`（从 layer 拖到 Finder/其他 app）和 file promise 未实现。外部拖放的 UI 光标/落点需要真实 Finder 手工验收。
 
 - 全量 UI target + blit 每帧，Cocoa 未启用 damage/retained/frame-plan。
 - 无 CVDisplayLink，`refreshHertz` 来自 `PresentFrameClock`，不代表真实显示刷新。
