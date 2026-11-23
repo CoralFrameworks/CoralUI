@@ -133,17 +133,19 @@ int main() {
       sidebarSelection = std::string(identifier);
     });
     window->setSidebarItems({
+      { "section", "Section", "", true },
       { "one", "One", "folder" },
       { "two", "Two", "gearshape" },
     });
     NSSplitViewController* split = (NSSplitViewController*)native.contentViewController;
     NSTableView* sidebar = findTableView(split.view);
     if (![split isKindOfClass:[NSSplitViewController class]] || split.splitViewItems.count != 2 ||
-        sidebar == nil || sidebar.numberOfRows != 2) {
+        sidebar == nil || sidebar.numberOfRows != 3 ||
+        ![sidebar.delegate tableView:sidebar isGroupRow:0]) {
       std::fprintf(stderr, "FAIL: native sidebar did not expose its split item/rows\n");
       return 1;
     }
-    [sidebar selectRowIndexes:[NSIndexSet indexSetWithIndex:1] byExtendingSelection:NO];
+    [sidebar selectRowIndexes:[NSIndexSet indexSetWithIndex:2] byExtendingSelection:NO];
     if (sidebarSelection != "two") {
       std::fprintf(stderr, "FAIL: sidebar selection produced '%s'\n", sidebarSelection.c_str());
       return 1;

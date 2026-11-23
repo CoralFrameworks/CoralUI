@@ -242,6 +242,8 @@ class Window final : public Renderer {
     std::string id;
     std::string label;
     std::string symbol;
+    /** A non-selectable section header in the native source list. */
+    bool group = false;
   };
 
   /** macOS native window tabbing preference; ignored by the other backends. */

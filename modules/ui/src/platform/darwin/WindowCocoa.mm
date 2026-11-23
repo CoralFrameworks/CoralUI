@@ -276,6 +276,7 @@ uint32_t argbFromColor(NSColor* color) {
 @property(nonatomic, strong) NSArray<NSString*>* identifiers;
 @property(nonatomic, strong) NSArray<NSString*>* labels;
 @property(nonatomic, strong) NSArray<NSString*>* symbols;
+@property(nonatomic, strong) NSIndexSet* groupRows;
 @property(nonatomic, strong) NSTableView* table;
 @end
 
@@ -723,7 +724,10 @@ class CocoaPlatform final : public WindowPlatform {
     NSMutableArray<NSString*>* identifiers = [NSMutableArray arrayWithCapacity:mSidebarItems.size()];
     NSMutableArray<NSString*>* labels = [NSMutableArray arrayWithCapacity:mSidebarItems.size()];
     NSMutableArray<NSString*>* symbols = [NSMutableArray arrayWithCapacity:mSidebarItems.size()];
-    for (const Window::SidebarItem& item: mSidebarItems) {
+    NSMutableIndexSet* groupRows = [NSMutableIndexSet indexSet];
+    for (std::size_t index = 0; index < mSidebarItems.size(); ++index) {
+      const Window::SidebarItem& item = mSidebarItems[index];
+      if (item.group) [groupRows addIndex:index];
       [identifiers addObject:item.id.empty()
         ? [NSString stringWithFormat:@"coral.sidebar.%zu", identifiers.count]
         : [NSString stringWithUTF8String:item.id.c_str()]];
@@ -736,6 +740,7 @@ class CocoaPlatform final : public WindowPlatform {
     mSidebarController.identifiers = identifiers;
     mSidebarController.labels = labels;
     mSidebarController.symbols = symbols;
+    mSidebarController.groupRows = groupRows;
     [mSidebarController.table reloadData];
     if (mSidebarSplitItem == nil) {
       NSViewController* sidebar = [[NSViewController alloc] init];
@@ -849,7 +854,8 @@ class CocoaPlatform final : public WindowPlatform {
     mToolbar = [[NSToolbar alloc] initWithIdentifier:@"CoralUIToolbar"];
     mToolbar.delegate = mToolbarDelegate;
     mToolbar.displayMode = NSToolbarDisplayModeIconAndLabel;
-    mToolbar.allowsUserCustomization = NO;
+    mToolbar.allowsUserCustomization = YES;
+    mToolbar.autosavesConfiguration = YES;
     if (@available(macOS 11.0, *)) mWindow.toolbarStyle = NSWindowToolbarStyleUnified;
     if (mToolbarVisible) mWindow.toolbar = mToolbar;
   }
@@ -2044,6 +2050,7 @@ coral::ui::DragPayload payloadFromPasteboard(NSPasteboard* pasteboard) {
 @synthesize identifiers = _identifiers;
 @synthesize labels = _labels;
 @synthesize symbols = _symbols;
+@synthesize groupRows = _groupRows;
 @synthesize table = _table;
 
 - (NSInteger)numberOfRowsInTableView:(NSTableView*)tableView {
@@ -2074,13 +2081,26 @@ coral::ui::DragPayload payloadFromPasteboard(NSPasteboard* pasteboard) {
     cell.textField = label;
   }
   cell.textField.stringValue = _labels[static_cast<NSUInteger>(row)];
-  NSString* symbol = _symbols[static_cast<NSUInteger>(row)];
+  const bool group = _groupRows != nil && [_groupRows containsIndex:static_cast<NSUInteger>(row)];
+  cell.textField.font = group ? [NSFont boldSystemFontOfSize:11.0]
+                              : [NSFont systemFontOfSize:13.0];
+  NSString* symbol = group ? @"" : _symbols[static_cast<NSUInteger>(row)];
   if (symbol.length > 0 && @available(macOS 11.0, *)) {
     cell.imageView.image = [NSImage imageWithSystemSymbolName:symbol accessibilityDescription:nil];
   } else {
     cell.imageView.image = nil;
   }
   return cell;
+}
+
+- (BOOL)tableView:(NSTableView*)tableView isGroupRow:(NSInteger)row {
+  (void)tableView;
+  return _groupRows != nil && [_groupRows containsIndex:static_cast<NSUInteger>(row)];
+}
+
+- (BOOL)tableView:(NSTableView*)tableView shouldSelectRow:(NSInteger)row {
+  (void)tableView;
+  return _groupRows == nil || ![_groupRows containsIndex:static_cast<NSUInteger>(row)];
 }
 
 - (void)tableViewSelectionDidChange:(NSNotification*)notification {
