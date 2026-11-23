@@ -94,6 +94,7 @@ set(PUBLIC_HDRS
     include/ui/TextLayout.h
     include/ui/TextRendererStats.h
     include/ui/SystemFonts.h
+    include/ui/SystemImage.h
     include/ui/Motion.h
     include/ui/NumberFormat.h
     include/ui/Spinner.h
@@ -261,6 +262,10 @@ if (WIN32)
   set(FILEDIALOG_PLATFORM_SOURCE src/platform/win32/FileDialogWin32.cpp)
 endif ()
 
+if (NOT APPLE OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  target_sources(${TARGET} PRIVATE src/platform/SystemImageFallback.cpp)
+endif ()
+
 if (APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   # The Cocoa window: one NSWindow whose content view is backed by a CAMetalLayer, handed to
   # graphics::gpu::WindowSurface. AppKit's event queue is drained from the framework's own run loop,
@@ -270,9 +275,11 @@ if (APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   find_library(QUARTZCORE_FRAMEWORK QuartzCore REQUIRED)
   find_library(UNIFORMTYPEIDENTIFIERS_FRAMEWORK UniformTypeIdentifiers REQUIRED)
   target_sources(${TARGET} PRIVATE src/platform/darwin/WindowCocoa.mm
-      src/platform/darwin/ClipboardCocoa.mm src/platform/darwin/FileDialogCocoa.mm)
+      src/platform/darwin/ClipboardCocoa.mm src/platform/darwin/FileDialogCocoa.mm
+      src/platform/darwin/SystemImageCocoa.mm)
   set_source_files_properties(src/platform/darwin/WindowCocoa.mm
       src/platform/darwin/ClipboardCocoa.mm src/platform/darwin/FileDialogCocoa.mm
+      src/platform/darwin/SystemImageCocoa.mm
       PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
   target_link_libraries(${TARGET} PRIVATE $<BUILD_INTERFACE:${COCOA_FRAMEWORK}>
       $<BUILD_INTERFACE:${METAL_FRAMEWORK}> $<BUILD_INTERFACE:${QUARTZCORE_FRAMEWORK}>

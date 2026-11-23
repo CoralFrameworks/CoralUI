@@ -22,6 +22,7 @@
 
 #include <ui/Button.h>
 #include <ui/Flex.h>
+#include <ui/SystemImage.h>
 #include <ui/TextInput.h>
 #include <ui/Window.h>
 
@@ -104,7 +105,14 @@ int main() {
         input->text().c_str(), [view hasMarkedText] ? 1 : 0);
       return 1;
     }
-    std::printf("native AX/IME smoke: roles, AXPress and IME commit passed\n");
+    const graphics::Image symbol = coral::ui::systemSymbolImage("gearshape", { .pointSize = 16.0f });
+    if (!coral::ui::supportsSystemSymbols() || symbol.isEmpty()) {
+      std::fprintf(stderr, "FAIL: SF Symbol did not resolve to an image\n");
+      return 1;
+    }
+
+    std::printf("native AX/IME/symbol smoke: roles, AXPress, IME commit and %dx%d SF Symbol passed\n",
+      symbol.width(), symbol.height());
     return 0;
   }
 }
