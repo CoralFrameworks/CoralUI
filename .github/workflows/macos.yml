@@ -82,3 +82,14 @@ jobs:
         run: >
           ctest --test-dir build --output-on-failure
           -R "^(test_ui|test_ui_shared_device|ui_native_smoke|ui_native_ax_smoke|example_ui_demo_headless|example_ui_mvvm_headless)$"
+
+      - name: Collect crash reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-crash-reports
+          path: |
+            ~/Library/Logs/DiagnosticReports/**
+            build/**/*.crash
+          if-no-files-found: ignore
+          retention-days: 7
