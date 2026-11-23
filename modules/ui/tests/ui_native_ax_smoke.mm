@@ -36,6 +36,26 @@
 
 namespace {
 
+NSView* findCoralContentView(NSView* root) {
+  if (root == nil) return nil;
+  if ([root respondsToSelector:@selector(setMarkedText:selectedRange:replacementRange:)]) {
+    return root;
+  }
+  for (NSView* child in root.subviews) {
+    if (NSView* found = findCoralContentView(child)) return found;
+  }
+  return nil;
+}
+
+NSTableView* findTableView(NSView* root) {
+  if (root == nil) return nil;
+  if ([root isKindOfClass:[NSTableView class]]) return (NSTableView*)root;
+  for (NSView* child in root.subviews) {
+    if (NSTableView* found = findTableView(child)) return found;
+  }
+  return nil;
+}
+
 id findElementByLabel(id root, const std::string& wanted) {
   NSMutableArray* pending = [NSMutableArray arrayWithObject:root];
   while (pending.count > 0) {
@@ -76,7 +96,11 @@ int main() {
     window->pump();
 
     NSWindow* native = [NSApp windows].firstObject;
-    NSView* view = native.contentView;
+    NSView* view = findCoralContentView(native.contentView);
+    if (view == nil) {
+      std::fprintf(stderr, "FAIL: could not find the CoralUI content view\n");
+      return 1;
+    }
 
     // Native NSToolbar: items resolve through the delegate and an item action reaches the window.
     std::string activated;
@@ -98,6 +122,28 @@ int main() {
       return 1;
     }
     window->setToolbarItems({});
+
+    std::string sidebarSelection;
+    window->setSidebarSelectionHandler([&sidebarSelection](std::string_view identifier) {
+      sidebarSelection = std::string(identifier);
+    });
+    window->setSidebarItems({
+      { "one", "One", "folder" },
+      { "two", "Two", "gearshape" },
+    });
+    NSSplitViewController* split = (NSSplitViewController*)native.contentViewController;
+    NSTableView* sidebar = findTableView(split.view);
+    if (![split isKindOfClass:[NSSplitViewController class]] || split.splitViewItems.count != 2 ||
+        sidebar == nil || sidebar.numberOfRows != 2) {
+      std::fprintf(stderr, "FAIL: native sidebar did not expose its split item/rows\n");
+      return 1;
+    }
+    [sidebar selectRowIndexes:[NSIndexSet indexSetWithIndex:1] byExtendingSelection:NO];
+    if (sidebarSelection != "two") {
+      std::fprintf(stderr, "FAIL: sidebar selection produced '%s'\n", sidebarSelection.c_str());
+      return 1;
+    }
+    window->setSidebarItems({});
 
     window->setSecureInputEnabled(true);
     if (!window->isSecureInputEnabled()) {

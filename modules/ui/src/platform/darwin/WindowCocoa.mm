@@ -271,6 +271,19 @@ uint32_t argbFromColor(NSColor* color) {
 @property(nonatomic, assign) NSDragOperation allowed;
 @end
 
+@interface CoralSidebarController : NSObject <NSTableViewDataSource, NSTableViewDelegate>
+@property(nonatomic, assign) void* platform;
+@property(nonatomic, strong) NSArray<NSString*>* identifiers;
+@property(nonatomic, strong) NSArray<NSString*>* labels;
+@property(nonatomic, strong) NSArray<NSString*>* symbols;
+@property(nonatomic, strong) NSTableView* table;
+@end
+
+/** Forwards split-pane resizes to the platform so the Metal layer follows the content pane. */
+@interface CoralSplitViewController : NSSplitViewController
+@property(nonatomic, assign) void* platform;
+@end
+
 @interface CoralToolbarTarget : NSObject
 @property(nonatomic, assign) void* platform;
 - (void)activate:(id)sender;
@@ -325,6 +338,13 @@ class CocoaPlatform final : public WindowPlatform {
     if (mToolbarDelegate != nil) {
       mToolbarDelegate.platform = nullptr;
       mToolbarDelegate.target.platform = nullptr;
+    }
+    if (mSplitController != nil) {
+      mSplitController.platform = nullptr;
+      mWindow.contentViewController = nil;
+      mSplitController = nil;
+      mSidebarController = nil;
+      mSidebarSplitItem = nil;
     }
     if (mWindow != nil) {
       mWindow.toolbar = nil;
@@ -462,7 +482,12 @@ class CocoaPlatform final : public WindowPlatform {
     mDelegate = [[CoralUIWindowDelegate alloc] init];
     mDelegate.platform = this;
     mWindow.delegate = mDelegate;
-    mWindow.contentView = mView;
+    NSViewController* content = [[NSViewController alloc] init];
+    content.view = mView;
+    mSplitController = [[CoralSplitViewController alloc] init];
+    mSplitController.platform = this;
+    [mSplitController addSplitViewItem:[NSSplitViewItem splitViewItemWithViewController:content]];
+    mWindow.contentViewController = mSplitController;
     [mWindow makeFirstResponder:mView];
     [mWindow makeKeyAndOrderFront:nil];
     [NSApp activateIgnoringOtherApps:YES];
@@ -652,6 +677,99 @@ class CocoaPlatform final : public WindowPlatform {
     }
     mSurface.reset();
     return createSurface();
+  }
+
+  void setSidebarItems(std::vector<Window::SidebarItem> items) override {
+    mSidebarItems = std::move(items);
+    applySidebar();
+  }
+
+  void setSidebarVisible(const bool visible) override {
+    mSidebarVisible = visible;
+    if (mSidebarSplitItem != nil) mSidebarSplitItem.collapsed = !visible;
+  }
+
+  void setSidebarSelectionHandler(std::function<void(std::string_view)> handler) override {
+    mSidebarSelection = std::move(handler);
+  }
+
+  [[nodiscard]] std::string selectedSidebarItem() const override {
+    return mSelectedSidebarItem;
+  }
+
+  void sidebarSelectionChanged(const std::string_view identifier) {
+    mSelectedSidebarItem = std::string(identifier);
+    if (mSidebarSelection) mSidebarSelection(identifier);
+  }
+
+  void splitViewResized() {
+    if (mHost != nullptr) updateBackingSize(true);
+  }
+
+  void applySidebar() {
+    if (mSplitController == nil) return;
+    if (mSidebarItems.empty()) {
+      if (mSidebarSplitItem != nil) {
+        [mSplitController removeSplitViewItem:mSidebarSplitItem];
+        mSidebarSplitItem = nil;
+        mSidebarController = nil;
+      }
+      return;
+    }
+    if (mSidebarController == nil) {
+      mSidebarController = [[CoralSidebarController alloc] init];
+      mSidebarController.platform = this;
+    }
+    NSMutableArray<NSString*>* identifiers = [NSMutableArray arrayWithCapacity:mSidebarItems.size()];
+    NSMutableArray<NSString*>* labels = [NSMutableArray arrayWithCapacity:mSidebarItems.size()];
+    NSMutableArray<NSString*>* symbols = [NSMutableArray arrayWithCapacity:mSidebarItems.size()];
+    for (const Window::SidebarItem& item: mSidebarItems) {
+      [identifiers addObject:item.id.empty()
+        ? [NSString stringWithFormat:@"coral.sidebar.%zu", identifiers.count]
+        : [NSString stringWithUTF8String:item.id.c_str()]];
+      [labels addObject:item.label.empty()
+        ? [NSString stringWithUTF8String:item.id.c_str()]
+        : [NSString stringWithUTF8String:item.label.c_str()]];
+      [symbols addObject:item.symbol.empty() ? @"" :
+        [NSString stringWithUTF8String:item.symbol.c_str()]];
+    }
+    mSidebarController.identifiers = identifiers;
+    mSidebarController.labels = labels;
+    mSidebarController.symbols = symbols;
+    [mSidebarController.table reloadData];
+    if (mSidebarSplitItem == nil) {
+      NSViewController* sidebar = [[NSViewController alloc] init];
+      NSVisualEffectView* background = [[NSVisualEffectView alloc]
+        initWithFrame:NSMakeRect(0.0, 0.0, 220.0, std::max(1.0, mWindow.contentView.bounds.size.height))];
+      background.material = NSVisualEffectMaterialSidebar;
+      background.blendingMode = NSVisualEffectBlendingModeWithinWindow;
+      background.state = NSVisualEffectStateActive;
+      background.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+      NSScrollView* scroll = [[NSScrollView alloc] initWithFrame:background.bounds];
+      scroll.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+      scroll.hasVerticalScroller = YES;
+      scroll.drawsBackground = NO;
+      NSTableView* table = [[NSTableView alloc] initWithFrame:scroll.bounds];
+      table.headerView = nil;
+      table.rowSizeStyle = NSTableViewRowSizeStyleMedium;
+      table.selectionHighlightStyle = NSTableViewSelectionHighlightStyleSourceList;
+      table.allowsMultipleSelection = NO;
+      NSTableColumn* column = [[NSTableColumn alloc] initWithIdentifier:@"coral.sidebar.column"];
+      column.width = 220.0;
+      [table addTableColumn:column];
+      table.delegate = mSidebarController;
+      table.dataSource = mSidebarController;
+      mSidebarController.table = table;
+      scroll.documentView = table;
+      [background addSubview:scroll];
+      sidebar.view = background;
+      mSidebarSplitItem = [NSSplitViewItem sidebarWithViewController:sidebar];
+      mSidebarSplitItem.canCollapse = YES;
+      mSidebarSplitItem.minimumThickness = 160.0;
+      mSidebarSplitItem.maximumThickness = 320.0;
+      [mSplitController insertSplitViewItem:mSidebarSplitItem atIndex:0];
+    }
+    mSidebarSplitItem.collapsed = !mSidebarVisible;
   }
 
   void setSecureInputEnabled(const bool enabled) override {
@@ -1690,6 +1808,13 @@ class CocoaPlatform final : public WindowPlatform {
   std::function<void(std::string_view)> mToolbarAction;
   bool mToolbarVisible = true;
   bool mSecureInputEnabled = false;
+  std::vector<Window::SidebarItem> mSidebarItems;
+  CoralSidebarController* mSidebarController = nil;
+  NSSplitViewItem* mSidebarSplitItem = nil;
+  CoralSplitViewController* mSplitController = nil;
+  std::function<void(std::string_view)> mSidebarSelection;
+  std::string mSelectedSidebarItem;
+  bool mSidebarVisible = true;
   std::function<AccessibilityNode()> mAccessibilityProvider;
   AccessibilityActionInvoker mAccessibilityInvoker;
   std::unique_ptr<graphics::gpu::WindowSurface> mSurface;
@@ -1909,6 +2034,77 @@ coral::ui::DragPayload payloadFromPasteboard(NSPasteboard* pasteboard) {
   }
   (void)coral::ui::detail::dispatchOpenFiles(std::move(paths));
   (void)sender;
+}
+
+@end
+
+@implementation CoralSidebarController
+
+@synthesize platform = _platform;
+@synthesize identifiers = _identifiers;
+@synthesize labels = _labels;
+@synthesize symbols = _symbols;
+@synthesize table = _table;
+
+- (NSInteger)numberOfRowsInTableView:(NSTableView*)tableView {
+  (void)tableView;
+  return static_cast<NSInteger>(_labels.count);
+}
+
+- (NSView*)tableView:(NSTableView*)tableView viewForTableColumn:(NSTableColumn*)column
+    row:(NSInteger)row {
+  (void)column;
+  if (row < 0 || row >= static_cast<NSInteger>(_labels.count)) return nil;
+  NSString* identifier = @"coral.sidebar.cell";
+  NSTableCellView* cell = [tableView makeViewWithIdentifier:identifier owner:self];
+  if (cell == nil) {
+    cell = [[NSTableCellView alloc] initWithFrame:NSMakeRect(0.0, 0.0, 220.0, 28.0)];
+    cell.identifier = identifier;
+    NSImageView* image = [[NSImageView alloc] initWithFrame:NSMakeRect(6.0, 6.0, 16.0, 16.0)];
+    image.imageScaling = NSImageScaleProportionallyDown;
+    [cell addSubview:image];
+    cell.imageView = image;
+    NSTextField* label = [[NSTextField alloc] initWithFrame:NSMakeRect(28.0, 5.0, 184.0, 18.0)];
+    label.bezeled = NO;
+    label.drawsBackground = NO;
+    label.editable = NO;
+    label.selectable = NO;
+    label.font = [NSFont systemFontOfSize:13.0];
+    [cell addSubview:label];
+    cell.textField = label;
+  }
+  cell.textField.stringValue = _labels[static_cast<NSUInteger>(row)];
+  NSString* symbol = _symbols[static_cast<NSUInteger>(row)];
+  if (symbol.length > 0 && @available(macOS 11.0, *)) {
+    cell.imageView.image = [NSImage imageWithSystemSymbolName:symbol accessibilityDescription:nil];
+  } else {
+    cell.imageView.image = nil;
+  }
+  return cell;
+}
+
+- (void)tableViewSelectionDidChange:(NSNotification*)notification {
+  (void)notification;
+  if (_platform == nullptr || _table == nil) return;
+  const NSInteger row = _table.selectedRow;
+  if (row < 0 || row >= static_cast<NSInteger>(_identifiers.count)) return;
+  const char* identifier = _identifiers[static_cast<NSUInteger>(row)].UTF8String;
+  if (identifier != nullptr) {
+    static_cast<coral::ui::detail::CocoaPlatform*>(_platform)->sidebarSelectionChanged(identifier);
+  }
+}
+
+@end
+
+@implementation CoralSplitViewController
+
+@synthesize platform = _platform;
+
+- (void)splitViewDidResizeSubviews:(NSNotification*)notification {
+  [super splitViewDidResizeSubviews:notification];
+  if (_platform != nullptr) {
+    static_cast<coral::ui::detail::CocoaPlatform*>(_platform)->splitViewResized();
+  }
 }
 
 @end

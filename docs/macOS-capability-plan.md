@@ -117,7 +117,8 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 ### 阶段二：macOS 原生体验（P1）
 
 - [x] Native Toolbar 基础：`Window::ToolbarItem`、`setToolbarItems/Visible/ActionHandler`、NSToolbar + SF Symbol 图标；
-- [ ] Sidebar / NSSplitView / 统一标题栏 + 内容区；
+- [x] Sidebar 基础：`Window::SidebarItem`/`setSidebarItems`/selection handler，NSSplitViewController + NSVisualEffectView + NSTableView + SF Symbol；
+- [ ] Sidebar 分组/outline/可编辑/拖拽、统一标题栏 + 内容区、titlebar accessory；
 - [ ] Toolbar 自定义、overflow、fullscreen 行为和内容区尺寸联动；
 - [x] SF Symbols → `graphics::Image`（`systemSymbolImage`，pointSize/scale，template 标记）；
 - [ ] template tinting/动态 accent color、vibrancy/material、系统 focus ring；
@@ -182,6 +183,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 | 2026-11-23 | 新增 macOS native smoke：`ui_native_ax_smoke`（AX role/tree/AXPress + NSTextInputClient marked/commit） | 已加入 CTest native label |
 | 2026-11-23 | 阶段 2 起步：`Window::Options::frameAutosaveName`/`TabbingMode`、AppKit frame autosave、tabbingIdentifier、Window 菜单 tab 项 | 基础完成，完整 restoration/titlebar accessory 待补 |
 | 2026-11-23 | 阶段 2 Toolbar：`Window::ToolbarItem`/`setToolbarItems`/handler、NSToolbar delegate、SF Symbol 图标；native smoke 校验 item/action | 基础完成，Sidebar/自定义/尺寸联动待补 |
+| 2026-11-23 | 阶段 2 Sidebar：`Window::SidebarItem`/selection、NSSplitViewController + visual-effect sidebar + NSTableView；native smoke 校验 split item/rows/selection | 基础完成，分组/outline/titlebar accessory 待补 |
 | 2026-11-23 | 阶段 2 secure input：`setSecureInputEnabled`/`isSecureInputEnabled`，Carbon 安全事件输入，native smoke 校验 | 完成基础能力，进程级/多窗口语义待补 |
 | 2026-11-23 | 阶段 2 spell check：`ui/SpellCheck.h` + NSSpellChecker，UTF-16→UTF-8 byte ranges，native smoke 校验 | API 完成，TextInput 下划线/autocorrect/字体面板待补 |
 | 2026-11-23 | 阶段 2 spell check UI：TextInput `setSpellCheckEnabled` 自动查询并绘制单行/多行红色下划线 | 下划线完成，右键建议/autocorrect/字体面板待补 |
@@ -224,7 +226,8 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 - `scripts/notarize-macos-app.sh` 需要已签名的 Developer ID `.app` 和 notarytool keychain profile；本机没有凭据，只做了脚本语法检查。
 - Security-scoped bookmark 只有在 App Sandbox entitlement 下才有实际意义；当前未 sandbox 的 native smoke 中，`NSURLBookmarkCreationWithSecurityScope` 对 `/tmp` 按预期失败。需要用 `CoralUIDemo.entitlements` 签名后再验证创建/恢复。
 - 窗口 autosave/tabbing 目前是 AppKit 原生基础：`frameAutosaveName` 恢复 frame，`TabbingMode` 设置 `NSWindow.tabbingMode`；还没有 Apple 的 state restoration（`restorationClass`/`encodeRestorableState`），也没有 tab 内容/新 tab 的 Window API。
-- Native Toolbar 目前是基础 `NSToolbar`（图标+标签、无自定义/overflow 控制），工具栏显示/隐藏会改变内容区高度；尚未实现 Sidebar/NSSplitView、titlebar accessory 或与 CoralUI 内容布局的显式联动。
+- Native Toolbar 目前是基础 `NSToolbar`（图标+标签、无自定义/overflow 控制），工具栏显示/隐藏会改变内容区高度。
+- Native Sidebar 使用 `NSSplitViewController` + `NSVisualEffectView` + `NSTableView`；目前是单列、单选、无分组/outline/拖拽/可编辑。内容视图现在嵌在 split view controller 中，测试和客户代码不应假设 `NSWindow.contentView` 就是 CoralUI 的 Metal view。
 - Secure event input 是进程级、由 OS 引用计数；`Window` 只平衡自己的一次 enable/disable，多窗口/异常退出时需要产品侧确保最终释放。只在 AppKit 主线程上生效。
 - Spell check 现在有查询 API、TextInput 红色下划线和动态右键替换建议；每次文本变化/右键同步调用 `NSSpellChecker`，长文档可能阻塞 UI，后续应做后台/去抖检查。autocorrect、字体面板、上下文菜单键盘导航的完整验收尚未完成。
 - 手势路由按 pointer 命中层向父链冒泡；没有独立的 gesture recognizer/冲突仲裁，也没有 Force Touch、pen pressure 或 swipe 的完整方向/阶段语义。ScrollView 目前只消费 delta，phase 字段供上层控件使用。

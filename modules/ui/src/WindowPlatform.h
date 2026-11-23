@@ -319,6 +319,18 @@ class WindowPlatform {
   virtual void setToolbarActionHandler(std::function<void(std::string_view)> handler) {
     (void)handler;
   }
+  virtual void setSidebarItems(std::vector<Window::SidebarItem> items) {
+    (void)items;
+  }
+  virtual void setSidebarVisible(bool visible) {
+    (void)visible;
+  }
+  virtual void setSidebarSelectionHandler(std::function<void(std::string_view)> handler) {
+    (void)handler;
+  }
+  [[nodiscard]] virtual std::string selectedSidebarItem() const {
+    return {};
+  }
   virtual void setSecureInputEnabled(bool enabled) {
     (void)enabled;
   }

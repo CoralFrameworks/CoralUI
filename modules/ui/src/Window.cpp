@@ -2095,6 +2095,27 @@ void Window::setToolbarItems(std::vector<ToolbarItem> items) {
   }
 }
 
+void Window::setSidebarItems(std::vector<SidebarItem> items) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) {
+    mImpl->platform->setSidebarItems(std::move(items));
+  }
+}
+
+void Window::setSidebarVisible(const bool visible) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) mImpl->platform->setSidebarVisible(visible);
+}
+
+void Window::setSidebarSelectionHandler(std::function<void(std::string_view)> handler) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) {
+    mImpl->platform->setSidebarSelectionHandler(std::move(handler));
+  }
+}
+
+std::string Window::selectedSidebarItem() const {
+  return mImpl != nullptr && mImpl->platform != nullptr
+    ? mImpl->platform->selectedSidebarItem() : std::string();
+}
+
 void Window::setSecureInputEnabled(const bool enabled) {
   if (mImpl != nullptr && mImpl->platform != nullptr) {
     mImpl->platform->setSecureInputEnabled(enabled);

@@ -237,6 +237,13 @@ class Window final : public Renderer {
     std::string tooltip;
   };
 
+  /** One native sidebar row. */
+  struct SidebarItem {
+    std::string id;
+    std::string label;
+    std::string symbol;
+  };
+
   /** macOS native window tabbing preference; ignored by the other backends. */
   enum class TabbingMode : uint8_t {
     Automatic,
@@ -455,6 +462,12 @@ class Window final : public Renderer {
   [[nodiscard]] bool isSecureInputEnabled() const noexcept;
   /** Called with the item id when a toolbar item is clicked. */
   void setToolbarActionHandler(std::function<void(std::string_view)> handler);
+
+  /** Replaces the native sidebar rows (macOS `NSSplitViewController`); empty removes the sidebar. */
+  void setSidebarItems(std::vector<SidebarItem> items);
+  void setSidebarVisible(bool visible);
+  void setSidebarSelectionHandler(std::function<void(std::string_view)> handler);
+  [[nodiscard]] std::string selectedSidebarItem() const;
 
   /** Chrome geometry used by client-side decorations; ignored in system-decoration mode. */
   void setChromeMetrics(WindowChromeMetrics metrics);
