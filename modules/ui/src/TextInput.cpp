@@ -620,6 +620,29 @@ void TextInput::drawSelectionForLine(RenderContext& context, const TextLine& lin
   }
 }
 
+void TextInput::drawSpellIssuesForLine(RenderContext& context, const TextLine& line,
+    const float left, const float top, const float height) {
+  if (!mSpellCheckEnabled || mSpellIssues.empty() || line.start >= line.end) return;
+  graphics::Paint paint;
+  paint.color = Color::MakeRGBA8(220, 80, 80, 230);
+  paint.style = graphics::Paint::Style::kFill;
+  for (const SpellIssue& issue: mSpellIssues) {
+    const size_t begin = std::max(issue.begin, line.start);
+    const size_t end = std::min(issue.end, line.end);
+    if (begin >= end) continue;
+    const float firstX = left + xForIndexInLine(begin, line);
+    const float secondX = left + xForIndexInLine(end, line);
+    context.canvas().drawRect(Rect::MakeXYWH(std::min(firstX, secondX), top + height - 2.0f,
+      std::max(1.0f, std::abs(secondX - firstX)), 1.5f), paint);
+  }
+}
+
+void TextInput::setSpellCheckEnabled(const bool enabled) {
+  if (mSpellCheckEnabled == enabled) return;
+  mSpellCheckEnabled = enabled;
+  refreshSpellIssues();
+}
+
 void TextInput::drawSelf(RenderContext& context) {
   auto& canvas = context.canvas();
   if (mBordered) {
@@ -666,6 +689,7 @@ void TextInput::drawSelf(RenderContext& context) {
           std::max(selectionBegin, line.start), std::min(selectionEndValue, line.end));
       }
       drawLine(context, line, left, baseline, text, index);
+      drawSpellIssuesForLine(context, line, left, lineTop + 3.0f, lineHeightValue - 6.0f);
     }
     if (mText.empty() && !mPlaceholder.empty()) {
       if (mPlaceholderPainter == nullptr) mPlaceholderPainter = std::make_unique<TextPainter>();
@@ -744,6 +768,10 @@ void TextInput::drawSelf(RenderContext& context) {
   } else {
     if (mTextPainter == nullptr) mTextPainter = std::make_unique<TextPainter>();
     mTextPainter->draw(context, mText, left, baseline, *mFont, text);
+  }
+  if (!mLayout.lines.empty()) {
+    drawSpellIssuesForLine(context, mLayout.lines.front(), left, bounds().getTop() + 6.0f,
+      bounds().getHeight() - 12.0f);
   }
   if (mFocused) {
     const float caretX = left + xForIndex(mCursor);
@@ -1337,7 +1365,20 @@ void TextInput::applyTheme(const Theme& theme) {
   setNeedsPaint();
 }
 
+void TextInput::refreshSpellIssues() {
+  if (!mSpellCheckEnabled) {
+    if (!mSpellIssues.empty()) {
+      mSpellIssues.clear();
+      setNeedsPaint();
+    }
+    return;
+  }
+  mSpellIssues = spellCheck(mText);
+  setNeedsPaint();
+}
+
 void TextInput::notifyChanged() {
+  refreshSpellIssues();
   mChanged.emit(mText);
 }
 

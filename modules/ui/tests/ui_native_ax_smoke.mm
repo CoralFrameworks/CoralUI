@@ -143,6 +143,19 @@ int main() {
         input->text().c_str(), [view hasMarkedText] ? 1 : 0);
       return 1;
     }
+    input->setSpellCheckEnabled(true);
+    input->setText("helo wrold");
+    if (input->spellIssues().empty()) {
+      std::fprintf(stderr, "FAIL: TextInput did not expose its spell issues\n");
+      return 1;
+    }
+    input->setText("hello world");
+    if (!input->spellIssues().empty()) {
+      std::fprintf(stderr, "FAIL: corrected TextInput still reports spell issues\n");
+      return 1;
+    }
+    input->setSpellCheckEnabled(false);
+
     const graphics::Image symbol = coral::ui::systemSymbolImage("gearshape", { .pointSize = 16.0f });
     if (!coral::ui::supportsSystemSymbols() || symbol.isEmpty()) {
       std::fprintf(stderr, "FAIL: SF Symbol did not resolve to an image\n");
