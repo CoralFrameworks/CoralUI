@@ -785,10 +785,9 @@ class CocoaPlatform final : public WindowPlatform {
   }
 
   [[nodiscard]] graphics::gpu::NativeDisplay nativeDisplay() const override {
-    // AppKit has no presentation-feedback source here, so the window uses its present clock. The
-    // RHI still needs the native handle for the render-thread path, which travels through
-    // `nativeWindow()` instead.
-    return {};
+    // CoralGraphics now has a macOS display-blank source (CVDisplayLink); the kind is enough for the
+    // per-window clock to select it. The RHI's render surface still travels through nativeWindow().
+    return graphics::gpu::NativeDisplay{ graphics::gpu::NativeDisplayKind::MacOS, nullptr, nullptr };
   }
 
   [[nodiscard]] void* nativeWindow() const override {

@@ -108,6 +108,10 @@ int main() {
         window->lastFrameTimings().draw);
       return 1;
     }
+    if (!(window->refreshHertz() > 0.0)) {
+      std::fprintf(stderr, "FAIL: CVDisplayLink did not report a refresh rate\n");
+      return 1;
+    }
   }
 
   // Damage: repaint a small child and let the damage path present it; the snapshot must reflect the
@@ -154,5 +158,8 @@ int main() {
     static_cast<double>(window->uiScale()), window->frameCount(),
     appearance.valid ? "valid" : "unavailable", appearance.preferDark ? 1 : 0,
     appearance.highContrast ? 1 : 0, parentHandle.empty() ? "none" : parentHandle.c_str());
+  if (window->nativePlatform() == coral::ui::Window::NativePlatform::Cocoa) {
+    std::printf("native refresh: %.1f Hz\n", static_cast<double>(window->refreshHertz()));
+  }
   return 0;
 }

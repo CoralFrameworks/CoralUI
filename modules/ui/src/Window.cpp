@@ -1176,6 +1176,11 @@ struct WindowImpl final : detail::WindowHost {
         case graphics::gpu::NativeDisplayKind::Wayland:
           hostOptions.nativeWindowKind = host::ThreadedRenderHost::NativeWindowKind::Wayland;
           break;
+        case graphics::gpu::NativeDisplayKind::MacOS:
+          // The Metal WindowSurface accepts an unknown/portable window system and uses the
+          // CAMetalLayer handle from `nativeWindow`.
+          hostOptions.nativeWindowKind = host::ThreadedRenderHost::NativeWindowKind::Unknown;
+          break;
         case graphics::gpu::NativeDisplayKind::Unknown:
         default:
           hostOptions.nativeWindowKind = host::ThreadedRenderHost::NativeWindowKind::Unknown;
