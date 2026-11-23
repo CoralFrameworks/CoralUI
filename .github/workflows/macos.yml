@@ -34,14 +34,32 @@ jobs:
           path: CoralCore
           submodules: recursive
 
-      # GoogleTest is also an update = none submodule in this tree; CoralUI's fallback looks for it
-      # at third_party/libgtest/coral after the bundled/shared paths miss.
+      # GoogleTest is listed in .gitmodules but has no gitlink in this branch's tree, so
+      # actions/checkout cannot materialize it. Fetch it at the fallback location CoralUI probes.
       - name: Checkout GoogleTest
         uses: actions/checkout@v4
         with:
           repository: CoralFrameworks/libgtest
           ref: main
           path: third_party/libgtest
+
+      # CoralGraphics' bundled zlib/libyuv are not gitlinks in its checkout; libz (and its zlib
+      # submodule) is required by libpng even with the effect module off.
+      - name: Checkout zlib
+        uses: actions/checkout@v4
+        with:
+          repository: CoralFrameworks/libz
+          ref: main
+          path: CoralGraphics/third_party/libz
+          submodules: recursive
+
+      - name: Checkout libyuv
+        uses: actions/checkout@v4
+        with:
+          repository: CoralFrameworks/libyuv
+          ref: main
+          path: CoralGraphics/third_party/libyuv
+          submodules: recursive
 
       - name: Configure
         run: >
