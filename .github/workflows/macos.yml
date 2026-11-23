@@ -83,6 +83,20 @@ jobs:
           ctest --test-dir build --output-on-failure
           -R "^(test_ui|test_ui_shared_device|ui_native_smoke|ui_native_ax_smoke|example_ui_demo_headless|example_ui_mvvm_headless)$"
 
+      - name: Backtrace failures
+        if: failure()
+        run: |
+          set +e
+          run_lldb() {
+            echo "===== $* ====="
+            timeout 60 lldb --batch -o run -o "thread backtrace all" -o quit -- "$@" 2>&1 | tail -80
+          }
+          run_lldb build/modules/ui/tests/test_ui
+          run_lldb build/modules/ui/tests/ui_native_smoke
+          run_lldb build/modules/ui/tests/ui_native_ax_smoke
+          run_lldb build/examples/ui/ui_demo.app/Contents/MacOS/ui_demo --headless --frames 2
+          run_lldb build/examples/ui/ui_mvvm_demo
+
       - name: Collect crash reports
         if: always()
         uses: actions/upload-artifact@v4
