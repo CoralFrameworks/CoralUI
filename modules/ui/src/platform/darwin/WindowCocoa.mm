@@ -1049,6 +1049,10 @@ class CocoaPlatform final : public WindowPlatform {
     }
   }
 
+  void windowOcclusionChanged(const bool visible) {
+    if (mHost != nullptr) mHost->platformOcclusionChanged(visible);
+  }
+
   void windowVisibilityChanged(const bool visible) {
     if (mHost == nullptr) return;
     mHost->platformStateChanged(mMaximized, mMinimized, mFullscreen);
@@ -2430,6 +2434,16 @@ CoralAXElement* makeCoralAXElement(const coral::ui::AccessibilityNode& node, NSR
   (void)notification;
   auto* platform = static_cast<CocoaPlatform*>(self.platform);
   if (platform != nullptr) platform->windowVisibilityChanged(false);
+}
+
+- (void)windowDidChangeOcclusionState:(NSNotification*)notification {
+  (void)notification;
+  auto* platform = static_cast<CocoaPlatform*>(self.platform);
+  if (platform == nullptr) return;
+  NSWindow* window = [notification object];
+  const bool visible = window != nil &&
+    (window.occlusionState & NSWindowOcclusionStateVisible) != 0;
+  platform->windowOcclusionChanged(visible);
 }
 
 - (void)windowDidChangeEffectiveAppearance:(NSNotification*)notification {

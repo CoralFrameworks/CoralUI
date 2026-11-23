@@ -131,7 +131,8 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 - [x] Cocoa 接入 retained frames 与 damage rects（`presentRetained`/`presentDamage`），native smoke 验证 clean frame 不重新录制、damage 后 snapshot 正确；
 - [ ] Cocoa 接入 frame-plan/boundary submission，减少多边界全量 blit；
 - [ ] CVDisplayLink / CAMetalDisplayLink vblank 调度，ProMotion/120Hz；
-- [ ] occlusion/最小化暂停渲染，降低能耗；
+- [x] occlusion 暂停自动帧（`NSWindowOcclusionState` → `WindowHost::platformOcclusionChanged`，重新可见时 damageAll + requestFrame）；
+- [x] 最小化/隐藏时不再由自动循环持续渲染（显式 `Window::renderFrame()` 仍可 snapshot）；
 - [ ] Display P3 / EDR / HDR10；
 - [ ] window server 截图/打印/PDF 导出；
 - [ ] 通知中心、Dock badge、Share Sheet、Services、打印、屏幕录制权限；
@@ -165,6 +166,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 | 2026-11-23 | 阶段 2 输入：`GestureEvent`/`ScrollPhase`/`onGesture`，Cocoa magnify/rotate/swipe 与 scroll phase/momentum 映射 | 基础完成，Force Touch/pen 与基于 phase 的识别器待补 |
 | 2026-11-23 | 阶段 2 SF Symbols：`ui/SystemImage.h`、NSImage symbol 光栅化、非 Apple fallback、native smoke 40x40 验证 | 基础完成，tinting/accent color 待补 |
 | 2026-11-23 | 阶段 3 渲染：Cocoa `supportsRetainedFrames`/`presentRetained`/`supportsDamageRects`/`presentDamage`；native smoke 验证 retained replay 与 damage snapshot | retained/damage 完成，frame-plan/boundary 待补 |
+| 2026-11-23 | 阶段 3 occlusion：Cocoa occlusionState → platformOcclusionChanged；自动 tick 在隐藏时保留待渲染请求 | 基础完成，手工隐藏/最小化验收待补 |
 
 ## 5. 问题记录
 
@@ -195,6 +197,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 - SF Symbol 目前以模板黑色/alpha 图像返回，尚未暴露颜色/tint 配置和动态 accent color；SF Symbol 的 symbol configuration（weight/scale/variant）只暴露 pointSize 与 raster scale。
 
 - 全量 UI target + blit 每帧；Cocoa 已接入 retained/damage，但 frame-plan/boundary submission 仍未接入，复杂页面仍可能录制/提交整棵内容。
+- occlusion 暂停逻辑没有自动化测试：需要真实 AppKit 前台会话通过隐藏/最小化窗口验证 frameCount 不再增长，并在恢复时重绘。`Window::renderFrame()` 显式调用仍会渲染，以便 snapshot/导出。
 - 无 CVDisplayLink，`refreshHertz` 来自 `PresentFrameClock`，不代表真实显示刷新。
 - `screenBounds`/`setPosition` 对副屏 origin 处理不完整。
 - 无 IME、Accessibility、拖放、原生菜单、应用生命周期。

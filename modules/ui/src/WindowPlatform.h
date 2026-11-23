@@ -102,6 +102,14 @@ class WindowHost {
     return DragEffect::None;
   }
   virtual void platformResized(int width, int height) = 0;
+  /**
+   * The OS hid the window (occluded by another app, app hidden, minimised on a platform that reports
+   * it this way). An automatic loop stops producing frames until it is visible again; an explicit
+   * `Window::renderFrame()` still renders, which snapshot and export code relies on.
+   */
+  virtual void platformOcclusionChanged(bool visible) {
+    (void)visible;
+  }
   /** Runs one frame from inside a platform modal loop (Win32 live resize). */
   virtual void renderFrameNow() = 0;
   /** Requests a frame for the next UI-loop iteration. */

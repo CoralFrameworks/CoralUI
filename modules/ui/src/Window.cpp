@@ -107,6 +107,8 @@ struct WindowImpl final : detail::WindowHost {
   SystemAppearance systemAppearance;
   /** True while the high-contrast palette is the theme in use. */
   bool highContrast = false;
+  /** True while the platform reports the window hidden; automatic frames pause. */
+  bool occluded = false;
   /** The theme the application installed, kept while high contrast overrides it. */
   std::shared_ptr<const Theme> baseTheme;
   std::shared_ptr<const StyleSheet> styleSheet;
@@ -1041,6 +1043,18 @@ struct WindowImpl final : detail::WindowHost {
     // cannot diverge on what high contrast or reduced motion means.
     if (self == nullptr) return;
     self->applySystemAppearance(platform != nullptr ? platform->systemAppearance() : SystemAppearance{});
+  }
+
+  void platformOcclusionChanged(const bool visible) override {
+    const bool nextOccluded = !visible;
+    if (occluded == nextOccluded) return;
+    occluded = nextOccluded;
+    if (!occluded) {
+      // The last presented frame may be arbitrarily old; a hidden window that comes back redraws.
+      damageAll();
+      markFrameNeeded();
+      if (platform != nullptr) platform->wake();
+    }
   }
 
   void platformResized(const int newWidth, const int newHeight) override {
@@ -2280,9 +2294,13 @@ bool Window::tick(const bool blockOnIdle) {
   // the limit at 0, so OnDemand still renders only when something asks.
   const bool limitPending = mImpl->options.frameLimit > 0 &&
     mImpl->frameCount < mImpl->options.frameLimit;
-  const bool wanted = mImpl->policy == FramePolicy::Continuous || animating || limitPending ||
-                      mImpl->frameWanted.exchange(false, std::memory_order_acq_rel);
-  if (wanted) {
+  // An occluded window keeps its pending request (do not exchange it away): the first visible tick
+  // then renders, while the idle loop can stay parked without a full repaint per animation tick.
+  bool wanted = mImpl->policy == FramePolicy::Continuous || animating || limitPending;
+  if (!wanted && !mImpl->occluded) {
+    wanted = mImpl->frameWanted.exchange(false, std::memory_order_acq_rel);
+  }
+  if (wanted && !mImpl->occluded) {
     if (!mImpl->renderFrame()) {
       if (mImpl->recoveryCount < 1 && recoverDevice()) return true;
       return false;
