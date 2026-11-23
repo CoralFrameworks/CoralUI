@@ -125,6 +125,7 @@ TextInput::TextInput(std::string text, std::shared_ptr<const graphics::Font> fon
   setClip(true);
   setAccessibleRole(AccessibilityRole::TextField);
   setAccessibleEditable(true);
+  setAccessibleValue(mText);
 
   // Dragging a press that lands inside an existing selection out of the field starts a platform drag
   // carrying the marked text. The press captures the text because it collapses the selection.
@@ -1378,6 +1379,7 @@ void TextInput::refreshSpellIssues() {
 }
 
 void TextInput::notifyChanged() {
+  setAccessibleValue(mText);
   refreshSpellIssues();
   mChanged.emit(mText);
 }

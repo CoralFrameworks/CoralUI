@@ -111,6 +111,7 @@ int main() {
       return 1;
     }
 
+    input->setText("hello world");
     id axButton = findElementByLabel(view, "Press me");
     id axInput = findElementByLabel(view, "Search");
     if (axButton == nil || axInput == nil) {
@@ -123,6 +124,19 @@ int main() {
         [[axButton accessibilityRole] UTF8String], [[axInput accessibilityRole] UTF8String]);
       return 1;
     }
+    if (![axInput accessibilityEditable] ||
+        ![[axInput accessibilityValue] isEqualToString:@"hello world"]) {
+      std::fprintf(stderr, "FAIL: AX text value/editability not exposed\n");
+      return 1;
+    }
+    [axInput setAccessibilityValue:@"ax edited"];
+    window->pump();
+    if (input->text() != "ax edited") {
+      std::fprintf(stderr, "FAIL: AX setValue produced '%s'\n", input->text().c_str());
+      return 1;
+    }
+    input->setText("");
+
     [axButton accessibilityPerformAction:NSAccessibilityPressAction];
     window->pump();
     if (!clicked) {

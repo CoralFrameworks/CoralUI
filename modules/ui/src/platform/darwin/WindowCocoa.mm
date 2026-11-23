@@ -2077,6 +2077,54 @@ CoralAXElement* makeCoralAXElement(const coral::ui::AccessibilityNode& node, NSR
   }
 }
 
+- (BOOL)accessibilityEditable {
+  const auto* payload = static_cast<const CoralAXPayload*>(_coralPayload);
+  return payload != nullptr && payload->node.editable;
+}
+
+- (NSRange)accessibilitySelectedTextRange {
+  const auto* payload = static_cast<const CoralAXPayload*>(_coralPayload);
+  if (payload == nullptr || !payload->node.textSelection.has_value()) return NSMakeRange(NSNotFound, 0);
+  const int start = std::max(0, payload->node.textSelection->start);
+  const int end = std::max(start, payload->node.textSelection->end);
+  return NSMakeRange(static_cast<NSUInteger>(start), static_cast<NSUInteger>(end - start));
+}
+
+- (NSString*)accessibilitySelectedText {
+  const auto* payload = static_cast<const CoralAXPayload*>(_coralPayload);
+  if (payload == nullptr || payload->node.value.empty() || !payload->node.textSelection.has_value()) {
+    return nil;
+  }
+  NSString* text = [NSString stringWithUTF8String:payload->node.value.c_str()];
+  const NSRange range = [self accessibilitySelectedTextRange];
+  if (text == nil || range.location == NSNotFound || NSMaxRange(range) > text.length) return nil;
+  return [text substringWithRange:range];
+}
+
+- (void)setAccessibilityValue:(id)value {
+  const auto* payload = static_cast<const CoralAXPayload*>(_coralPayload);
+  CoralUIView* owner = _coralOwner;
+  if (payload == nullptr || owner == nil || !payload->node.editable) return;
+  auto* platform = static_cast<coral::ui::detail::CocoaPlatform*>(owner.platform);
+  if (platform == nullptr) return;
+  NSString* text = [value isKindOfClass:[NSString class]] ? (NSString*)value
+    : ([value respondsToSelector:@selector(stringValue)] ? [value stringValue] : nil);
+  if (text == nil) return;
+  (void)platform->performAccessibilityAction(payload->node.path,
+    coral::ui::AccessibilityAction::SetValue, utf8String(text));
+}
+
+- (void)setAccessibilitySelectedTextRange:(NSRange)range {
+  const auto* payload = static_cast<const CoralAXPayload*>(_coralPayload);
+  CoralUIView* owner = _coralOwner;
+  if (payload == nullptr || owner == nil || !payload->node.editable) return;
+  auto* platform = static_cast<coral::ui::detail::CocoaPlatform*>(owner.platform);
+  if (platform == nullptr) return;
+  const std::string value = std::to_string(range.location) + "," + std::to_string(NSMaxRange(range));
+  (void)platform->performAccessibilityAction(payload->node.path,
+    coral::ui::AccessibilityAction::Select, value);
+}
+
 - (BOOL)accessibilityEnabled {
   const auto* payload = static_cast<const CoralAXPayload*>(_coralPayload);
   return payload == nullptr ? NO : payload->node.enabled;
