@@ -1074,8 +1074,16 @@ struct WindowImpl final : detail::WindowHost {
     layoutRoot();
   }
 
+  [[nodiscard]] bool canClose() const override {
+    return !closeRequested || closeRequested();
+  }
+
   void requestClose() override {
-    if (closeRequested && !closeRequested()) return;
+    if (!canClose()) return;
+    closeWindow();
+  }
+
+  void closeWindow() override {
     running = false;
   }
 

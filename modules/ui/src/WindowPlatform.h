@@ -114,7 +114,10 @@ class WindowHost {
   virtual void renderFrameNow() = 0;
   /** Requests a frame for the next UI-loop iteration. */
   virtual void requestFrame() = 0;
+  virtual bool canClose() const = 0;
   virtual void requestClose() = 0;
+  /** Closes without consulting the interceptor; only call after `canClose()` returned true. */
+  virtual void closeWindow() = 0;
   /**
    * The system appearance settings changed (high contrast, theme, animation policy).
    *

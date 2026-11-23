@@ -286,6 +286,12 @@ namespace coral::ui::detail {
  */
 class CocoaPlatform final : public WindowPlatform {
  public:
+  /** True when every open Cocoa window's close interceptor allows closing. */
+  [[nodiscard]] static bool canCloseAllWindows();
+  /** @return true when the quit was started, false when a window vetoed it. */
+  static bool requestQuit();
+  [[nodiscard]] static bool hasOpenWindows();
+  
   CocoaPlatform(Window::Options options, backend::Device* sharedDevice)
     : mOptions(std::move(options)), mSharedDevice(sharedDevice),
       mWidth(std::max(1, mOptions.width)), mHeight(std::max(1, mOptions.height)) {}
@@ -306,6 +312,7 @@ class CocoaPlatform final : public WindowPlatform {
     }
     mView = nil;
     mDelegate = nil;
+    unregisterWindow(this);
   }
 
   bool initialize(std::string* diagnostics) {
@@ -441,6 +448,7 @@ class CocoaPlatform final : public WindowPlatform {
 
     if (mOptions.renderHost == RenderHostKind::RenderThread) {
       // The render thread owns the surface; `nativeWindow()` hands it this layer.
+      registerWindow(this);
       return true;
     }
     if (!createSurface()) {
@@ -450,6 +458,7 @@ class CocoaPlatform final : public WindowPlatform {
       }
       return false;
     }
+    registerWindow(this);
     return true;
   }
 
@@ -1546,6 +1555,13 @@ class CocoaPlatform final : public WindowPlatform {
   CoralUIView* mView = nil;
   CoralUIWindowDelegate* mDelegate = nil;
   CAMetalLayer* mMetalLayer = nil;
+  static void registerWindow(CocoaPlatform* window);
+  static void unregisterWindow(CocoaPlatform* window);
+
+  [[nodiscard]] bool canClose() const {
+    return mHost != nullptr && mHost->canClose();
+  }
+
   WindowHost* mHost = nullptr;
   CoralDragSource* mActiveDragSource = nil;
   std::function<AccessibilityNode()> mAccessibilityProvider;
@@ -1554,6 +1570,87 @@ class CocoaPlatform final : public WindowPlatform {
   std::unique_ptr<backend::Device> mDeviceOwner;
   std::string mDiagnostics;
 };
+
+} // namespace coral::ui::detail
+
+namespace coral::ui::detail {
+namespace {
+
+struct CocoaWindowRegistry {
+  std::mutex mutex;
+  std::vector<CocoaPlatform*> windows;
+  bool quitPending = false;
+};
+
+CocoaWindowRegistry& windowRegistry() {
+  static CocoaWindowRegistry registry;
+  return registry;
+}
+
+} // namespace
+
+void CocoaPlatform::registerWindow(CocoaPlatform* window) {
+  const std::lock_guard<std::mutex> lock(windowRegistry().mutex);
+  windowRegistry().windows.push_back(window);
+}
+
+void CocoaPlatform::unregisterWindow(CocoaPlatform* window) {
+  bool last = false;
+  {
+    const std::lock_guard<std::mutex> lock(windowRegistry().mutex);
+    auto& windows = windowRegistry().windows;
+    windows.erase(std::remove(windows.begin(), windows.end(), window), windows.end());
+    last = windows.empty() && windowRegistry().quitPending;
+    if (last) windowRegistry().quitPending = false;
+  }
+  if (last) {
+    if ([NSThread isMainThread]) {
+      [NSApp replyToApplicationShouldTerminate:YES];
+    } else {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        [NSApp replyToApplicationShouldTerminate:YES];
+      });
+    }
+  }
+}
+
+bool CocoaPlatform::canCloseAllWindows() {
+  std::vector<CocoaPlatform*> windows;
+  {
+    const std::lock_guard<std::mutex> lock(windowRegistry().mutex);
+    windows = windowRegistry().windows;
+  }
+  for (CocoaPlatform* window: windows) {
+    if (!window->canClose()) return false;
+  }
+  return true;
+}
+
+bool CocoaPlatform::hasOpenWindows() {
+  const std::lock_guard<std::mutex> lock(windowRegistry().mutex);
+  return !windowRegistry().windows.empty();
+}
+
+bool CocoaPlatform::requestQuit() {
+  std::vector<CocoaPlatform*> windows;
+  {
+    const std::lock_guard<std::mutex> lock(windowRegistry().mutex);
+    if (windowRegistry().quitPending) return true;
+    windowRegistry().quitPending = true;
+    windows = windowRegistry().windows;
+  }
+  for (CocoaPlatform* window: windows) {
+    if (!window->canClose()) {
+      const std::lock_guard<std::mutex> lock(windowRegistry().mutex);
+      windowRegistry().quitPending = false;
+      return false;
+    }
+  }
+  for (CocoaPlatform* window: windows) {
+    if (window->mHost != nullptr) window->mHost->closeWindow();
+  }
+  return true;
+}
 
 } // namespace coral::ui::detail
 
@@ -1653,7 +1750,10 @@ coral::ui::DragPayload payloadFromPasteboard(NSPasteboard* pasteboard) {
 
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication*)sender {
   (void)sender;
-  return coral::ui::detail::dispatchShouldTerminate() ? NSTerminateNow : NSTerminateCancel;
+  if (!coral::ui::detail::dispatchShouldTerminate()) return NSTerminateCancel;
+  if (!coral::ui::detail::CocoaPlatform::hasOpenWindows()) return NSTerminateNow;
+  return coral::ui::detail::CocoaPlatform::requestQuit()
+    ? NSTerminateLater : NSTerminateCancel;
 }
 
 - (BOOL)applicationShouldHandleReopen:(NSApplication*)sender hasVisibleWindows:(BOOL)flag {

@@ -131,14 +131,19 @@ int main() {
     [delegate application:NSApp openURLs:@[ [NSURL fileURLWithPath:@"/tmp/coral-open-test"] ]];
     [delegate applicationShouldHandleReopen:NSApp hasVisibleWindows:NO];
     const NSApplicationTerminateReply reply = [delegate applicationShouldTerminate:NSApp];
+    // With no app-level veto, a window close interceptor must still be able to veto quitting.
+    coral::ui::setShouldTerminateHandler({});
+    window->setCloseRequestedCallback([] { return false; });
+    const NSApplicationTerminateReply windowVeto = [delegate applicationShouldTerminate:NSApp];
+    window->setCloseRequestedCallback({});
     const bool lifecycleOk = opened.size() == 1 && opened[0] == "/tmp/coral-open-test" &&
-      reopened && reply == NSTerminateCancel;
+      reopened && reply == NSTerminateCancel && windowVeto == NSTerminateCancel;
     coral::ui::setOpenFilesHandler({});
     coral::ui::setReopenHandler({});
     coral::ui::setShouldTerminateHandler({});
     if (!lifecycleOk) {
       std::fprintf(stderr, "FAIL: lifecycle callbacks opened=%zu reopened=%d terminate=%ld\n",
-        opened.size(), reopened ? 1 : 0, static_cast<long>(reply));
+        opened.size(), reopened ? 1 : 0, static_cast<long>(windowVeto));
       return 1;
     }
 
