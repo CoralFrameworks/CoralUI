@@ -159,7 +159,7 @@ bool WindowManager::load(const std::string& data) {
     for (int index = 0; index < 4; ++index) {
       const std::string& field = fields[static_cast<std::size_t>(index) + 1];
       const auto result = std::from_chars(field.data(), field.data() + field.size(),
-        values[index]);
+        values[index], 10);
       if (result.ec != std::errc{} || result.ptr != field.data() + field.size()) {
         valid = false;
         break;

@@ -18,8 +18,10 @@
 
 #include <array>
 #include <cctype>
-#include <charconv>
+#include <cerrno>
+#include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <sstream>
 
 namespace coral::ui {
@@ -129,11 +131,14 @@ std::optional<Theme> parseTheme(const std::string_view text, const Theme& base, 
     }
 
     if (key == "focusRingWidth") {
-      float width = 0.0f;
-      const char* first = value.data();
-      const char* last = value.data() + value.size();
-      const auto [pointer, ec] = std::from_chars(first, last, width);
-      if (ec != std::errc() || pointer != last || width < 0.0f) {
+      // Apple's libc++ lacks the floating-point from_chars overload; parse with strtof and verify
+      // that the whole value was consumed.
+      const std::string text(value);
+      char* end = nullptr;
+      errno = 0;
+      const float width = std::strtof(text.c_str(), &end);
+      if (end != text.c_str() + text.size() || errno == ERANGE || !std::isfinite(width) ||
+          width < 0.0f) {
         if (error != nullptr) *error = "line " + std::to_string(lineNumber) + ": invalid number";
         return std::nullopt;
       }
