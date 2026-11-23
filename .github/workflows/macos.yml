@@ -34,6 +34,15 @@ jobs:
           path: CoralCore
           submodules: recursive
 
+      # GoogleTest is also an update = none submodule in this tree; CoralUI's fallback looks for it
+      # at third_party/libgtest/coral after the bundled/shared paths miss.
+      - name: Checkout GoogleTest
+        uses: actions/checkout@v4
+        with:
+          repository: CoralFrameworks/libgtest
+          ref: main
+          path: third_party/libgtest
+
       - name: Configure
         run: >
           cmake -S . -B build -G "Unix Makefiles"
