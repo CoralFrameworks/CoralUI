@@ -229,7 +229,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 - Cmd+Q 现在会先检查所有 Cocoa 窗口的 close interceptor：任一 veto 返回 `NSTerminateCancel`；全部允许则请求关闭并返回 `NSTerminateLater`，最后一个 `CocoaPlatform` 析构时 `replyToApplicationShouldTerminate:YES`。自动化只覆盖 veto 路径，完整终止路径会结束测试进程，需手工验收。
 - IME：`setMarkedText` 忽略 marked text 内部的 selection 和 replacementRange；`selectedRange` 只做 UTF-8→UTF-16 的 caret/selection 映射；尚未验证真实中文/日文/韩文候选窗和死键。CJK 输入法需要在真实前台会话中手工测试。
 - IME 的 `validAttributesForMarkedText` 只声明了下划线，marked text 仍由 CoralUI 的 composition 绘制；没有使用 AppKit 的 attributed marked text 渲染。
-- 拖放目前只实现 destination；`NSDraggingSource`（从 layer 拖到 Finder/其他 app）和 file promise 未实现。外部拖放的 UI 光标/落点需要真实 Finder 手工验收。
+- 拖放 destination 已实现；source 支持 text/file URL/custom MIME，但 file promise、拖拽取消反馈和真实 Finder 多文件拖出仍需手工验收。
 - AX 目前是查询时重建整棵 `NSAccessibilityElement` 树；没有稳定的 element 身份。文本字段映射 editable/value/selected range 并支持 AXSetValue；表格容器映射 row/column count 与 index range，grid 子节点映射 AXCell，ListItem 映射 AXRow，并实现了 `accessibilityHitTest:` 与 focused-element 通知。VoiceOver 实测仍待补。
 - AX bounds 通过父元素逻辑偏移累加得到屏幕 frame；需要确认多层嵌套/Flex 布局下的偏移和 Retina 取整。
 - 文件对话框 sheet 的 parent 通过当前 `NSApp.keyWindow`/`mainWindow` 解析，`FileDialogOptions.parent` 还没有直接映射到对应 `NSWindow`；非活动 app 会回退 `runModal`。`NSOpenPanel.canChooseDirectories` 仍固定 false，需要扩展 `FileDialogOptions`。
@@ -256,15 +256,39 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 
 - 全量 UI target + blit 每帧；Cocoa 已接入 retained/damage 和 opt-in frame-plan/boundary submission，但 plan 仍只在 `CORAL_UI_FRAME_PLAN_WINDOW=1` 下启用，复杂页面/滚动 viewport 的边界场景还需更多验证。
 - occlusion 暂停逻辑没有自动化测试：需要真实 AppKit 前台会话通过隐藏/最小化窗口验证 frameCount 不再增长，并在恢复时重绘。`Window::renderFrame()` 显式调用仍会渲染，以便 snapshot/导出。
-- 无 CVDisplayLink，`refreshHertz` 来自 `PresentFrameClock`，不代表真实显示刷新。
 - `screenBounds`/`setPosition` 对副屏 origin 处理不完整。
-- 无 IME、Accessibility、拖放、原生菜单、应用生命周期。
-- 文件对话框使用 `allowedFileTypes`（deprecated），未使用 UTType。
+- 文件对话框已使用 UTType（macOS 11+，旧系统 fallback `allowedFileTypes`）；`canChooseDirectories` 仍未暴露。
 - 剪贴板无 NSPasteboard 推送通知，只有 changeCount 轮询。
 - OpenGL 窗口路径未接；仅 Metal。
-- 尚无 `.app` 打包、签名、公证、sandbox。
+- `.app` 打包、ad-hoc/identity 签名钩子、universal lipo 脚本和 notarization 脚本已有；Developer ID 真实公证与 sandbox 实测仍待完成。
 
-## 6. 验收与回归
+
+## 6. 当前交付快照（2026-11-23）
+
+已完成并可回归：
+
+- `NSTextInputClient` IME、marked text/commit、候选锚点；
+- NSAccessibility 树、文本值/编辑、grid 行列、hit test、focused-element 通知；
+- 原生菜单、open/reopen/quit 生命周期、quit 尊重 close interceptor；
+- 外部拖放 destination + text/file source；
+- 文件对话框 sheet + UTType；`NSAlert`；原生 toolbar/sidebar/titlebar accessory；
+- secure input、输入源查询/通知、`NSSpellChecker` 下划线与右键替换建议；
+- frame autosave/tabbing、SF Symbols、retained/damage、opt-in frame-plan、occlusion、CVDisplayLink vblank；
+- EDR headroom/wide-colour 上报；
+- ad-hoc 签名、universal 双 slice、notarization 脚本、本地 CI 和 GitHub Actions workflow。
+
+仍需真实环境/凭据/更多回归：
+
+- VoiceOver、真实 CJK 候选窗、真实 Finder 多文件拖出、真实 sheet/alert 交互；
+- sandbox 签名下的 security-scoped bookmark；
+- Developer ID + notarytool 公证；
+- CoralGraphics 的 P3/EDR/PQ 输出；
+- CVDisplayLink → CADisplayLink/CAMetalDisplayLink 迁移；
+- frame-plan 默认启用前的滚动/裁剪/overlay 回归；
+- sidebar outline/拖拽、任意 titlebar accessory、vibrancy、autocorrect/字体面板。
+
+跨仓库依赖：CoralGraphics `feature/metal-backend` 的 `e4be56e`、`20c1afa`、`b6bb18c` 必须先 push；CoralUI 才能构建。之后可以再 pin 到 submodule commit 或 tag。
+## 7. 验收与回归
 
 每阶段至少保持：
 
