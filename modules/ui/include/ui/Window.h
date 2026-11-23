@@ -229,6 +229,14 @@ class Window final : public Renderer {
     Cocoa,
   };
 
+  /** One native toolbar item; `symbol` is an SF Symbol name on macOS. */
+  struct ToolbarItem {
+    std::string id;
+    std::string label;
+    std::string symbol;
+    std::string tooltip;
+  };
+
   /** macOS native window tabbing preference; ignored by the other backends. */
   enum class TabbingMode : uint8_t {
     Automatic,
@@ -431,6 +439,16 @@ class Window final : public Renderer {
   enum class Decorations : uint8_t { System, Client };
   void setDecorations(Decorations decorations);
   [[nodiscard]] Decorations decorations() const noexcept;
+
+  /**
+   * Replaces the native toolbar items (macOS `NSToolbar`); an empty list removes the toolbar.
+   * Other backends currently ignore it.
+   */
+  void setToolbarItems(std::vector<ToolbarItem> items);
+  /** Shows or hides the native toolbar without discarding its items. */
+  void setToolbarVisible(bool visible);
+  /** Called with the item id when a toolbar item is clicked. */
+  void setToolbarActionHandler(std::function<void(std::string_view)> handler);
 
   /** Chrome geometry used by client-side decorations; ignored in system-decoration mode. */
   void setChromeMetrics(WindowChromeMetrics metrics);

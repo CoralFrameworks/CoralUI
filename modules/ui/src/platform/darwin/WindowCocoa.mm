@@ -270,6 +270,19 @@ uint32_t argbFromColor(NSColor* color) {
 @property(nonatomic, assign) NSDragOperation allowed;
 @end
 
+@interface CoralToolbarTarget : NSObject
+@property(nonatomic, assign) void* platform;
+- (void)activate:(id)sender;
+@end
+
+/** Builds and owns the NSToolbar items for one Cocoa window. */
+@interface CoralToolbarDelegate : NSObject <NSToolbarDelegate>
+@property(nonatomic, assign) void* platform;
+@property(nonatomic, strong) NSArray<NSString*>* identifiers;
+@property(nonatomic, strong) NSDictionary<NSString*, NSToolbarItem*>* items;
+@property(nonatomic, strong) CoralToolbarTarget* target;
+@end
+
 /** The window delegate: resize/DPI/appearance callbacks and close interception. */
 @interface CoralUIWindowDelegate : NSObject <NSWindowDelegate>
 @property(nonatomic, assign) void* platform;
@@ -304,7 +317,12 @@ class CocoaPlatform final : public WindowPlatform {
     mSurface.reset();
     mDeviceOwner.reset();
     mHost = nullptr;
+    if (mToolbarDelegate != nil) {
+      mToolbarDelegate.platform = nullptr;
+      mToolbarDelegate.target.platform = nullptr;
+    }
     if (mWindow != nil) {
+      mWindow.toolbar = nil;
       mWindow.delegate = nil;
       [mWindow orderOut:nil];
       [mWindow close];
@@ -629,6 +647,72 @@ class CocoaPlatform final : public WindowPlatform {
     }
     mSurface.reset();
     return createSurface();
+  }
+
+  void setToolbarItems(std::vector<Window::ToolbarItem> items) override {
+    mToolbarItems = std::move(items);
+    applyToolbar();
+  }
+
+  void setToolbarVisible(const bool visible) override {
+    mToolbarVisible = visible;
+    if (mWindow != nil) mWindow.toolbar = visible ? mToolbar : nil;
+  }
+
+  void setToolbarActionHandler(std::function<void(std::string_view)> handler) override {
+    mToolbarAction = std::move(handler);
+  }
+
+  void toolbarItemActivated(const std::string_view identifier) {
+    if (mToolbarAction) mToolbarAction(identifier);
+  }
+
+  void applyToolbar() {
+    if (mWindow == nil) return;
+    if (mToolbar != nil) {
+      mWindow.toolbar = nil;
+      mToolbar = nil;
+      mToolbarDelegate = nil;
+    }
+    if (mToolbarItems.empty()) return;
+    NSMutableArray<NSString*>* identifiers = [NSMutableArray arrayWithCapacity:mToolbarItems.size()];
+    NSMutableDictionary<NSString*, NSToolbarItem*>* items = [NSMutableDictionary dictionary];
+    CoralToolbarTarget* target = [[CoralToolbarTarget alloc] init];
+    target.platform = this;
+    for (std::size_t index = 0; index < mToolbarItems.size(); ++index) {
+      const Window::ToolbarItem& item = mToolbarItems[index];
+      NSString* identifier = item.id.empty()
+        ? [NSString stringWithFormat:@"coral.toolbar.%zu", index]
+        : [NSString stringWithUTF8String:item.id.c_str()];
+      if (identifier.length == 0 || items[identifier] != nil) continue;
+      NSToolbarItem* nativeItem = [[NSToolbarItem alloc] initWithItemIdentifier:identifier];
+      nativeItem.label = item.label.empty() ? identifier
+        : [NSString stringWithUTF8String:item.label.c_str()];
+      nativeItem.paletteLabel = nativeItem.label;
+      if (!item.tooltip.empty()) {
+        nativeItem.toolTip = [NSString stringWithUTF8String:item.tooltip.c_str()];
+      }
+      if (!item.symbol.empty() && @available(macOS 11.0, *)) {
+        nativeItem.image = [NSImage imageWithSystemSymbolName:
+          [NSString stringWithUTF8String:item.symbol.c_str()] accessibilityDescription:nil];
+      }
+      nativeItem.target = target;
+      nativeItem.action = @selector(activate:);
+      items[identifier] = nativeItem;
+      [identifiers addObject:identifier];
+    }
+    if (identifiers.count == 0) return;
+    mToolbarDelegate = [[CoralToolbarDelegate alloc] init];
+    mToolbarDelegate.platform = this;
+    mToolbarDelegate.identifiers = identifiers;
+    mToolbarDelegate.items = items;
+    mToolbarDelegate.target = target;
+    mToolbar = [[NSToolbar alloc] initWithIdentifier:@"CoralUIToolbar"];
+    mToolbar.delegate = mToolbarDelegate;
+    mToolbar.displayMode = NSToolbarDisplayModeIconAndLabel;
+    mToolbar.allowsUserCustomization = NO;
+    if (@available(macOS 11.0, *)) mWindow.toolbarStyle = NSWindowToolbarStyleUnified;
+    if (mToolbarVisible) mWindow.toolbar = mToolbar;
   }
 
   void setTitle(std::string_view title) override {
@@ -1564,6 +1648,11 @@ class CocoaPlatform final : public WindowPlatform {
 
   WindowHost* mHost = nullptr;
   CoralDragSource* mActiveDragSource = nil;
+  NSToolbar* mToolbar = nil;
+  CoralToolbarDelegate* mToolbarDelegate = nil;
+  std::vector<Window::ToolbarItem> mToolbarItems;
+  std::function<void(std::string_view)> mToolbarAction;
+  bool mToolbarVisible = true;
   std::function<AccessibilityNode()> mAccessibilityProvider;
   AccessibilityActionInvoker mAccessibilityInvoker;
   std::unique_ptr<graphics::gpu::WindowSurface> mSurface;
@@ -1783,6 +1872,46 @@ coral::ui::DragPayload payloadFromPasteboard(NSPasteboard* pasteboard) {
   }
   (void)coral::ui::detail::dispatchOpenFiles(std::move(paths));
   (void)sender;
+}
+
+@end
+
+@implementation CoralToolbarTarget
+
+@synthesize platform = _platform;
+
+- (void)activate:(id)sender {
+  if (_platform == nullptr) return;
+  NSString* identifier = [sender itemIdentifier];
+  const char* utf8 = identifier.UTF8String;
+  static_cast<coral::ui::detail::CocoaPlatform*>(_platform)->toolbarItemActivated(
+    utf8 != nullptr ? std::string_view(utf8) : std::string_view());
+}
+
+@end
+
+@implementation CoralToolbarDelegate
+
+@synthesize platform = _platform;
+@synthesize identifiers = _identifiers;
+@synthesize items = _items;
+@synthesize target = _target;
+
+- (NSToolbarItem*)toolbar:(NSToolbar*)toolbar itemForItemIdentifier:
+    (NSToolbarItemIdentifier)identifier willBeInsertedIntoToolbar:(BOOL)flag {
+  (void)toolbar;
+  (void)flag;
+  return _items[identifier];
+}
+
+- (NSArray<NSString*>*)toolbarDefaultItemIdentifiers:(NSToolbar*)toolbar {
+  (void)toolbar;
+  return _identifiers;
+}
+
+- (NSArray<NSString*>*)toolbarAllowedItemIdentifiers:(NSToolbar*)toolbar {
+  (void)toolbar;
+  return _identifiers;
 }
 
 @end

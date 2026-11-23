@@ -75,6 +75,27 @@ int main() {
 
     NSWindow* native = [NSApp windows].firstObject;
     NSView* view = native.contentView;
+
+    // Native NSToolbar: items resolve through the delegate and an item action reaches the window.
+    std::string activated;
+    window->setToolbarActionHandler([&activated](std::string_view identifier) {
+      activated = std::string(identifier);
+    });
+    window->setToolbarItems({ coral::ui::Window::ToolbarItem{
+      "com.coral.test", "Test", "gearshape", "Test item" } });
+    NSToolbar* toolbar = native.toolbar;
+    NSToolbarItem* toolbarItem = toolbar.items.firstObject;
+    if (toolbar == nil || toolbar.items.count != 1 || toolbarItem == nil ||
+        ![toolbarItem.label isEqualToString:@"Test"]) {
+      std::fprintf(stderr, "FAIL: native toolbar did not expose its item\n");
+      return 1;
+    }
+    [(id)toolbarItem.target performSelector:toolbarItem.action withObject:toolbarItem];
+    if (activated != "com.coral.test") {
+      std::fprintf(stderr, "FAIL: toolbar action produced '%s'\n", activated.c_str());
+      return 1;
+    }
+    window->setToolbarItems({});
     id axButton = findElementByLabel(view, "Press me");
     id axInput = findElementByLabel(view, "Search");
     if (axButton == nil || axInput == nil) {

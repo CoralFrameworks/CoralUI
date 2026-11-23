@@ -2089,6 +2089,22 @@ int Window::minimumHeight() const noexcept {
   return mImpl != nullptr ? mImpl->minHeight : 0;
 }
 
+void Window::setToolbarItems(std::vector<ToolbarItem> items) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) {
+    mImpl->platform->setToolbarItems(std::move(items));
+  }
+}
+
+void Window::setToolbarVisible(const bool visible) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) mImpl->platform->setToolbarVisible(visible);
+}
+
+void Window::setToolbarActionHandler(std::function<void(std::string_view)> handler) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) {
+    mImpl->platform->setToolbarActionHandler(std::move(handler));
+  }
+}
+
 void Window::setDecorations(const Decorations decorations) {
   if (mImpl == nullptr || mImpl->decorations == decorations) return;
   mImpl->decorations = decorations;

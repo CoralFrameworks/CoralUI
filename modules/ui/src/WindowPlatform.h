@@ -314,6 +314,11 @@ class WindowPlatform {
    */
   virtual void setPointerCapture(bool captured) { (void)captured; }
   virtual void setDecorations(Window::Decorations decorations) { (void)decorations; }
+  virtual void setToolbarItems(std::vector<Window::ToolbarItem> items) { (void)items; }
+  virtual void setToolbarVisible(bool visible) { (void)visible; }
+  virtual void setToolbarActionHandler(std::function<void(std::string_view)> handler) {
+    (void)handler;
+  }
   virtual void setOpacity(float opacity) { (void)opacity; }
   virtual void setAlwaysOnTop(bool onTop) { (void)onTop; }
   /** The OS light/dark preference; a platform without one reports light. */
