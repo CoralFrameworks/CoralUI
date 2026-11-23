@@ -447,6 +447,12 @@ class Window final : public Renderer {
   void setToolbarItems(std::vector<ToolbarItem> items);
   /** Shows or hides the native toolbar without discarding its items. */
   void setToolbarVisible(bool visible);
+  /**
+   * Enables macOS secure event input for password fields. Process-wide and reference-counted by the
+   * OS; the backend balances its own enable. Other platforms ignore it.
+   */
+  void setSecureInputEnabled(bool enabled);
+  [[nodiscard]] bool isSecureInputEnabled() const noexcept;
   /** Called with the item id when a toolbar item is clicked. */
   void setToolbarActionHandler(std::function<void(std::string_view)> handler);
 

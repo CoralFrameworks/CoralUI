@@ -37,6 +37,7 @@
 #include <gpu/WindowSurface.h>
 
 #import <Cocoa/Cocoa.h>
+#import <Carbon/Carbon.h>
 #import <QuartzCore/CAMetalLayer.h>
 
 #include <CoreFoundation/CoreFoundation.h>
@@ -317,6 +318,10 @@ class CocoaPlatform final : public WindowPlatform {
     mSurface.reset();
     mDeviceOwner.reset();
     mHost = nullptr;
+    if (mSecureInputEnabled) {
+      DisableSecureEventInput();
+      mSecureInputEnabled = false;
+    }
     if (mToolbarDelegate != nil) {
       mToolbarDelegate.platform = nullptr;
       mToolbarDelegate.target.platform = nullptr;
@@ -647,6 +652,22 @@ class CocoaPlatform final : public WindowPlatform {
     }
     mSurface.reset();
     return createSurface();
+  }
+
+  void setSecureInputEnabled(const bool enabled) override {
+    if (mSecureInputEnabled == enabled) return;
+    if (![NSThread isMainThread]) return;
+    if (enabled) {
+      EnableSecureEventInput();
+      mSecureInputEnabled = true;
+    } else {
+      DisableSecureEventInput();
+      mSecureInputEnabled = false;
+    }
+  }
+
+  [[nodiscard]] bool isSecureInputEnabled() const override {
+    return IsSecureEventInputEnabled();
   }
 
   void setToolbarItems(std::vector<Window::ToolbarItem> items) override {
@@ -1653,6 +1674,7 @@ class CocoaPlatform final : public WindowPlatform {
   std::vector<Window::ToolbarItem> mToolbarItems;
   std::function<void(std::string_view)> mToolbarAction;
   bool mToolbarVisible = true;
+  bool mSecureInputEnabled = false;
   std::function<AccessibilityNode()> mAccessibilityProvider;
   AccessibilityActionInvoker mAccessibilityInvoker;
   std::unique_ptr<graphics::gpu::WindowSurface> mSurface;

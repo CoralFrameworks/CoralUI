@@ -319,6 +319,12 @@ class WindowPlatform {
   virtual void setToolbarActionHandler(std::function<void(std::string_view)> handler) {
     (void)handler;
   }
+  virtual void setSecureInputEnabled(bool enabled) {
+    (void)enabled;
+  }
+  [[nodiscard]] virtual bool isSecureInputEnabled() const {
+    return false;
+  }
   virtual void setOpacity(float opacity) { (void)opacity; }
   virtual void setAlwaysOnTop(bool onTop) { (void)onTop; }
   /** The OS light/dark preference; a platform without one reports light. */

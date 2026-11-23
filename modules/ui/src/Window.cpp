@@ -2095,6 +2095,17 @@ void Window::setToolbarItems(std::vector<ToolbarItem> items) {
   }
 }
 
+void Window::setSecureInputEnabled(const bool enabled) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) {
+    mImpl->platform->setSecureInputEnabled(enabled);
+  }
+}
+
+bool Window::isSecureInputEnabled() const noexcept {
+  return mImpl != nullptr && mImpl->platform != nullptr &&
+    mImpl->platform->isSecureInputEnabled();
+}
+
 void Window::setToolbarVisible(const bool visible) {
   if (mImpl != nullptr && mImpl->platform != nullptr) mImpl->platform->setToolbarVisible(visible);
 }

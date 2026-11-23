@@ -278,6 +278,7 @@ if (APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   find_library(METAL_FRAMEWORK Metal REQUIRED)
   find_library(QUARTZCORE_FRAMEWORK QuartzCore REQUIRED)
   find_library(UNIFORMTYPEIDENTIFIERS_FRAMEWORK UniformTypeIdentifiers REQUIRED)
+  find_library(CARBON_FRAMEWORK Carbon REQUIRED)
   target_sources(${TARGET} PRIVATE src/platform/darwin/WindowCocoa.mm
       src/platform/darwin/ClipboardCocoa.mm src/platform/darwin/FileDialogCocoa.mm
       src/platform/darwin/SystemImageCocoa.mm src/platform/darwin/NativeAlertCocoa.mm)
@@ -287,7 +288,8 @@ if (APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
       PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
   target_link_libraries(${TARGET} PRIVATE $<BUILD_INTERFACE:${COCOA_FRAMEWORK}>
       $<BUILD_INTERFACE:${METAL_FRAMEWORK}> $<BUILD_INTERFACE:${QUARTZCORE_FRAMEWORK}>
-      $<BUILD_INTERFACE:${UNIFORMTYPEIDENTIFIERS_FRAMEWORK}>)
+      $<BUILD_INTERFACE:${UNIFORMTYPEIDENTIFIERS_FRAMEWORK}>
+      $<BUILD_INTERFACE:${CARBON_FRAMEWORK}>)
   target_compile_definitions(${TARGET} PRIVATE CORAL_UI_COCOA=1)
   set(CLIPBOARD_PLATFORM_SOURCE src/platform/darwin/ClipboardCocoa.mm)
   set(FILEDIALOG_PLATFORM_SOURCE src/platform/darwin/FileDialogCocoa.mm)
