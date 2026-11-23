@@ -1,0 +1,43 @@
+name: macOS
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# The CoralGraphics changes for macOS vblank/plan presentation live on feature/metal-backend in this
+# workgroup. The workflow checks that branch out beside CoralUI; update the ref together with the
+# CoralUI branch when those commits are pushed.
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout CoralUI
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Checkout CoralGraphics
+        uses: actions/checkout@v4
+        with:
+          repository: CoralFrameworks/CoralGraphics
+          ref: feature/metal-backend
+          path: CoralGraphics
+          submodules: recursive
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -G "Unix Makefiles"
+          -DCMAKE_BUILD_TYPE=Release
+          -DCORAL_BUILD_TESTS=ON
+          -DCORAL_GRAPHICS_DIR="${{ github.workspace }}/CoralGraphics"
+
+      - name: Build
+        run: >
+          cmake --build build -j 4
+          --target test_ui ui_native_smoke ui_native_ax_smoke ui_demo ui_mvvm_demo
+
+      - name: Test
+        run: >
+          ctest --test-dir build --output-on-failure
+          -R "^(test_ui|test_ui_shared_device|ui_native_smoke|ui_native_ax_smoke|example_ui_demo_headless|example_ui_mvvm_headless)$"
