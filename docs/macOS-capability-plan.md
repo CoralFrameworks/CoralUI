@@ -54,7 +54,8 @@
 - [ ] VoiceOver 手工验证；
 - [ ] 开启/关闭 accessibility bridge 的策略（类似 `CORAL_UI_UIA=0`）；
 - [x] AX 文本：editable/value/selectedTextRange/selectedText、AXSetValue → `TextInput::SetValue`；
-- [ ] AX 行列/表格语义、hit test 与 AXFocus 的完整映射；
+- [x] AX 表格/行列语义：rowCount/columnCount/rowIndexRange/columnIndexRange（来自 `AccessibleGrid`）；
+- [ ] AX hit test、cell role、AXFocus 的完整映射；
 
 基础树已验证：`AXGroup` → `AXButton`/`AXTextField`，frame 为屏幕坐标，AXPress 能触发按钮回调。
 
@@ -174,6 +175,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 | 2026-11-23 | 阶段 1.4：`NSDraggingDestination` 外部文件/文本落入、effect 映射、drag cursor | destination 完成，source/file promise 待补 |
 | 2026-11-23 | 阶段 1.2：`CoralAXElement` 子树、role/value/frame/state 映射、AXPress/Increment/Decrement/ScrollToVisible、通知 | 基础 bridge 完成，VoiceOver/Text AX 待补 |
 | 2026-11-23 | 阶段 1.2 AX 文本：TextInput 暴露 accessibleValue，CoralAXElement 映射 editable/value/selection，AXSetValue 走 SetValue action | 文本 AX 基础完成，表格/焦点/hit test 待补 |
+| 2026-11-23 | 阶段 1.2 AX 表格：grid rowCount/columnCount/index ranges，native smoke 用 Table 校验 2x2 | 表格尺寸完成，cell role/hit test 待补 |
 | 2026-11-23 | 阶段 1.4 source：`CoralDragSource`、文本/文件/custom MIME、拖拽图像 | 基础 source 完成，file promise/真实 Finder 验收待补 |
 | 2026-11-23 | 阶段 1.5：文件对话框 sheet、UTType 过滤（UniformTypeIdentifiers）、默认路径/多选 | 部分完成，NSAlert/accessory/sandbox bookmark 待补 |
 | 2026-11-23 | 阶段 1.5：`NativeAlert.h` / NSAlert sheet 封装，native smoke 校验 `supportsNativeAlerts` | NSAlert 基础完成，真实弹窗手工验收/accessory 待补 |
@@ -216,7 +218,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 - IME：`setMarkedText` 忽略 marked text 内部的 selection 和 replacementRange；`selectedRange` 只做 UTF-8→UTF-16 的 caret/selection 映射；尚未验证真实中文/日文/韩文候选窗和死键。CJK 输入法需要在真实前台会话中手工测试。
 - IME 的 `validAttributesForMarkedText` 只声明了下划线，marked text 仍由 CoralUI 的 composition 绘制；没有使用 AppKit 的 attributed marked text 渲染。
 - 拖放目前只实现 destination；`NSDraggingSource`（从 layer 拖到 Finder/其他 app）和 file promise 未实现。外部拖放的 UI 光标/落点需要真实 Finder 手工验收。
-- AX 目前是查询时重建整棵 `NSAccessibilityElement` 树；没有稳定的 element 身份。文本字段现在映射 editable/value/selected range 并支持 AXSetValue；表格行列、hit test 和更细的 element 通知仍待补。焦点/值通知目前 post 到根 view，VoiceOver 可能需要更细的 element 通知。
+- AX 目前是查询时重建整棵 `NSAccessibilityElement` 树；没有稳定的 element 身份。文本字段映射 editable/value/selected range 并支持 AXSetValue；表格容器映射 row/column count 与 index range，但 cell role、hit test 和更细的 element 通知仍待补。
 - AX bounds 通过父元素逻辑偏移累加得到屏幕 frame；需要确认多层嵌套/Flex 布局下的偏移和 Retina 取整。
 - 文件对话框 sheet 的 parent 通过当前 `NSApp.keyWindow`/`mainWindow` 解析，`FileDialogOptions.parent` 还没有直接映射到对应 `NSWindow`；非活动 app 会回退 `runModal`。`NSOpenPanel.canChooseDirectories` 仍固定 false，需要扩展 `FileDialogOptions`。
 - `NativeAlert` 的 parent 同样通过当前 key/main window 解析；真实 sheet 的按钮返回/Esc 行为仍需前台手工验收。非 macOS 平台目前返回 -1，继续使用 in-window `Dialog`。

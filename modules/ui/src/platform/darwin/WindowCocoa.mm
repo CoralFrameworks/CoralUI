@@ -2288,6 +2288,32 @@ CoralAXElement* makeCoralAXElement(const coral::ui::AccessibilityNode& node, NSR
   }
 }
 
+- (NSInteger)accessibilityRowCount {
+  const auto* payload = static_cast<const CoralAXPayload*>(_coralPayload);
+  return payload != nullptr && payload->node.grid.has_value() ? payload->node.grid->rows : 0;
+}
+
+- (NSInteger)accessibilityColumnCount {
+  const auto* payload = static_cast<const CoralAXPayload*>(_coralPayload);
+  return payload != nullptr && payload->node.grid.has_value() ? payload->node.grid->columns : 0;
+}
+
+- (NSRange)accessibilityRowIndexRange {
+  const auto* payload = static_cast<const CoralAXPayload*>(_coralPayload);
+  if (payload == nullptr || !payload->node.grid.has_value() || payload->node.grid->row < 0) {
+    return NSMakeRange(NSNotFound, 0);
+  }
+  return NSMakeRange(static_cast<NSUInteger>(payload->node.grid->row), 1);
+}
+
+- (NSRange)accessibilityColumnIndexRange {
+  const auto* payload = static_cast<const CoralAXPayload*>(_coralPayload);
+  if (payload == nullptr || !payload->node.grid.has_value() || payload->node.grid->column < 0) {
+    return NSMakeRange(NSNotFound, 0);
+  }
+  return NSMakeRange(static_cast<NSUInteger>(payload->node.grid->column), 1);
+}
+
 - (BOOL)accessibilityEditable {
   const auto* payload = static_cast<const CoralAXPayload*>(_coralPayload);
   return payload != nullptr && payload->node.editable;

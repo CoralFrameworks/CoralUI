@@ -26,6 +26,7 @@
 #include <ui/NativeAlert.h>
 #include <ui/SecurityScopedBookmark.h>
 #include <ui/SpellCheck.h>
+#include <ui/Table.h>
 #include <ui/SystemImage.h>
 #include <ui/TextInput.h>
 #include <ui/Window.h>
@@ -86,8 +87,12 @@ int main() {
     auto button = std::make_shared<coral::ui::Button>("Press me", nullptr);
     auto input = std::make_shared<coral::ui::TextInput>("", nullptr);
     input->setAccessibleName("Search");
+    auto table = std::make_shared<coral::ui::Table>();
+    table->setAccessibleName("Grid");
+    table->setRows({ { nullptr, nullptr }, { nullptr, nullptr } });
     root->addChild(button);
     root->addChild(input);
+    root->addChild(table);
     window->setRoot(root);
     window->focusLayer(input.get());
     bool clicked = false;
@@ -177,8 +182,14 @@ int main() {
     input->setText("hello world");
     id axButton = findElementByLabel(view, "Press me");
     id axInput = findElementByLabel(view, "Search");
-    if (axButton == nil || axInput == nil) {
+    id axGrid = findElementByLabel(view, "Grid");
+    if (axButton == nil || axInput == nil || axGrid == nil) {
       std::fprintf(stderr, "FAIL: accessibility tree did not expose the button/input\n");
+      return 1;
+    }
+    if ([axGrid accessibilityRowCount] != 2 || [axGrid accessibilityColumnCount] != 2 ||
+        [axGrid accessibilityRowIndexRange].length != 0) {
+      std::fprintf(stderr, "FAIL: AX grid dimensions were not exposed\n");
       return 1;
     }
     if (![[axButton accessibilityRole] isEqualToString:NSAccessibilityButtonRole] ||
