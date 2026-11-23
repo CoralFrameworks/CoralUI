@@ -83,13 +83,21 @@ jobs:
           ctest --test-dir build --output-on-failure
           -R "^(test_ui|test_ui_shared_device|ui_native_smoke|ui_native_ax_smoke|example_ui_demo_headless|example_ui_mvvm_headless)$"
 
+      - name: Runner diagnostics
+        if: failure()
+        run: |
+          uname -a
+          system_profiler SPDisplaysDataType || true
+          xcodebuild -version || true
+
       - name: Backtrace failures
         if: failure()
         run: |
           set +e
+          # macOS images do not ship GNU timeout; lldb exits after the crash and the bt/quit commands.
           run_lldb() {
             echo "===== $* ====="
-            timeout 60 lldb --batch -o run -o "thread backtrace all" -o quit -- "$@" 2>&1 | tail -80
+            lldb --batch -o run -o "thread backtrace all" -o quit -- "$@" 2>&1 | tail -120
           }
           run_lldb build/modules/ui/tests/test_ui
           run_lldb build/modules/ui/tests/ui_native_smoke
