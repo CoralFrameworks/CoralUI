@@ -24,6 +24,7 @@
 #include <ui/Button.h>
 #include <ui/Flex.h>
 #include <ui/NativeAlert.h>
+#include <ui/SecurityScopedBookmark.h>
 #include <ui/SpellCheck.h>
 #include <ui/SystemImage.h>
 #include <ui/TextInput.h>
@@ -104,6 +105,21 @@ int main() {
       return 1;
     }
     window->setSecureInputEnabled(false);
+
+    std::string bookmarkError;
+    const std::optional<std::string> bookmark =
+      coral::ui::createSecurityScopedBookmark("/tmp", &bookmarkError);
+    if (!bookmark.has_value()) {
+      std::fprintf(stderr, "bookmark create failed: %s\n", bookmarkError.c_str());
+    } else {
+      auto access = coral::ui::SecurityScopedAccess::fromBookmark(*bookmark, &bookmarkError);
+      if (!access.has_value() || access->path() != "/tmp" || !access->startAccessing()) {
+        std::fprintf(stderr, "FAIL: security-scoped bookmark did not resolve/access: %s\n",
+          bookmarkError.c_str());
+        return 1;
+      }
+      access->stopAccessing();
+    }
 
     const std::vector<coral::ui::SpellIssue> issues = coral::ui::spellCheck("helo wrold");
     const std::vector<std::string> suggestions = coral::ui::spellSuggestions("helo");

@@ -98,6 +98,7 @@ set(PUBLIC_HDRS
     include/ui/SystemFonts.h
     include/ui/SystemImage.h
     include/ui/SpellCheck.h
+    include/ui/SecurityScopedBookmark.h
     include/ui/Motion.h
     include/ui/NumberFormat.h
     include/ui/Spinner.h
@@ -270,6 +271,7 @@ if (NOT APPLE OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
   target_sources(${TARGET} PRIVATE src/platform/SystemImageFallback.cpp)
   target_sources(${TARGET} PRIVATE src/platform/NativeAlertFallback.cpp)
   target_sources(${TARGET} PRIVATE src/platform/SpellCheckFallback.cpp)
+  target_sources(${TARGET} PRIVATE src/platform/SecurityScopedBookmarkFallback.cpp)
 endif ()
 
 if (APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
@@ -284,11 +286,13 @@ if (APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   target_sources(${TARGET} PRIVATE src/platform/darwin/WindowCocoa.mm
       src/platform/darwin/ClipboardCocoa.mm src/platform/darwin/FileDialogCocoa.mm
       src/platform/darwin/SystemImageCocoa.mm src/platform/darwin/NativeAlertCocoa.mm
-      src/platform/darwin/SpellCheckCocoa.mm)
+      src/platform/darwin/SpellCheckCocoa.mm
+      src/platform/darwin/SecurityScopedBookmarkCocoa.mm)
   set_source_files_properties(src/platform/darwin/WindowCocoa.mm
       src/platform/darwin/ClipboardCocoa.mm src/platform/darwin/FileDialogCocoa.mm
       src/platform/darwin/SystemImageCocoa.mm src/platform/darwin/NativeAlertCocoa.mm
       src/platform/darwin/SpellCheckCocoa.mm
+      src/platform/darwin/SecurityScopedBookmarkCocoa.mm
       PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
   target_link_libraries(${TARGET} PRIVATE $<BUILD_INTERFACE:${COCOA_FRAMEWORK}>
       $<BUILD_INTERFACE:${METAL_FRAMEWORK}> $<BUILD_INTERFACE:${QUARTZCORE_FRAMEWORK}>

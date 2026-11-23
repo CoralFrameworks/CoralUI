@@ -107,7 +107,9 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 - [x] universal binary：`macos-arm64` / `macos-x86_64` 两个 slice + `scripts/make-universal-demo.sh` lipo 成 universal `.app`；单次 configure 的 universal 仍被 vendored libjpeg-turbo 拒绝；
 - [x] 代码签名与 hardened runtime 的 CMake 钩子：`CORAL_MACOS_CODE_SIGN_IDENTITY`、`CORAL_MACOS_HARDENED_RUNTIME`、`CORAL_MACOS_ENTITLEMENTS`；
 - [x] notarization 脚本：`scripts/notarize-macos-app.sh`（notarytool submit --wait + stapler staple/validate）；
-- [ ] App Sandbox entitlements 模板；
+- [x] App Sandbox entitlements 模板：`examples/ui/CoralUIDemo.entitlements`；
+- [x] security-scoped bookmark API：`createSecurityScopedBookmark` / `SecurityScopedAccess`；
+- [ ] sandbox-enabled 签名 demo 的 bookmark 读写实测；
 - [ ] 文档类型 / URL scheme / open files 声明示例。
 
 验收：`open out/examples/ui/ui_demo.app` 正常启动；签名/公证待后续。
@@ -176,6 +178,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 | 2026-11-23 | 阶段 1.5：`NativeAlert.h` / NSAlert sheet 封装，native smoke 校验 `supportsNativeAlerts` | NSAlert 基础完成，真实弹窗手工验收/accessory 待补 |
 | 2026-11-23 | 阶段 1.6：`CORAL_MACOS_CODE_SIGN_IDENTITY` / `CORAL_MACOS_HARDENED_RUNTIME` / entitlements 签名钩子；ad-hoc 签名实测通过 | 签名钩子完成，notarization/sandbox/universal preset 待补 |
 | 2026-11-23 | 阶段 1.6 universal：`CMakePresets.json` arm64/x86_64 preset、host shader compiler 复用、`scripts/make-universal-demo.sh` lipo 验证 dual-arch；notarization 脚本 | universal/notarization 脚本完成，真实公证/sandbox 待补 |
+| 2026-11-23 | 阶段 1.6 sandbox：entitlements 模板 + security-scoped bookmark API；非 sandbox 环境下创建 bookmark 按预期失败 | API/模板完成，sandbox 签名实测待补 |
 | 2026-11-23 | 新增 macOS native smoke：`ui_native_ax_smoke`（AX role/tree/AXPress + NSTextInputClient marked/commit） | 已加入 CTest native label |
 | 2026-11-23 | 阶段 2 起步：`Window::Options::frameAutosaveName`/`TabbingMode`、AppKit frame autosave、tabbingIdentifier、Window 菜单 tab 项 | 基础完成，完整 restoration/titlebar accessory 待补 |
 | 2026-11-23 | 阶段 2 Toolbar：`Window::ToolbarItem`/`setToolbarItems`/handler、NSToolbar delegate、SF Symbol 图标；native smoke 校验 item/action | 基础完成，Sidebar/自定义/尺寸联动待补 |
@@ -219,6 +222,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 - 代码签名钩子只在显式传入 `CORAL_MACOS_CODE_SIGN_IDENTITY` 时执行；默认不签名。ad-hoc 签名已验证，Developer ID 证书与 notarization 需要真实账号。
 - universal 不能一次 configure：CoralGraphics 的 vendored libjpeg-turbo 拒绝多架构；当前用 arm64/x86_64 两个 slice，x86 slice 复用 arm64 的 `shader_compiler`，再用 `lipo` 合并 demo 可执行文件。框架作为静态库随 app 链接；如果分发独立 dylib，需要为每个 slice 单独 lipo。
 - `scripts/notarize-macos-app.sh` 需要已签名的 Developer ID `.app` 和 notarytool keychain profile；本机没有凭据，只做了脚本语法检查。
+- Security-scoped bookmark 只有在 App Sandbox entitlement 下才有实际意义；当前未 sandbox 的 native smoke 中，`NSURLBookmarkCreationWithSecurityScope` 对 `/tmp` 按预期失败。需要用 `CoralUIDemo.entitlements` 签名后再验证创建/恢复。
 - 窗口 autosave/tabbing 目前是 AppKit 原生基础：`frameAutosaveName` 恢复 frame，`TabbingMode` 设置 `NSWindow.tabbingMode`；还没有 Apple 的 state restoration（`restorationClass`/`encodeRestorableState`），也没有 tab 内容/新 tab 的 Window API。
 - Native Toolbar 目前是基础 `NSToolbar`（图标+标签、无自定义/overflow 控制），工具栏显示/隐藏会改变内容区高度；尚未实现 Sidebar/NSSplitView、titlebar accessory 或与 CoralUI 内容布局的显式联动。
 - Secure event input 是进程级、由 OS 引用计数；`Window` 只平衡自己的一次 enable/disable，多窗口/异常退出时需要产品侧确保最终释放。只在 AppKit 主线程上生效。
