@@ -130,7 +130,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 ### 阶段三：性能、画质与工程化（P2）
 
 - [x] Cocoa 接入 retained frames 与 damage rects（`presentRetained`/`presentDamage`），native smoke 验证 clean frame 不重新录制、damage 后 snapshot 正确；
-- [ ] Cocoa 接入 frame-plan/boundary submission，减少多边界全量 blit；
+- [x] Cocoa 接入 frame-plan/boundary submission（`CORAL_UI_FRAME_PLAN_WINDOW=1` opt-in），native smoke 验证 plan items/command buffers；
 - [ ] CVDisplayLink / CAMetalDisplayLink vblank 调度，ProMotion/120Hz；
 - [x] occlusion 暂停自动帧（`NSWindowOcclusionState` → `WindowHost::platformOcclusionChanged`，重新可见时 damageAll + requestFrame）；
 - [x] 最小化/隐藏时不再由自动循环持续渲染（显式 `Window::renderFrame()` 仍可 snapshot）；
@@ -171,6 +171,7 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 | 2026-11-23 | 阶段 3 渲染：Cocoa `supportsRetainedFrames`/`presentRetained`/`supportsDamageRects`/`presentDamage`；native smoke 验证 retained replay 与 damage snapshot | retained/damage 完成，frame-plan/boundary 待补 |
 | 2026-11-23 | 阶段 3 occlusion：Cocoa occlusionState → platformOcclusionChanged；自动 tick 在隐藏时保留待渲染请求 | 基础完成，手工隐藏/最小化验收待补 |
 | 2026-11-23 | 阶段 3 vblank：CoralGraphics CVDisplayLink `MacVBlankSource` + `NativeDisplayKind::MacOS`；Cocoa 返回真实 display source，native smoke 校验 refreshHertz > 0 | 基础完成，CVDisplayLink 弃用/per-window 显示切换待补 |
+| 2026-11-23 | 阶段 3 frame-plan：Cocoa boundary submission、WindowSurface 复用 open frame；native smoke plan items=1/buffers=1 | 基础完成，opt-in 与更多边界场景待补 |
 
 ## 5. 问题记录
 
@@ -200,10 +201,10 @@ destination 和基础 source 都已实现；source 的拖拽图像、file promis
 - 窗口 autosave/tabbing 目前是 AppKit 原生基础：`frameAutosaveName` 恢复 frame，`TabbingMode` 设置 `NSWindow.tabbingMode`；还没有 Apple 的 state restoration（`restorationClass`/`encodeRestorableState`），也没有 tab 内容/新 tab 的 Window API。
 - 手势路由按 pointer 命中层向父链冒泡；没有独立的 gesture recognizer/冲突仲裁，也没有 Force Touch、pen pressure 或 swipe 的完整方向/阶段语义。ScrollView 目前只消费 delta，phase 字段供上层控件使用。
 - SF Symbol 目前以模板黑色/alpha 图像返回，尚未暴露颜色/tint 配置和动态 accent color；SF Symbol 的 symbol configuration（weight/scale/variant）只暴露 pointSize 与 raster scale。
-- macOS vblank 使用 CoralGraphics 的 `CVDisplayLink` 源（CoralGraphics 分支 `feature/metal-backend`，commit `e4be56e` + `20c1afa`）。`CVDisplayLink` 在新 SDK 已弃用，后续应迁移到 `CADisplayLink`/`CAMetalDisplayLink`；当前 link 基于 active displays，不是 per-window，跨显示器/动态刷新率切换还未处理。首次对齐会等待两个 vblank（约 33ms）。
+- macOS vblank 使用 CoralGraphics 的 `CVDisplayLink` 源（CoralGraphics 分支 `feature/metal-backend`，commit `e4be56e` + `20c1afa`）；plan multi-list 还需要 `b6bb18c`（复用已开启 frame）。`CVDisplayLink` 在新 SDK 已弃用，后续应迁移到 `CADisplayLink`/`CAMetalDisplayLink`；当前 link 基于 active displays，不是 per-window，跨显示器/动态刷新率切换还未处理。首次对齐会等待两个 vblank（约 33ms）。
 - 当前 macOS 测试机 `Window::refreshHertz()` 报告约 74 Hz（真实 display 回调间隔），不是固定的 60/120；UI 动画和 ProMotion 调度应以该值为准。
 
-- 全量 UI target + blit 每帧；Cocoa 已接入 retained/damage，但 frame-plan/boundary submission 仍未接入，复杂页面仍可能录制/提交整棵内容。
+- 全量 UI target + blit 每帧；Cocoa 已接入 retained/damage 和 opt-in frame-plan/boundary submission，但 plan 仍只在 `CORAL_UI_FRAME_PLAN_WINDOW=1` 下启用，复杂页面/滚动 viewport 的边界场景还需更多验证。
 - occlusion 暂停逻辑没有自动化测试：需要真实 AppKit 前台会话通过隐藏/最小化窗口验证 frameCount 不再增长，并在恢复时重绘。`Window::renderFrame()` 显式调用仍会渲染，以便 snapshot/导出。
 - 无 CVDisplayLink，`refreshHertz` 来自 `PresentFrameClock`，不代表真实显示刷新。
 - `screenBounds`/`setPosition` 对副屏 origin 处理不完整。

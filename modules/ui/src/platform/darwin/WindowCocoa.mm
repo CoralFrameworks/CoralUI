@@ -558,6 +558,28 @@ class CocoaPlatform final : public WindowPlatform {
     return mSurface != nullptr && mSurface->presentDamage(damage);
   }
 
+  [[nodiscard]] bool supportsBoundarySubmission() const override {
+    // Opt-in until the Metal multi-list path has as much mileage as the Linux window path.
+    static const bool enabled = std::getenv("CORAL_UI_FRAME_PLAN_WINDOW") != nullptr;
+    return enabled && mSurface != nullptr;
+  }
+
+  bool presentBoundaries(
+      const std::vector<graphics::gpu::Surface::ListItem>& items) override {
+    if (mSurface == nullptr) return false;
+    std::vector<graphics::gpu::WindowSurface::ListItem> windowItems;
+    windowItems.reserve(items.size());
+    for (const graphics::gpu::Surface::ListItem& item: items) {
+      graphics::gpu::WindowSurface::ListItem windowItem;
+      windowItem.list = item.list;
+      windowItem.clip = item.clip;
+      windowItem.translation = item.translation;
+      windowItem.opacity = item.opacity;
+      windowItems.push_back(std::move(windowItem));
+    }
+    return mSurface->presentListItems(windowItems);
+  }
+
   [[nodiscard]] bool snapshot(graphics::Bitmap* out) override {
     return mSurface != nullptr && mSurface->readback(out);
   }

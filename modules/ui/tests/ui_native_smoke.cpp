@@ -29,9 +29,13 @@
 #include <graphics/Color.h>
 
 #include <cstdio>
+#include <cstdlib>
 #include <memory>
 
 int main() {
+#if defined(__APPLE__)
+  (void)setenv("CORAL_UI_FRAME_PLAN_WINDOW", "1", 1);
+#endif
   coral::ui::Window::Options options;
   options.headless = false;
   options.width = 320;
@@ -82,6 +86,7 @@ int main() {
   auto root = std::make_shared<coral::ui::ColorLayer>(graphics::Color::MakeRGBA8(56, 132, 220, 255));
   auto focusable = std::make_shared<coral::ui::Button>("Focus", nullptr);
   focusable->setBounds(coral::ui::Rect::MakeLTRB(8.0f, 8.0f, 80.0f, 40.0f));
+  focusable->setRepaintBoundary(true);
   root->addChild(focusable);
   window->setRoot(root);
   window->focusLayer(focusable.get());
@@ -118,6 +123,7 @@ int main() {
   // new colour while the untouched area keeps the root colour.
   auto damaged = std::make_shared<coral::ui::ColorLayer>(graphics::Color::MakeRGBA8(255, 0, 0, 255));
   damaged->setBounds(coral::ui::Rect::MakeLTRB(0.0f, 0.0f, 40.0f, 40.0f));
+  damaged->setRepaintBoundary(true);
   root->addChild(damaged);
   if (!window->renderFrame()) {
     std::fprintf(stderr, "FAIL: the native frame with a damage child did not render\n");
@@ -159,7 +165,14 @@ int main() {
     appearance.valid ? "valid" : "unavailable", appearance.preferDark ? 1 : 0,
     appearance.highContrast ? 1 : 0, parentHandle.empty() ? "none" : parentHandle.c_str());
   if (window->nativePlatform() == coral::ui::Window::NativePlatform::Cocoa) {
-    std::printf("native refresh: %.1f Hz\n", static_cast<double>(window->refreshHertz()));
+    const coral::ui::FrameStatistics stats = window->frameStatistics();
+    std::printf("native refresh: %.1f Hz, plan items=%u, buffers=%u\n",
+      static_cast<double>(window->refreshHertz()), stats.framePlanItems, stats.commandBuffers);
+    if (stats.framePlanItems == 0 || stats.commandBuffers != 1) {
+      std::fprintf(stderr, "FAIL: Cocoa plan frame was flattened (items=%u buffers=%u)\n",
+        stats.framePlanItems, stats.commandBuffers);
+      return 1;
+    }
   }
   return 0;
 }
