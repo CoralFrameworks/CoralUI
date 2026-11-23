@@ -1615,7 +1615,11 @@ class CocoaPlatform final : public WindowPlatform {
 
   void raiseAccessibilityFocusEvent() override {
     if (mView == nil) return;
-    NSAccessibilityPostNotification(mView, NSAccessibilityFocusedUIElementChangedNotification);
+    // Post on the element that now owns focus when the generated AX tree can name it; the view's
+    // group is the fallback for an unnamed/generic focused layer.
+    id focused = [mView accessibilityFocusedUIElement];
+    NSAccessibilityPostNotification(focused != nil ? focused : (id)mView,
+      NSAccessibilityFocusedUIElementChangedNotification);
   }
 
   void raiseAccessibilityPropertyEvent(const std::string_view path,
