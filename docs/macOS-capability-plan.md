@@ -78,19 +78,20 @@
 - [x] `draggingEntered/Updated/Exited/performDragOperation` → `DragEvent`/`DropEvent`；
 - [x] 外部落入路径、位置、effect、拖拽光标（文件 URL 主类型 + text/plain secondary）；
 - [x] 外部 drag 进入 `WindowImpl::routeExternalDrag()`，与内部 drag 共用目标命中；
-- [ ] 从 CoralUI 拖出到 Finder（`NSDraggingSource` + `NSPasteboardWriting`）；
-- [ ] file promise / 多文件（多文件 URL 已解析，promise 未支持）；
+- [x] 从 CoralUI 拖出到 Finder/其他 app（`NSDraggingSource` + `NSPasteboardWriting`，文本/文件 URL/custom MIME）；
+- [ ] file promise / 多文件（多文件 URL 已解析并以多个 dragging item 发出，promise 未支持）；
 - [ ] 验收 demo：把文件拖进窗口，拖出文本/文件（需要真实 Finder 手工测试）。
 
-当前只实现了 **destination**（接收外部拖放）；**source**（从 CoralUI 拖出）仍缺。
+destination 和基础 source 都已实现；source 的拖拽图像、file promise、取消/多文件体验仍需在真实 Finder 会话中验收。
 
 #### 1.5 Sheet、原生弹窗与文件对话框增强
 
 - [ ] `NSAlert` 封装（message/informative/buttons）；
-- [ ] window-attached sheet（`beginSheetModalForWindow:`）；
-- [ ] `NSOpenPanel`/`NSSavePanel` 的 sheet/async 版本，`FileDialogOptions.parent` 真正使用；
-- [ ] UTType 过滤，替代已弃用的 `allowedFileTypes`；
-- [ ] 目录选择、多选、accessory view、默认路径；
+- [x] window-attached sheet（`beginSheetModalForWindow:` + 主 runloop 等待，非活动窗口回退 app-modal）；
+- [x] `NSOpenPanel`/`NSSavePanel` 的 sheet/同步包装；`FileDialogOptions.parent` 通过当前 key/main window 解析；
+- [x] UTType 过滤（macOS 11+ `allowedContentTypes`，旧系统 `allowedFileTypes` fallback）；
+- [x] 目录选择（open panel 仍固定不允许目录；需要 `FileDialogOptions` 扩展）、多选、默认路径；
+- [ ] accessory view；
 - [ ] sandbox security-scoped bookmark（如启用 App Sandbox）。
 
 #### 1.6 macOS 打包与发布
@@ -148,6 +149,8 @@
 | 2026-11-23 | 阶段 1.1：`NSTextInputClient`、interpretKeyEvents、marked/commit、候选窗 anchor、doCommandBySelector、UTF-16 selectedRange | 代码完成，待真实中日韩输入法手工验收 |
 | 2026-11-23 | 阶段 1.4：`NSDraggingDestination` 外部文件/文本落入、effect 映射、drag cursor | destination 完成，source/file promise 待补 |
 | 2026-11-23 | 阶段 1.2：`CoralAXElement` 子树、role/value/frame/state 映射、AXPress/Increment/Decrement/ScrollToVisible、通知 | 基础 bridge 完成，VoiceOver/Text AX 待补 |
+| 2026-11-23 | 阶段 1.4 source：`CoralDragSource`、文本/文件/custom MIME、拖拽图像 | 基础 source 完成，file promise/真实 Finder 验收待补 |
+| 2026-11-23 | 阶段 1.5：文件对话框 sheet、UTType 过滤（UniformTypeIdentifiers）、默认路径/多选 | 部分完成，NSAlert/accessory/sandbox bookmark 待补 |
 
 ## 5. 问题记录
 
@@ -170,6 +173,8 @@
 - 拖放目前只实现 destination；`NSDraggingSource`（从 layer 拖到 Finder/其他 app）和 file promise 未实现。外部拖放的 UI 光标/落点需要真实 Finder 手工验收。
 - AX 目前是查询时重建整棵 `NSAccessibilityElement` 树；没有稳定的 element 身份，也没有 AXSetValue/文本编辑/表格行列的完整映射。焦点/值通知目前 post 到根 view，VoiceOver 可能需要更细的 element 通知。
 - AX bounds 通过父元素逻辑偏移累加得到屏幕 frame；需要确认多层嵌套/Flex 布局下的偏移和 Retina 取整。
+- 文件对话框 sheet 的 parent 通过当前 `NSApp.keyWindow`/`mainWindow` 解析，`FileDialogOptions.parent` 还没有直接映射到对应 `NSWindow`；非活动 app 会回退 `runModal`。`NSOpenPanel.canChooseDirectories` 仍固定 false，需要扩展 `FileDialogOptions`。
+- 拖放 source 的拖拽图像对文件使用 `NSWorkspace iconForFile`，文本使用自绘标签；file promise、拖拽取消反馈、真实 Finder 多文件拖出尚未验收。
 
 - 全量 UI target + blit 每帧，Cocoa 未启用 damage/retained/frame-plan。
 - 无 CVDisplayLink，`refreshHertz` 来自 `PresentFrameClock`，不代表真实显示刷新。

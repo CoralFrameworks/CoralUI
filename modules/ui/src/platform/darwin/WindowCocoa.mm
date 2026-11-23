@@ -263,6 +263,12 @@ uint32_t argbFromColor(NSColor* color) {
 @interface CoralAppDelegate : NSObject <NSApplicationDelegate>
 @end
 
+/** The source side of an outgoing drag: CoralUI -> Finder / another application. */
+@interface CoralDragSource : NSObject <NSDraggingSource>
+@property(nonatomic, assign) void* platform;
+@property(nonatomic, assign) NSDragOperation allowed;
+@end
+
 /** The window delegate: resize/DPI/appearance callbacks and close interception. */
 @interface CoralUIWindowDelegate : NSObject <NSWindowDelegate>
 @property(nonatomic, assign) void* platform;
@@ -284,6 +290,10 @@ class CocoaPlatform final : public WindowPlatform {
       mWidth(std::max(1, mOptions.width)), mHeight(std::max(1, mOptions.height)) {}
 
   ~CocoaPlatform() override {
+    if (mActiveDragSource != nil) {
+      mActiveDragSource.platform = nullptr;
+      mActiveDragSource = nil;
+    }
     mSurface.reset();
     mDeviceOwner.reset();
     mHost = nullptr;
@@ -1083,6 +1093,90 @@ class CocoaPlatform final : public WindowPlatform {
     return mHost->dispatchDragDrop(event);
   }
 
+  /** A small type label used as the drag image when the payload has no file icon. */
+  static NSImage* makeDragImage(NSString* text) {
+    const NSSize size = NSMakeSize(160.0, 24.0);
+    return [NSImage imageWithSize:size flipped:NO drawingHandler:^BOOL(NSRect rect) {
+      [[NSColor colorWithCalibratedRed:0.16 green:0.20 blue:0.26 alpha:0.92] setFill];
+      [[NSBezierPath bezierPathWithRoundedRect:rect xRadius:6.0 yRadius:6.0] fill];
+      NSDictionary* attributes = @{
+        NSFontAttributeName: [NSFont systemFontOfSize:12.0],
+        NSForegroundColorAttributeName: [NSColor whiteColor]
+      };
+      NSString* shown = text.length > 24
+        ? [[text substringToIndex:24] stringByAppendingString:@"..."] : text;
+      [shown drawAtPoint:NSMakePoint(8.0, 4.0) withAttributes:attributes];
+      return YES;
+    }];
+  }
+
+  DragEffect beginDragOut(const DragPayload& payload, const DragEffect allowed) override {
+    if (mView == nil || payload.empty()) return DragEffect::None;
+    NSEvent* event = [NSApp currentEvent];
+    if (event == nil) return DragEffect::None;
+
+    NSMutableArray<NSDraggingItem*>* items = [NSMutableArray array];
+    const NSPoint location = [mView convertPoint:event.locationInWindow fromView:nil];
+    const NSRect frame = NSMakeRect(location.x - 16.0, location.y - 16.0, 32.0, 32.0);
+    NSImage* textImage = nil;
+
+    if (payload.hasType("text/uri-list")) {
+      for (const std::string& path: payload.paths()) {
+        NSString* file = [NSString stringWithUTF8String:path.c_str()];
+        if (file.length == 0) continue;
+        NSURL* url = [NSURL fileURLWithPath:file];
+        NSDraggingItem* item = [[NSDraggingItem alloc] initWithPasteboardWriter:url];
+        NSImage* icon = [[NSWorkspace sharedWorkspace] iconForFile:file];
+        [item setDraggingFrame:frame contents:icon];
+        [items addObject:item];
+      }
+    } else if (payload.hasType("text/plain")) {
+      NSPasteboardItem* pasteboard = [[NSPasteboardItem alloc] init];
+      [pasteboard setString:[NSString stringWithUTF8String:payload.data().c_str()]
+                    forType:NSPasteboardTypeString];
+      NSDraggingItem* item = [[NSDraggingItem alloc] initWithPasteboardWriter:pasteboard];
+      if (textImage == nil) textImage = makeDragImage(
+        [NSString stringWithUTF8String:payload.data().c_str()]);
+      [item setDraggingFrame:frame contents:textImage];
+      [items addObject:item];
+    } else {
+      NSPasteboardItem* pasteboard = [[NSPasteboardItem alloc] init];
+      NSData* data = [NSData dataWithBytes:payload.data().data() length:payload.data().size()];
+      NSString* type = [NSString stringWithUTF8String:payload.type().c_str()];
+      if (type.length == 0 || ![pasteboard setData:data forType:type]) return DragEffect::None;
+      if (payload.hasSecondary()) {
+        NSData* secondary = [NSData dataWithBytes:payload.secondaryData().data()
+                                           length:payload.secondaryData().size()];
+        [pasteboard setData:secondary
+                    forType:[NSString stringWithUTF8String:payload.secondaryType().c_str()]];
+      }
+      NSDraggingItem* item = [[NSDraggingItem alloc] initWithPasteboardWriter:pasteboard];
+      NSImage* image = makeDragImage([NSString stringWithUTF8String:payload.type().c_str()]);
+      [item setDraggingFrame:frame contents:image];
+      [items addObject:item];
+    }
+    if (items.count == 0) return DragEffect::None;
+
+    CoralDragSource* source = [[CoralDragSource alloc] init];
+    source.platform = this;
+    source.allowed = allowed == DragEffect::Move ? NSDragOperationMove
+      : (allowed == DragEffect::Link ? NSDragOperationLink : NSDragOperationCopy);
+    mActiveDragSource = source;
+    NSDraggingSession* session = [mView beginDraggingSessionWithItems:items event:event
+                                                               source:source];
+    if (session == nil) {
+      mActiveDragSource = nil;
+      return DragEffect::None;
+    }
+    return allowed == DragEffect::None ? DragEffect::Copy : allowed;
+  }
+
+  void dragSourceEnded() {
+    // The dragging session still owns the source for the duration of its callback; only detach the
+    // platform pointer here and keep the object alive until the next drag or destruction.
+    if (mActiveDragSource != nil) mActiveDragSource.platform = nullptr;
+  }
+
   // --- Accessibility bridge queries (NSAccessibilityElement wrappers live in the view) ----------
   [[nodiscard]] AccessibilityNode accessibilitySnapshot() const {
     return mAccessibilityProvider != nullptr ? mAccessibilityProvider() : AccessibilityNode{};
@@ -1346,6 +1440,7 @@ class CocoaPlatform final : public WindowPlatform {
   CoralUIWindowDelegate* mDelegate = nil;
   CAMetalLayer* mMetalLayer = nil;
   WindowHost* mHost = nullptr;
+  CoralDragSource* mActiveDragSource = nil;
   std::function<AccessibilityNode()> mAccessibilityProvider;
   AccessibilityActionInvoker mAccessibilityInvoker;
   std::unique_ptr<graphics::gpu::WindowSurface> mSurface;
@@ -1447,6 +1542,36 @@ coral::ui::DragPayload payloadFromPasteboard(NSPasteboard* pasteboard) {
   // window close would cut a multi-window session short while another window is being recreated.
   (void)sender;
   return NO;
+}
+
+@end
+
+@implementation CoralDragSource
+
+@synthesize platform = _platform;
+@synthesize allowed = _allowed;
+
+- (NSDragOperation)draggingSession:(NSDraggingSession*)session
+    sourceOperationMaskForDraggingContext:(NSDraggingContext)context {
+  (void)session;
+  (void)context;
+  return _allowed != NSDragOperationNone ? _allowed : NSDragOperationCopy;
+}
+
+- (BOOL)ignoreModifierKeysForDraggingSession:(NSDraggingSession*)session {
+  (void)session;
+  return YES;
+}
+
+- (void)draggingSession:(NSDraggingSession*)session endedAtPoint:(NSPoint)screenPoint
+    operation:(NSDragOperation)operation {
+  (void)session;
+  (void)screenPoint;
+  (void)operation;
+  if (_platform != nullptr) {
+    static_cast<coral::ui::detail::CocoaPlatform*>(_platform)->dragSourceEnded();
+    _platform = nullptr;
+  }
 }
 
 @end
