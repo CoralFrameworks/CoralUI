@@ -73,6 +73,9 @@ class SearchField final : public Layer {
   bool onTextCommit(const std::string& text) override;
   bool onTextDelete(int32_t index, uint32_t length) override;
   void onFocusChanged(bool focused) override;
+  [[nodiscard]] const char* defaultStyleName() const override {
+    return "searchfield";
+  }
 
  protected:
   void applyTheme(const Theme& theme) override;

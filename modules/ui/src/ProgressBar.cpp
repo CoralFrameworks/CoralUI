@@ -21,13 +21,16 @@
 #include <ui/Theme.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <utility>
 
 namespace coral::ui {
 
 ProgressBar::ProgressBar(std::shared_ptr<const graphics::Font> font, const double value)
-    : mFont(std::move(font)), mValue(std::clamp(value, 0.0, 1.0)) {}
+    : mFont(std::move(font)), mValue(std::clamp(value, 0.0, 1.0)) {
+  setAccessibleRole(AccessibilityRole::ProgressIndicator);
+}
 
 void ProgressBar::setFont(std::shared_ptr<const graphics::Font> font) {
   mFont = std::move(font);
@@ -40,6 +43,12 @@ void ProgressBar::setColors(const graphics::Color background, const graphics::Co
   mBackground = background;
   mForeground = foreground;
   mAccent = accent;
+  setNeedsPaint();
+}
+
+void ProgressBar::setIndeterminate(const bool indeterminate) {
+  mIndeterminate = indeterminate;
+  mLastFrame = {};
   setNeedsPaint();
 }
 
@@ -70,6 +79,23 @@ void ProgressBar::applyTheme(const Theme& theme) {
   setNeedsPaint();
 }
 
+std::optional<AccessibleRange> ProgressBar::accessibleRange() const {
+  return AccessibleRange{ mValue, 0.0, 1.0, 0.0 };
+}
+
+void ProgressBar::onFrame(const std::chrono::steady_clock::time_point now) {
+  Layer::onFrame(now);
+  if (!mIndeterminate || !visible()) return;
+  if (mLastFrame == std::chrono::steady_clock::time_point{}) {
+    mLastFrame = now;
+    return;
+  }
+  const double elapsed = std::chrono::duration<double>(now - mLastFrame).count();
+  mLastFrame = now;
+  mPhase = std::fmod(mPhase + elapsed * 0.6, 1.0);
+  setNeedsPaint();
+}
+
 void ProgressBar::drawSelf(RenderContext& context) {
   auto& canvas = context.canvas();
   graphics::Paint background;
@@ -77,14 +103,25 @@ void ProgressBar::drawSelf(RenderContext& context) {
   background.style = graphics::Paint::Style::kFill;
   canvas.drawRoundRect(graphics::RoundRect::MakeRectRadius(bounds(), mRadius), background);
 
-  const float ratio = static_cast<float>(mValue);
-  if (ratio > 0.0f) {
+  if (mIndeterminate) {
+    const float band = std::max(mRadius * 2.0f, bounds().getWidth() * 0.32f);
+    const float x = bounds().getLeft() + (bounds().getWidth() - band) *
+      static_cast<float>(mPhase);
     graphics::Paint fill;
     fill.color = mAccent;
     fill.style = graphics::Paint::Style::kFill;
     canvas.drawRoundRect(graphics::RoundRect::MakeRectRadius(
-      Rect::MakeXYWH(bounds().getLeft(), bounds().getTop(), bounds().getWidth() * ratio,
-        bounds().getHeight()), mRadius), fill);
+      Rect::MakeXYWH(x, bounds().getTop(), band, bounds().getHeight()), mRadius), fill);
+  } else {
+    const float ratio = static_cast<float>(mValue);
+    if (ratio > 0.0f) {
+      graphics::Paint fill;
+      fill.color = mAccent;
+      fill.style = graphics::Paint::Style::kFill;
+      canvas.drawRoundRect(graphics::RoundRect::MakeRectRadius(
+        Rect::MakeXYWH(bounds().getLeft(), bounds().getTop(), bounds().getWidth() * ratio,
+          bounds().getHeight()), mRadius), fill);
+    }
   }
 
   graphics::Paint border;
@@ -93,7 +130,7 @@ void ProgressBar::drawSelf(RenderContext& context) {
   border.strokeWidth = 1.0f;
   canvas.drawRoundRect(graphics::RoundRect::MakeRectRadius(bounds(), mRadius), border);
 
-  if (mShowPercentage && mFont != nullptr) {
+  if (mShowPercentage && !mIndeterminate && mFont != nullptr) {
     char text[32]{};
     std::snprintf(text, sizeof(text), "%d%%", static_cast<int>(mValue * 100.0 + 0.5));
     const float width = mFont->measureWidth(text);

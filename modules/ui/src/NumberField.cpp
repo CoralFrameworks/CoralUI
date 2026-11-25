@@ -78,6 +78,12 @@ void NumberField::setRange(const double minimum, const double maximum) {
   setNeedsPaint();
 }
 
+void NumberField::setNumberFormat(const NumberFormatOptions& format) {
+  mFormat = format;
+  if (mInput != nullptr) mInput->setText(formatValue());
+  setNeedsPaint();
+}
+
 void NumberField::setDecimals(const int decimals) {
   mDecimals = std::clamp(decimals, 0, 8);
   if (mInput != nullptr) {
@@ -242,9 +248,25 @@ void NumberField::commit() {
   }
   const size_t end = raw.find_last_not_of(" \t\r\n");
   const std::string text = raw.substr(begin, end - begin + 1);
+  std::string normalized;
+  normalized.reserve(text.size());
+  for (size_t index = 0; index < text.size();) {
+    if (!mFormat.groupSeparator.empty() &&
+        text.compare(index, mFormat.groupSeparator.size(), mFormat.groupSeparator) == 0) {
+      index += mFormat.groupSeparator.size();
+      continue;
+    }
+    if (!mFormat.decimalSeparator.empty() &&
+        text.compare(index, mFormat.decimalSeparator.size(), mFormat.decimalSeparator) == 0) {
+      normalized.push_back('.');
+      index += mFormat.decimalSeparator.size();
+      continue;
+    }
+    normalized.push_back(text[index++]);
+  }
   char* parsedEnd = nullptr;
-  const double parsed = std::strtod(text.c_str(), &parsedEnd);
-  if (parsedEnd == text.c_str() || *parsedEnd != '\0' || !std::isfinite(parsed)) {
+  const double parsed = std::strtod(normalized.c_str(), &parsedEnd);
+  if (parsedEnd == normalized.c_str() || *parsedEnd != '\0' || !std::isfinite(parsed)) {
     mInput->setText(formatValue());
     return;
   }
@@ -256,9 +278,10 @@ void NumberField::commit() {
 }
 
 std::string NumberField::formatValue() const {
-  std::ostringstream stream;
-  stream << std::fixed << std::setprecision(mDecimals) << mValue;
-  return stream.str();
+  NumberFormatOptions format = mFormat;
+  format.maxFractionDigits = std::clamp(mDecimals, 0, 9);
+  format.minFractionDigits = format.maxFractionDigits;
+  return formatNumber(mValue, format);
 }
 
 } // namespace coral::ui

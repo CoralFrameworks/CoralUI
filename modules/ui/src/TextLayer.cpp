@@ -160,9 +160,32 @@ float TextLayer::measureText(const std::string_view text, const bool rightToLeft
   if (mFont == nullptr) return 0.0f;
   const std::string expanded = expandTabs(text, mTabSize);
   const std::string_view measured = expanded.empty() ? text : std::string_view(expanded);
+  const graphics::Font::Direction direction = rightToLeft
+    ? graphics::Font::Direction::RightToLeft : graphics::Font::Direction::LeftToRight;
+  if (!mFontFeatures.empty()) {
+    return mFont->measureWidth(measured, direction, mFontFeatures);
+  }
   if (mFallback != nullptr) return mFallback->measure(measured);
-  return detail::TextShapeCache::instance().measure(*mFont, measured,
-    rightToLeft ? graphics::Font::Direction::RightToLeft : graphics::Font::Direction::LeftToRight);
+  return detail::TextShapeCache::instance().measure(*mFont, measured, direction);
+}
+
+bool TextLayer::setFontVariations(std::vector<graphics::FontVariation> variations,
+    std::string* error) {
+  if (mFont == nullptr) return false;
+  std::shared_ptr<graphics::Font> varied = mFont->withVariations(variations, error);
+  if (varied == nullptr) return false;
+  setFont(std::move(varied));
+  return true;
+}
+
+void TextLayer::setFontFeatures(std::vector<graphics::FontFeature> features) {
+  mFontFeatures = std::move(features);
+  mLayout = TextLayout{};
+  mPainters.clear();
+  mRunPainters.clear();
+  mHyphenPainter.reset();
+  setNeedsLayout();
+  setNeedsPaint();
 }
 
 float TextLayer::xForLineOffset(const TextLine& line, const size_t offset) const {
@@ -689,12 +712,14 @@ void TextLayer::drawSelfContent(RenderContext& context) {
           }
           if (!tab) {
             if (upright) {
+              mPainters[index]->setFeatures(mFontFeatures);
               mPainters[index]->draw(context, shown, columnX, y + metrics.ascent, *mFont, paint);
             } else {
               // text-orientation: mixed rotates Latin/digits 90° clockwise.
               context.canvas().save();
               context.canvas().translate(columnX + metrics.ascent, y);
               context.canvas().rotate(90.0f);
+              mPainters[index]->setFeatures(mFontFeatures);
               mPainters[index]->draw(context, shown, 0.0f, 0.0f, *mFont, paint);
               context.canvas().restore();
             }
@@ -786,6 +811,7 @@ void TextLayer::drawSelfContent(RenderContext& context) {
     if (!line.hyphenated) return;
     if (mHyphenPainter == nullptr) mHyphenPainter = std::make_unique<TextPainter>();
     const auto spaces = static_cast<float>(std::count(line.text.begin(), line.text.end(), ' '));
+    mHyphenPainter->setFeatures(mFontFeatures);
     mHyphenPainter->draw(context, hyphenText,
       bounds().getLeft() + line.xOffset + line.width +
         spaces * line.justifySpacing - hyphenWidth,
@@ -817,6 +843,7 @@ void TextLayer::drawSelfContent(RenderContext& context) {
           for (const graphics::FontRun& fontRun: runs) {
             if (fontRun.font == nullptr) continue;
             TextPainter painter;
+            painter.setFeatures(mFontFeatures);
             painter.draw(context, fontRun.text, x, baseline, *fontRun.font, paint, direction);
             x += fontRun.width;
           }
@@ -827,6 +854,7 @@ void TextLayer::drawSelfContent(RenderContext& context) {
           std::shared_ptr<const graphics::TextBlob> runBlob;
           const auto lazyRun = line.visualRuns.lazy(runIndex);
           if (runBlob == nullptr && lazyRun != nullptr) runBlob = lazyRun->get();
+          mPainters[index]->setFeatures(mFontFeatures);
           mPainters[index]->draw(context, paintedDisplay, x, baseline, *mFont, paint, direction, runBlob);
           x += detail::TextShapeCache::instance().measure(*mFont, paintedDisplay, direction);
         }
@@ -846,6 +874,7 @@ void TextLayer::drawSelfContent(RenderContext& context) {
         if (mRunPainters[index][runIndex] == nullptr) {
           mRunPainters[index][runIndex] = std::make_unique<TextPainter>();
         }
+        mRunPainters[index][runIndex]->setFeatures(mFontFeatures);
         mRunPainters[index][runIndex]->draw(context, run.text, x, baseline, *run.font, paint);
         x += run.width;
       }
@@ -864,6 +893,7 @@ void TextLayer::drawSelfContent(RenderContext& context) {
             space == std::string_view::npos ? std::string_view::npos : space - begin);
           if (!token.empty()) {
             const std::string display = expandTabs(token, mTabSize);
+            mPainters[index]->setFeatures(mFontFeatures);
             mPainters[index]->draw(context, display, x, baseline, *mFont, paint);
             x += measureText(token, false);
           }
@@ -873,6 +903,7 @@ void TextLayer::drawSelfContent(RenderContext& context) {
         }
       } else {
         const std::string display = expandTabs(line.text, mTabSize);
+        mPainters[index]->setFeatures(mFontFeatures);
         if (line.rtl) {
           mPainters[index]->draw(context, display, bounds().getLeft() + line.xOffset,
             baseline, *mFont, paint, graphics::Font::Direction::RightToLeft);

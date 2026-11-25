@@ -64,6 +64,18 @@ class TextLayer final : public Layer {
   [[nodiscard]] const std::shared_ptr<const FontFallback>& fontFallback() const noexcept {
     return mFallback;
   }
+  /**
+   * Returns a varied copy of this layer's font and installs it. False when the face is static or an
+   * axis/value is invalid; @p error names the offending axis.
+   */
+  bool setFontVariations(std::vector<graphics::FontVariation> variations, std::string* error = nullptr);
+
+  /** Per-run OpenType feature settings; tags are borrowed and must outlive the layer. */
+  void setFontFeatures(std::vector<graphics::FontFeature> features);
+  [[nodiscard]] const std::vector<graphics::FontFeature>& fontFeatures() const noexcept {
+    return mFontFeatures;
+  }
+
   /** Build the fallback chain from the platform font directories (see ui/SystemFonts.h). */
   void setSystemFontFallback(bool enabled);
   [[nodiscard]] bool usesSystemFontFallback() const noexcept {
@@ -223,6 +235,7 @@ class TextLayer final : public Layer {
   std::vector<std::unique_ptr<TextPainter>> mPainters;
   std::vector<std::vector<std::unique_ptr<TextPainter>>> mRunPainters;
   std::unique_ptr<TextPainter> mHyphenPainter;
+  std::vector<graphics::FontFeature> mFontFeatures;
   [[nodiscard]] float measureText(std::string_view text, bool rightToLeft) const;
   [[nodiscard]] float xForLineOffset(const TextLine& line, size_t offset) const;
   [[nodiscard]] size_t indexAtLine(const TextLine& line, float localX) const;

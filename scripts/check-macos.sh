@@ -18,7 +18,8 @@ fi
 "$CMAKE" --build --preset macos-arm64 -j "$JOBS" \
   --target test_ui ui_native_smoke ui_native_ax_smoke ui_demo ui_mvvm_demo
 ctest --test-dir out/macos-arm64 --output-on-failure \
-  -R "^(test_ui|test_ui_shared_device|ui_native_smoke|ui_native_ax_smoke|example_ui_demo_headless|example_ui_mvvm_headless)$"
+  -R "^(test_ui|test_ui_shared_device|ui_native_smoke|ui_native_ax_smoke|example_ui_demo_headless|example_ui_demo_light_headless|example_ui_mvvm_headless)$"
+"$ROOT/scripts/check-install.sh" out/macos-arm64
 
 if [[ "$UNIVERSAL" -eq 1 ]]; then
   "$ROOT/scripts/make-universal-demo.sh"

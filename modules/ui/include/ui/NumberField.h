@@ -20,6 +20,7 @@
 #include <ui/Types.h>
 
 #include <ui/Layer.h>
+#include <ui/NumberFormat.h>
 
 
 #include <functional>
@@ -53,6 +54,11 @@ class NumberField : public Layer {
     mStep = step;
   }
   void setDecimals(int decimals);
+  /** Number formatting/parsing; defaults to the current system locale. */
+  void setNumberFormat(const NumberFormatOptions& format);
+  [[nodiscard]] const NumberFormatOptions& numberFormat() const noexcept {
+    return mFormat;
+  }
   void setValue(double value);
   [[nodiscard]] double value() const noexcept {
     return mValue;
@@ -78,6 +84,9 @@ class NumberField : public Layer {
   bool onTextCommit(const std::string& text) override;
   bool onTextDelete(int32_t index, uint32_t length) override;
   void onFocusChanged(bool focused) override;
+  [[nodiscard]] const char* defaultStyleName() const override {
+    return "numberfield";
+  }
 
  protected:
   explicit NumberField(std::shared_ptr<const Font> font, double minimum,
@@ -105,6 +114,7 @@ class NumberField : public Layer {
   double mValue = 0.0;
   double mStep = 1.0;
   int mDecimals = 2;
+  NumberFormatOptions mFormat = systemNumberFormat();
   bool mSteppers = false;
   bool mFocused = false;
 };

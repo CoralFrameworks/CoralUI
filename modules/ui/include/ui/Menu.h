@@ -78,6 +78,14 @@ class Menu final : public Layer {
   void addSeparator();
   void addSubmenu(std::string label, std::shared_ptr<Menu> submenu);
   void setShortcut(int index, std::string shortcut);
+  /**
+   * Render this menu through the platform's native menu when it has an attached Window.
+   * Requires a macOS window; otherwise the custom layer menu is used.
+   */
+  void setNativePresentation(bool native);
+  [[nodiscard]] bool usesNativePresentation() const noexcept {
+    return mNativePresentation;
+  }
   void setItemEnabled(int index, bool enabled);
   void setItemChecked(int index, bool checked);
   [[nodiscard]] bool isItemChecked(int index) const;
@@ -117,6 +125,10 @@ class Menu final : public Layer {
     return mPanel;
   }
 
+  [[nodiscard]] const char* defaultStyleName() const override {
+    return "menu";
+  }
+
  protected:
   void applyTheme(const Theme& theme) override;
 
@@ -146,6 +158,7 @@ class Menu final : public Layer {
   float itemHeight(size_t index) const;
   float itemTop(size_t index) const;
   void activate(int index);
+  void activateNativePath(std::string_view path);
   void showSubmenu(int index);
   void hideSubmenu();
   void hideAll();
@@ -157,6 +170,7 @@ class Menu final : public Layer {
   int mCommandsToken = 0;
   Menu* mOwner = nullptr;
   std::shared_ptr<Menu> mOpenSubmenu;
+  bool mNativePresentation = false;
   Rect mPanel{};
   Color mBackground = Color::MakeRGBA8(45, 49, 58, 255);
   Color mBorder = Color::MakeRGBA8(62, 67, 78, 255);

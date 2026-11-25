@@ -179,6 +179,7 @@ bool ThreadedRenderHost::Impl::createTarget(const uint64_t id, const Options& op
     configuration.height = options.height;
     configuration.sampleCount = 1;
     configuration.presentMode = backend::PresentMode::Mailbox;
+    configuration.outputColorSpace = options.outputColorSpace;
     configuration.preferred = toBackend(options.rendererApi);
     if (device != nullptr) {
       target->windowSurface = graphics::gpu::WindowSurface::makeOn(device.get(), configuration);

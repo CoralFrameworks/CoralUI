@@ -77,11 +77,11 @@ separate `modules/mvvm` library; `modules/ui` is the toolkit.
 
 - Clipboard: multi-MIME read/write (UTF-8 text, HTML, PNG, file lists, custom MIME), X11/Wayland
   PRIMARY selection, X11 INCR transfers and change notification.
-- Drag and drop: Windows OLE drop target and X11 XDND drag-out.
+- Drag and drop: Windows OLE, X11 XDND, macOS `NSDraggingSource`/`NSDraggingDestination`.
 - File dialogs: Win32 `IFileOpenDialog`/`IFileSaveDialog`; Linux xdg-desktop-portal with
   `zenity`/`kdialog` fallback.
 - IME: Win32 IMM32, Linux IBus/XIM and Wayland `text-input` v1/v3, including surrounding-text and
-  delete-surrounding support.
+  delete-surrounding support; macOS `NSTextInputClient` with marked text and candidate anchoring.
 - System appearance: dark/light, contrast and reduced-motion preferences where the platform
   exposes them.
 
@@ -101,6 +101,8 @@ separate `modules/mvvm` library; `modules/ui` is the toolkit.
 - Windows UI Automation provider with Invoke/Toggle/Value/RangeValue/Scroll/Grid/GridItem/Text/
   SelectionItem/Selection patterns and focus/property/structure events.
 - Linux AT-SPI D-Bus bridge (Accessible/Component/Action/Cache with focus state changes).
+- macOS `NSAccessibility` tree with roles, actions, text values/selection, grid metadata, hit testing
+  and focused-element notifications.
 
 ### Verification and packaging
 
@@ -117,11 +119,12 @@ separate `modules/mvvm` library; `modules/ui` is the toolkit.
 | Native window and GPU surface | Yes | Yes | Yes | Yes, Cocoa + `CAMetalLayer` |
 | High-DPI scaling | Per-monitor v2 | Global DPI | Per-output scale, including fractional | Backing scale, per screen |
 | Client-side title bar | Yes | Yes | Yes; server-side `xdg-decoration` when offered | System frame only (`Client` maps to `System`) |
-| IME | IMM32 | IBus/XIM | `text-input` v1/v3 | Not yet |
+| IME | IMM32 | IBus/XIM | `text-input` v1/v3 | `NSTextInputClient` |
+| Native chrome | Custom | Custom | Custom / server-side | Toolbar, sidebar/outline, titlebar accessory, native menus |
 | Clipboard | Multi-MIME, files, PNG | Multi-MIME, PRIMARY, INCR | Per-MIME, PRIMARY | Multi-MIME, HTML, PNG, file URLs |
-| Drag and drop | OLE | XDND | Not yet | Not yet |
+| Drag and drop | OLE | XDND | Not yet | `NSDraggingSource` / destination |
 | File dialogs | Native | Portal, `zenity`/`kdialog` | Portal | `NSOpenPanel`/`NSSavePanel` |
-| Accessibility | UI Automation | AT-SPI | AT-SPI | Not yet |
+| Accessibility | UI Automation | AT-SPI | AT-SPI | `NSAccessibility` tree, actions, text, grid, hit test |
 | Maximize/minimize | Yes | Yes | Yes | Yes (zoom/miniaturize) |
 | Always-on-top | Yes | X11 only | No | Yes |
 | Threaded render host | Yes | Yes | Rejected with a diagnostic | Yes |
@@ -210,6 +213,5 @@ window->run();
 
 CoralUI is a GUI toolkit, not a product shell or an application framework: application-level
 widgets, navigation and product pages live in the application. It does not provide a CSS selector
-engine, an ABI-stable binary interface yet, or an Android window backend, and macOS IME,
-accessibility and drag-and-drop are not implemented yet. The source-level API is the supported
+engine, an ABI-stable binary interface yet, or an Android window backend. The source-level API is the supported
 contract; rebuild against the matching CoralCore/CoralGraphics revisions.

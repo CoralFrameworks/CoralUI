@@ -156,6 +156,36 @@ void TextInput::setText(std::string text) {
   notifyChanged();
 }
 
+bool TextInput::setFontVariations(std::vector<graphics::FontVariation> variations,
+    std::string* error) {
+  if (mFont == nullptr) return false;
+  std::shared_ptr<graphics::Font> varied = mFont->withVariations(variations, error);
+  if (varied == nullptr) return false;
+  setFont(std::move(varied));
+  return true;
+}
+
+float TextInput::measureText(const std::string_view text,
+    const graphics::Font::Direction direction) const {
+  if (mFont == nullptr) return 0.0f;
+  if (!mFontFeatures.empty()) return mFont->measureWidth(text, direction, mFontFeatures);
+  if (mFallback != nullptr) return mFallback->measure(text);
+  return detail::TextShapeCache::instance().measure(*mFont, text, direction);
+}
+
+void TextInput::setFontFeatures(std::vector<graphics::FontFeature> features) {
+  mFontFeatures = std::move(features);
+  mLayout = TextLayout{};
+  mLayoutWidth = -1.0f;
+  mRunPainters.clear();
+  mTextPainter.reset();
+  mPlaceholderPainter.reset();
+  mCompositionPainter.reset();
+  mHyphenPainter.reset();
+  setNeedsLayout();
+  setNeedsPaint();
+}
+
 void TextInput::setFont(std::shared_ptr<const graphics::Font> font) {
   if (mFont == font) return;
   mFont = std::move(font);
@@ -427,7 +457,7 @@ float TextInput::xForIndexInLine(const size_t index, const TextLine& line) const
   const size_t end = std::min(std::max(index, begin), mText.size());
   if (line.visualRuns.empty()) {
     const std::string_view value = std::string_view(mText).substr(begin, end - begin);
-    return mFallback != nullptr ? mFallback->measure(value) : mFont->measureWidth(value);
+    return measureText(value);
   }
 
   const std::vector<uint32_t>& order = line.visualRuns.order();
@@ -442,18 +472,14 @@ float TextInput::xForIndexInLine(const size_t index, const TextLine& line) const
     const graphics::Font::Direction direction = rightToLeft
       ? graphics::Font::Direction::RightToLeft
       : graphics::Font::Direction::LeftToRight;
-    const float width = mFallback != nullptr
-      ? mFallback->measure(painted)
-      : detail::TextShapeCache::instance().measure(*mFont, painted, direction);
+    const float width = measureText(painted, direction);
     if (clamped < run.start || clamped > run.end) {
       left += width;
       continue;
     }
     const std::string prefix = runText.substr(0, clamped - run.start);
     const std::string paintedPrefix = rightToLeft ? mirrorBidiText(prefix) : prefix;
-    const float prefixWidth = mFallback != nullptr
-      ? mFallback->measure(paintedPrefix)
-      : detail::TextShapeCache::instance().measure(*mFont, paintedPrefix, direction);
+    const float prefixWidth = measureText(paintedPrefix, direction);
     return rightToLeft ? left + width - prefixWidth : left + prefixWidth;
   }
   return left;
@@ -472,7 +498,7 @@ size_t TextInput::indexAtPoint(const Point& point) const {
   size_t best = entry.start;
   float bestDistance = std::abs(local);
   const auto measureGrapheme = [&](const std::string_view value) {
-    return mFallback != nullptr ? mFallback->measure(value) : mFont->measureWidth(value);
+    return measureText(value);
   };
   if (entry.visualRuns.empty()) {
     float advance = 0.0f;
@@ -529,12 +555,11 @@ size_t TextInput::indexAtPoint(const Point& point) const {
 void TextInput::drawLine(RenderContext& context, const TextLine& line, const float left,
     const float baseline, const graphics::Paint& paint, const size_t painterIndex) {
   const std::string hyphenText = "\xE2\x80\x90";
-  const float hyphenWidth = mFallback != nullptr
-    ? mFallback->measure(hyphenText)
-    : detail::TextShapeCache::instance().measure(*mFont, hyphenText);
+  const float hyphenWidth = measureText(hyphenText);
   const auto drawHyphen = [&]() {
     if (!line.hyphenated) return;
     if (mHyphenPainter == nullptr) mHyphenPainter = std::make_unique<TextPainter>();
+    mHyphenPainter->setFeatures(mFontFeatures);
     mHyphenPainter->draw(context, hyphenText, left + line.width - hyphenWidth, baseline, *mFont, paint);
   };
   if (line.text.empty()) return;
@@ -552,11 +577,13 @@ void TextInput::drawLine(RenderContext& context, const TextLine& line, const flo
         if (mRunPainters[painterIndex][runIndex] == nullptr) {
           mRunPainters[painterIndex][runIndex] = std::make_unique<TextPainter>();
         }
+        mRunPainters[painterIndex][runIndex]->setFeatures(mFontFeatures);
         mRunPainters[painterIndex][runIndex]->draw(context, run.text, x, baseline, *run.font, paint);
         x += run.width;
       }
     } else {
       if (mTextPainter == nullptr) mTextPainter = std::make_unique<TextPainter>();
+      mTextPainter->setFeatures(mFontFeatures);
       mTextPainter->draw(context, line.text, left, baseline, *mFont, paint,
         graphics::Font::Direction::Auto, line.shaped);
     }
@@ -578,6 +605,7 @@ void TextInput::drawLine(RenderContext& context, const TextLine& line, const flo
     if (mFallback != nullptr) {
       const std::vector<graphics::FontRun> runs = mFallback->shape(painted);
       TextPainter painter;
+      painter.setFeatures(mFontFeatures);
       for (const graphics::FontRun& fontRun: runs) {
         if (fontRun.font == nullptr) continue;
         painter.draw(context, fontRun.text, x, baseline, *fontRun.font, paint, direction);
@@ -588,8 +616,9 @@ void TextInput::drawLine(RenderContext& context, const TextLine& line, const flo
       std::shared_ptr<const graphics::TextBlob> runBlob;
       const auto lazyRun = line.visualRuns.lazy(runIndex);
         if (runBlob == nullptr && lazyRun != nullptr) runBlob = lazyRun->get();
+        mTextPainter->setFeatures(mFontFeatures);
         mTextPainter->draw(context, painted, x, baseline, *mFont, paint, direction, runBlob);
-      x += detail::TextShapeCache::instance().measure(*mFont, painted, direction);
+      x += measureText(painted, direction);
     }
   }
   drawHyphen();
@@ -696,6 +725,7 @@ void TextInput::drawSelf(RenderContext& context) {
       if (mPlaceholderPainter == nullptr) mPlaceholderPainter = std::make_unique<TextPainter>();
       graphics::Paint placeholder = text;
       placeholder.color = mMuted;
+      mPlaceholderPainter->setFeatures(mFontFeatures);
       mPlaceholderPainter->draw(context, mPlaceholder, left,
         top + metrics.ascent, *mFont, placeholder);
     }
@@ -716,8 +746,9 @@ void TextInput::drawSelf(RenderContext& context) {
         graphics::Paint composed = text;
         composed.color = mMuted;
         const float baseline = top + static_cast<float>(lineIndex) * lineHeightValue + metrics.ascent;
+        mCompositionPainter->setFeatures(mFontFeatures);
         mCompositionPainter->draw(context, mComposition, caretX, baseline, *mFont, composed);
-        const float width = mFont->measureWidth(mComposition);
+        const float width = measureText(mComposition);
         canvas.drawRect(Rect::MakeXYWH(caretX, baseline + 2.0f, width, 1.0f), caret);
       }
     }
@@ -749,6 +780,7 @@ void TextInput::drawSelf(RenderContext& context) {
     if (mPlaceholderPainter == nullptr) mPlaceholderPainter = std::make_unique<TextPainter>();
     graphics::Paint placeholder = text;
     placeholder.color = mMuted;
+    mPlaceholderPainter->setFeatures(mFontFeatures);
     mPlaceholderPainter->draw(context, mPlaceholder, left, baseline, *mFont, placeholder);
   } else if (!mLayout.lines.empty()) {
     drawLine(context, mLayout.lines.front(), left, baseline, text, 0);
@@ -763,11 +795,13 @@ void TextInput::drawSelf(RenderContext& context) {
       if (mRunPainters[0][runIndex] == nullptr) {
         mRunPainters[0][runIndex] = std::make_unique<TextPainter>();
       }
+      mRunPainters[0][runIndex]->setFeatures(mFontFeatures);
       mRunPainters[0][runIndex]->draw(context, run.text, x, baseline, *run.font, text);
       x += run.width;
     }
   } else {
     if (mTextPainter == nullptr) mTextPainter = std::make_unique<TextPainter>();
+    mTextPainter->setFeatures(mFontFeatures);
     mTextPainter->draw(context, mText, left, baseline, *mFont, text);
   }
   if (!mLayout.lines.empty()) {
@@ -787,8 +821,9 @@ void TextInput::drawSelf(RenderContext& context) {
       if (mCompositionPainter == nullptr) mCompositionPainter = std::make_unique<TextPainter>();
       graphics::Paint composed = text;
       composed.color = mMuted;
+      mCompositionPainter->setFeatures(mFontFeatures);
       mCompositionPainter->draw(context, mComposition, caretX, baseline, *mFont, composed);
-      const float width = mFont->measureWidth(mComposition);
+      const float width = measureText(mComposition);
       canvas.drawRect(Rect::MakeXYWH(caretX, baseline + 2.0f, width, 1.0f), caret);
     }
   }
@@ -804,7 +839,7 @@ Rect TextInput::imeCursorRect() const {
   const float compositionWidth = mComposition.empty()
                                    ? 0.0f
                                    : (mFallback != nullptr ? mFallback->measure(mComposition)
-                                                           : mFont->measureWidth(mComposition));
+                                                           : measureText(mComposition));
   if (mMultiline) {
     ensureLayout(std::max(1.0f, bounds().getWidth() - mPadding * 2.0f));
     const size_t lineIndex = lineIndexForCursor(mCursor);
@@ -979,7 +1014,11 @@ bool TextInput::onKeyDown(const KeyEvent& event) {
       setCursor(mCursor);
       return true;
     case Key::Enter:
-      if (mMultiline) replaceSelection("\n");
+      if (mMultiline) {
+        replaceSelection("\n");
+      } else if (mOnSubmit) {
+        mOnSubmit(mText);
+      }
       return true;
     default:
       return false;
@@ -989,6 +1028,21 @@ bool TextInput::onKeyDown(const KeyEvent& event) {
 bool TextInput::onTextInput(const char32_t character) {
   if (character < 0x20 || character == 0x7F) {
     return false;
+  }
+  if (mAutocorrectEnabled && character == U' ' && mComposition.empty() && mCursor > 0) {
+    // wordRangeAt treats an exact boundary as the start of the next word; query from just before
+    // the cursor so typing a trailing space finds the word that just ended.
+    const size_t before = unicode::previousGraphemeBoundary(mText, mCursor);
+    const auto range = wordRangeAt(before);
+    if (range.first < range.second && range.second == mCursor) {
+      const std::string word = mText.substr(range.first, range.second - range.first);
+      const std::string correction = spellCorrection(word);
+      if (!correction.empty() && correction != word) {
+        mSelectionAnchor = range.first;
+        mCursor = range.second;
+        replaceSelection(correction);
+      }
+    }
   }
   insert(character);
   return true;
@@ -1352,7 +1406,7 @@ size_t TextInput::indexAtX(const float x) const {
   for (const size_t index: boundaries) {
     if (index == 0) continue;
     const std::string_view grapheme = std::string_view(mText).substr(previous, index - previous);
-    advance += mFallback != nullptr ? mFallback->measure(grapheme) : mFont->measureWidth(grapheme);
+    advance += measureText(grapheme);
     const float distance = std::abs(local - advance);
     if (distance < bestDistance) {
       bestDistance = distance;
@@ -1375,7 +1429,7 @@ float TextInput::xForIndex(const size_t index) const {
   }
   const size_t clamped = std::min(index, mText.size());
   const std::string_view value = std::string_view(mText).substr(0, clamped);
-  return mFallback != nullptr ? mFallback->measure(value) : mFont->measureWidth(value);
+  return measureText(value);
 }
 
 void TextInput::applyTheme(const Theme& theme) {

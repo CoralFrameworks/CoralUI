@@ -62,10 +62,13 @@ class SegmentedControl final : public Layer {
   }
 
   Size measure(const Size& available) override;
+  void layout() override;
   void drawSelf(RenderContext& context) override;
   bool onPointerDown(const PointerEvent& event) override;
   bool onKeyDown(const KeyEvent& event) override;
   void onFocusChanged(bool focused) override;
+  bool performAccessibilityAction(AccessibilityAction action,
+    std::string_view value) override;
   [[nodiscard]] const char* defaultStyleName() const override { return "segmented"; }
   [[nodiscard]] StateMask styleStates() const override {
     StateMask mask = Layer::styleStates() | stateFlag(ControlState::Selected);
@@ -78,9 +81,11 @@ class SegmentedControl final : public Layer {
 
  private:
   void select(int index);
+  void rebuildAccessibilityItems();
   [[nodiscard]] float segmentWidth(const std::string& label) const;
 
   std::vector<std::string> mSegments;
+  std::vector<std::shared_ptr<Layer>> mAccessibilityItems;
   std::shared_ptr<const Font> mFont;
   Color mBackground = Color::MakeRGBA8(35, 38, 46, 255);
   Color mBorder = Color::MakeRGBA8(62, 67, 78, 255);

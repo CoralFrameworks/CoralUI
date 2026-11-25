@@ -30,6 +30,8 @@
 
 #include <cstdio>
 #include <cstdlib>
+
+#include <ui/WindowRestoration.h>
 #include <memory>
 
 int main() {
@@ -159,6 +161,68 @@ int main() {
     return 1;
   }
 
+  if (window->nativePlatform() == coral::ui::Window::NativePlatform::Cocoa) {
+    coral::ui::Window::Options hdrOptions;
+    hdrOptions.headless = false;
+    hdrOptions.width = 240;
+    hdrOptions.height = 160;
+    hdrOptions.outputColorSpace = coral::ui::OutputColorSpace::Hdr10Pq;
+    hdrOptions.frameLimit = 1;
+    auto hdrWindow = coral::ui::Window::create(hdrOptions);
+    if (hdrWindow != nullptr) {
+      if (!hdrWindow->renderFrame()) {
+        std::fprintf(stderr, "FAIL: HDR request window did not render\n");
+        return 1;
+      }
+      const coral::ui::FrameStatistics hdrStats = hdrWindow->frameStatistics();
+      const bool hdr = hdrWindow->outputColorSpace() == coral::ui::OutputColorSpace::Hdr10Pq ||
+        hdrWindow->outputColorSpace() == coral::ui::OutputColorSpace::ExtendedLinearP3;
+      if (hdrStats.hdrOutput != hdr) {
+        std::fprintf(stderr, "FAIL: HDR statistics disagree with the granted colour space\n");
+        return 1;
+      }
+    }
+  }
+
+  if (window->nativePlatform() == coral::ui::Window::NativePlatform::Cocoa) {
+    if (!coral::ui::supportsWindowRestoration()) {
+      std::fprintf(stderr, "FAIL: window restoration is not advertised\n");
+      return 1;
+    }
+    coral::ui::Window::Options restoreOptions;
+    restoreOptions.headless = false;
+    restoreOptions.width = 200;
+    restoreOptions.height = 120;
+    restoreOptions.restorationIdentifier = "coral.native.smoke";
+    auto restoredWindow = coral::ui::Window::create(restoreOptions);
+    if (restoredWindow == nullptr) {
+      std::fprintf(stderr, "FAIL: restoration window could not be created\n");
+      return 1;
+    }
+    if (restoredWindow->nativeWindowHandle() == nullptr ||
+        restoredWindow->restorationIdentifier() != "coral.native.smoke") {
+      std::fprintf(stderr, "FAIL: native window restoration state was not configured\n");
+      return 1;
+    }
+
+    coral::ui::Window::Options fullSize;
+    fullSize.headless = false;
+    fullSize.width = 240;
+    fullSize.height = 160;
+    fullSize.fullSizeContentView = true;
+    auto fullSizeWindow = coral::ui::Window::create(fullSize);
+    if (fullSizeWindow != nullptr) {
+      if (!fullSizeWindow->renderFrame()) {
+        std::fprintf(stderr, "FAIL: full-size content window did not render\n");
+        return 1;
+      }
+      if (!(fullSizeWindow->safeAreaInsets().top > 0.0f)) {
+        std::fprintf(stderr, "FAIL: full-size content did not report a titlebar safe area\n");
+        return 1;
+      }
+    }
+  }
+
   std::printf("native ui smoke: %dx%d uiScale=%.2f frames=%d appearance=%s dark=%d highContrast=%d "
               "parent=%s\n", window->width(), window->height(),
     static_cast<double>(window->uiScale()), window->frameCount(),
@@ -173,7 +237,9 @@ int main() {
         stats.framePlanItems, stats.commandBuffers);
       return 1;
     }
-    std::printf("native display: headroom=%.2f wideColor=%d\n",
+    std::printf("native display: colorSpace=%d hdr=%d headroom=%.2f wideColor=%d\n",
+      static_cast<int>(window->outputColorSpace()),
+      window->frameStatistics().hdrOutput ? 1 : 0,
       static_cast<double>(window->displayHeadroom()), window->supportsWideColor() ? 1 : 0);
     if (window->displayHeadroom() < 1.0f) {
       std::fprintf(stderr, "FAIL: display headroom is below SDR\n");

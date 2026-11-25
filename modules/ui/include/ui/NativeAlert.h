@@ -39,6 +39,8 @@ struct NativeAlertOptions {
   /** Index of the button that receives Return; clamped to the button list. */
   int defaultButton = 0;
   AlertStyle style = AlertStyle::Informational;
+  /** Optional native accessory view (`NSView*` on macOS); ignored by other backends. */
+  void* accessoryView = nullptr;
 };
 
 /**

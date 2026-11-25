@@ -22,6 +22,8 @@
 #include "WidgetDrawing.h"
 
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
 #include <array>
 #include <cmath>
 #include <utility>
@@ -89,7 +91,9 @@ Color hsvToColor(const float hue, const float saturation, const float value, con
 
 ColorPicker::ColorPicker(std::vector<Color> palette)
     : mPalette(palette.empty() ? defaultPalette() : std::move(palette)) {
-  setAccessibleRole(AccessibilityRole::Generic);
+  setAccessibleRole(AccessibilityRole::ColorPicker);
+  setAccessibleName("Color");
+  syncAccessibleValue();
 }
 
 ColorPicker::~ColorPicker() = default;
@@ -97,6 +101,7 @@ ColorPicker::~ColorPicker() = default;
 void ColorPicker::setPalette(std::vector<Color> palette) {
   mPalette = palette.empty() ? defaultPalette() : std::move(palette);
   mSelected = std::min(mSelected, static_cast<int>(mPalette.size()) - 1);
+  syncAccessibleValue();
   setNeedsLayout();
   setNeedsPaint();
 }
@@ -118,11 +123,13 @@ void ColorPicker::setColor(const Color color) {
   mSaturation = hsv[1];
   mValue = hsv[2];
   mAlpha = color.alpha;
+  syncAccessibleValue();
   setNeedsPaint();
 }
 
 void ColorPicker::setAlpha(const float alpha) {
   mAlpha = std::clamp(alpha, 0.0f, 1.0f);
+  syncAccessibleValue();
   setNeedsPaint();
 }
 
@@ -138,6 +145,7 @@ void ColorPicker::setSelected(const int index) {
   if (index < 0 || index >= static_cast<int>(mPalette.size())) return;
   mSelected = index;
   if (mMode == ColorPickerMode::Hsv) setColor(mPalette[static_cast<size_t>(index)]);
+  syncAccessibleValue();
   setNeedsPaint();
 }
 
@@ -322,6 +330,7 @@ void ColorPicker::applyTheme(const Theme& theme) {
 void ColorPicker::select(const int index) {
   if (mSelected == index) return;
   mSelected = index;
+  syncAccessibleValue();
   setNeedsPaint();
   notify();
 }
@@ -343,6 +352,59 @@ void ColorPicker::updateHsvFromPoint(const Point point) {
     }
   }
   notify();
+}
+
+void ColorPicker::syncAccessibleValue() {
+  if (mMode == ColorPickerMode::Palette &&
+      (mSelected < 0 || mSelected >= static_cast<int>(mPalette.size()))) {
+    setAccessibleValue({});
+    return;
+  }
+  const Color color = this->color();
+  char text[16]{};
+  std::snprintf(text, sizeof(text), "#%02X%02X%02X",
+    static_cast<int>(std::lround(color.red * 255.0f)),
+    static_cast<int>(std::lround(color.green * 255.0f)),
+    static_cast<int>(std::lround(color.blue * 255.0f)));
+  setAccessibleValue(text);
+}
+
+bool ColorPicker::performAccessibilityAction(const AccessibilityAction action,
+    const std::string_view value) {
+  if (action != AccessibilityAction::SetValue) return false;
+  std::string text(value);
+  if (text.empty() || text.front() != '#') return false;
+  text.erase(text.begin());
+  if (text.size() != 6 && text.size() != 8) return false;
+  unsigned channels[4] = { 255, 255, 255, 255 };
+  for (size_t index = 0; index < text.size() / 2; ++index) {
+    char* end = nullptr;
+    const std::string part = text.substr(index * 2, 2);
+    const long channel = std::strtol(part.c_str(), &end, 16);
+    if (end == part.c_str() || *end != '\0' || channel < 0 || channel > 255) return false;
+    channels[index] = static_cast<unsigned>(channel);
+  }
+  const Color requested = Color::MakeRGBA8(static_cast<uint8_t>(channels[0]),
+    static_cast<uint8_t>(channels[1]), static_cast<uint8_t>(channels[2]),
+    static_cast<uint8_t>(channels[3]));
+  if (mMode == ColorPickerMode::Palette) {
+    for (size_t index = 0; index < mPalette.size(); ++index) {
+      const Color& candidate = mPalette[index];
+      if (std::abs(candidate.red - requested.red) < 1e-4f &&
+          std::abs(candidate.green - requested.green) < 1e-4f &&
+          std::abs(candidate.blue - requested.blue) < 1e-4f) {
+        mSelected = static_cast<int>(index);
+        syncAccessibleValue();
+        setNeedsPaint();
+        notify();
+        return true;
+      }
+    }
+    setMode(ColorPickerMode::Hsv);
+  }
+  setColor(requested);
+  notify();
+  return true;
 }
 
 void ColorPicker::notify() {

@@ -31,6 +31,7 @@
 #include <ui/TextRendererStats.h>
 
 #include <algorithm>
+#include <span>
 #include <array>
 #include <atomic>
 #include <cmath>
@@ -73,6 +74,30 @@ class TextPainter {
     bool subpixel = false;
   };
 
+  /**
+   * Sets per-run OpenType feature settings. Tags are borrowed from the caller and must outlive the
+   * painter; the UI layer owns the strings.
+   */
+  void setFeatures(std::span<const graphics::FontFeature> features) {
+    if (mFeatures.size() == features.size() &&
+        std::equal(mFeatures.begin(), mFeatures.end(), features.begin(),
+          [](const graphics::FontFeature& a, const graphics::FontFeature& b) {
+            return a.tag == b.tag && a.value == b.value && a.start == b.start && a.end == b.end;
+          })) {
+      return;
+    }
+    mFeatures.assign(features.begin(), features.end());
+    mFeaturesDirty = true;
+    mText.clear();
+    mBlob.reset();
+    mRunAttempted = false;
+    mSubpixelAttempted = false;
+  }
+
+  [[nodiscard]] std::span<const graphics::FontFeature> features() const noexcept {
+    return mFeatures;
+  }
+
   void draw(RenderContext& context, const std::string_view text, const float x, const float baseline,
           const graphics::Font& font, const graphics::Paint& paint,
           const graphics::Font::Direction direction = graphics::Font::Direction::Auto,
@@ -97,9 +122,12 @@ class TextPainter {
       mText.assign(text.data(), text.size());
       mRunAttempted = false;
       mSubpixelAttempted = false;
-    } else if (mText != text) {
+    } else if (mText != text || mFeaturesDirty) {
       mText.assign(text.data(), text.size());
-      mBlob = detail::TextShapeCache::instance().shape(*mDeviceFont, text, direction);
+      mBlob = mFeatures.empty()
+        ? detail::TextShapeCache::instance().shape(*mDeviceFont, text, direction)
+        : std::make_shared<const graphics::TextBlob>(mDeviceFont->shape(text, direction, mFeatures));
+      mFeaturesDirty = false;
       mRunAttempted = false;
       mSubpixelAttempted = false;
     }
@@ -114,7 +142,8 @@ class TextPainter {
     // Platform ClearType/CoreText coverage is composited as three channel-masked passes. The fallback
     // path below stays grayscale when the placement, blend or paint cannot support per-channel
     // coverage.
-    if (canDrawSubpixel(canvas, paint) && buildSubpixelRunBitmap(paint, x * scale, deviceBaseline)) {
+    if (context.isOpaque() && canDrawSubpixel(canvas, paint) &&
+        buildSubpixelRunBitmap(paint, x * scale, deviceBaseline)) {
       drawSubpixelRun(canvas, x * scale, deviceBaseline, paint, scale);
       return;
     }
@@ -244,6 +273,7 @@ class TextPainter {
   /** Builds the three per-channel strips for one run, or returns false to fall back to grayscale. */
   bool buildSubpixelRunBitmap(const graphics::Paint& paint, const float deviceX,
       const float deviceBaseline) {
+    if (!mFeatures.empty()) return false;
     const auto channel = [](const float value) {
       return static_cast<uint32_t>(std::lround(std::clamp(value, 0.0f, 1.0f) * 255.0f));
     };
@@ -512,6 +542,7 @@ class TextPainter {
    * glyphs are refused because the strip is tinted by the paint colour.
    */
   bool buildRunBitmap() {
+    if (!mFeatures.empty()) return false;
     if (mRunAttempted) return mRunBitmapValid;
     mRunAttempted = true;
     mRunBitmapValid = false;
@@ -705,6 +736,8 @@ class TextPainter {
   std::shared_ptr<const graphics::Font> mDeviceFont;
   std::string mText;
   std::shared_ptr<const graphics::TextBlob> mBlob;
+  std::vector<graphics::FontFeature> mFeatures;
+  bool mFeaturesDirty = false;
   bool mHinted = true;
   bool mRunAttempted = false;
   bool mRunBitmapValid = false;

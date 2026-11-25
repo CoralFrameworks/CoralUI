@@ -66,6 +66,8 @@ struct SystemAppearance {
   bool highContrast = false;
   bool preferDark = false;
   bool reduceMotion = false;
+  /** NSColor.controlAccentColor as ARGB, or 0 when the platform has no accent concept. */
+  uint32_t accentColor = 0;
   SystemColors colors{};
 };
 

@@ -62,6 +62,10 @@ class ListView final : public ScrollView {
   void setOnSelection(std::function<void(int, const std::string&)> callback);
   void setRowColors(Color normal, Color selected);
 
+  [[nodiscard]] const char* defaultStyleName() const override {
+    return "listview";
+  }
+
  protected:
   void applyTheme(const Theme& theme) override;
 

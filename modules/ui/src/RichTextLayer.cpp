@@ -487,6 +487,13 @@ void RichTextLayer::drawSelf(RenderContext& context) {
       layoutOptions(mWrapWidth > 0.0f ? mWrapWidth : bounds().getWidth()));
   }
   auto& canvas = context.canvas();
+  const auto measureSegment = [](const RichTextSegment& segment, const std::string_view text,
+      const graphics::Font::Direction direction = graphics::Font::Direction::Auto) {
+    if (segment.font == nullptr) return 0.0f;
+    return segment.features.empty()
+      ? detail::TextShapeCache::instance().measure(*segment.font, text, direction)
+      : segment.font->measureWidth(text, direction, segment.features);
+  };
   if (mPainters.size() < mLayout.lines.size()) {
     mPainters.resize(mLayout.lines.size());
   }
@@ -520,9 +527,8 @@ void RichTextLayer::drawSelf(RenderContext& context) {
         }
         const bool tab = grapheme == "\t";
         const float advance = tab && mTabSize > 0
-          ? detail::TextShapeCache::instance().measure(*segment.font, " ") *
-              static_cast<float>(mTabSize)
-          : detail::TextShapeCache::instance().measure(*segment.font, shown) +
+          ? measureSegment(segment, " ") * static_cast<float>(mTabSize)
+          : measureSegment(segment, shown) +
               (grapheme == " " ? line.justifySpacing : 0.0f);
         if (hasSelection() && selectionStart() < endOffset && selectionEnd() > beginOffset) {
           context.canvas().drawRect(
@@ -534,6 +540,7 @@ void RichTextLayer::drawSelf(RenderContext& context) {
           mPainters[lineIndex][0] = std::make_unique<TextPainter>();
         }
         TextPainter* painter = mPainters[lineIndex][0].get();
+        painter->setFeatures(segment.features);
         if (upright && !tab) {
           painter->draw(context, shown, columnX, y + metrics.ascent, *segment.font, paint);
         } else {
@@ -591,6 +598,7 @@ void RichTextLayer::drawSelf(RenderContext& context) {
     graphics::Paint paint;
     paint.color = segment.color;
     paint.style = graphics::Paint::Style::kFill;
+    mHyphenPainter->setFeatures(segment.features);
     mHyphenPainter->draw(context, hyphenText, x, top + segment.font->metrics().ascent,
       *segment.font, paint);
   };
@@ -619,7 +627,7 @@ void RichTextLayer::drawSelf(RenderContext& context) {
         const float leading = std::max(0.0f,
           line.height - (metrics.ascent + metrics.descent + metrics.lineGap));
         const float baseline = top + leading * 0.5f + metrics.ascent;
-        const float width = detail::TextShapeCache::instance().measure(*segment.font, paintedText, direction);
+        const float width = measureSegment(segment, paintedText, direction);
         if (hasSelection()) {
           const size_t begin = std::max(selectionStart(), run.start);
           const size_t end = std::min(selectionEnd(), run.end);
@@ -628,10 +636,8 @@ void RichTextLayer::drawSelf(RenderContext& context) {
             const std::string suffix = runText.substr(0, end - run.start);
             const std::string paintedPrefix = rightToLeft ? mirrorBidiText(prefix) : prefix;
             const std::string paintedSuffix = rightToLeft ? mirrorBidiText(suffix) : suffix;
-            const float prefixWidth = detail::TextShapeCache::instance().measure(
-              *segment.font, paintedPrefix, direction);
-            const float suffixWidth = detail::TextShapeCache::instance().measure(
-              *segment.font, paintedSuffix, direction);
+            const float prefixWidth = measureSegment(segment, paintedPrefix, direction);
+            const float suffixWidth = measureSegment(segment, paintedSuffix, direction);
             const float spanLeft = rightToLeft ? x + width - prefixWidth : x + prefixWidth;
             const float spanRight = rightToLeft ? x + width - suffixWidth : x + suffixWidth;
             graphics::Paint selection;
@@ -649,6 +655,7 @@ void RichTextLayer::drawSelf(RenderContext& context) {
         if (mPainters[lineIndex][segmentIndex] == nullptr) {
           mPainters[lineIndex][segmentIndex] = std::make_unique<TextPainter>();
         }
+        mPainters[lineIndex][segmentIndex]->setFeatures(segment.features);
         mPainters[lineIndex][segmentIndex]->draw(context, paintedText, x, baseline, *segment.font, paint, direction);
         if (segment.underline) {
           graphics::Paint linePaint;
@@ -686,8 +693,8 @@ void RichTextLayer::drawSelf(RenderContext& context) {
             std::count(prefix.begin(), prefix.end(), ' '));
           const auto valueSpaces = static_cast<float>(
             std::count(value.begin(), value.end(), ' '));
-          const float left = x + segment.font->measureWidth(prefix) + prefixSpaces * spacing;
-          const float right = x + segment.font->measureWidth(value) + valueSpaces * spacing;
+          const float left = x + measureSegment(segment, prefix) + prefixSpaces * spacing;
+          const float right = x + measureSegment(segment, value) + valueSpaces * spacing;
           graphics::Paint selection;
           selection.color = mSelectionColor;
           selection.style = graphics::Paint::Style::kFill;
@@ -711,8 +718,9 @@ void RichTextLayer::drawSelf(RenderContext& context) {
             const std::string_view prefix = std::string_view(segment.text).substr(0, begin);
             const auto prefixSpaces = static_cast<float>(
               std::count(prefix.begin(), prefix.end(), ' '));
-            const float tokenX = x + segment.font->measureWidth(prefix) + prefixSpaces * spacing;
+            const float tokenX = x + measureSegment(segment, prefix) + prefixSpaces * spacing;
             const std::string display = expandTabs(token, mTabSize);
+            mPainters[lineIndex][segmentIndex]->setFeatures(segment.features);
             mPainters[lineIndex][segmentIndex]->draw(context, display, tokenX, baseline,
               *segment.font, paint);
           }
@@ -721,6 +729,7 @@ void RichTextLayer::drawSelf(RenderContext& context) {
         }
       } else {
         const std::string display = expandTabs(segment.text, mTabSize);
+        mPainters[lineIndex][segmentIndex]->setFeatures(segment.features);
         mPainters[lineIndex][segmentIndex]->draw(context, display, x, baseline,
           *segment.font, paint);
       }

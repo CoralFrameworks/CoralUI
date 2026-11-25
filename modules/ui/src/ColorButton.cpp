@@ -136,7 +136,8 @@ void ColorButton::activate() {
       while (root->parent() != nullptr) root = root->parent();
       if (root != this) {
         if (mPopup->parent() != root) root->addChild(mPopup);
-        mPopup->showAt(Point{ bounds().getLeft(), bounds().getBottom() + 4.0f });
+        const Rect anchor = boundsInWindow();
+        mPopup->showAt(Point{ anchor.getLeft(), anchor.getBottom() + 4.0f });
       }
     }
   }

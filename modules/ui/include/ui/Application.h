@@ -154,6 +154,11 @@ class Application {
    */
   bool applyWindowLayout(const std::vector<WindowLayout>& layout);
 
+  /** Writes the current window layout to a small text file; empty layouts are valid. */
+  bool saveWindowLayout(std::string_view path) const;
+  /** Loads and applies a previously saved layout; false when the file is invalid or window counts differ. */
+  bool loadWindowLayout(std::string_view path);
+
   /** Raises and activates @p window; no-op when it is headless or the platform has no activation. */
   void activateWindow(Window& window);
 

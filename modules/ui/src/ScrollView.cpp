@@ -625,18 +625,44 @@ Rect ScrollView::scrollbarThumbBounds() const {
 
 bool ScrollView::onPointerDown(const PointerEvent& event) {
   const Rect horizontal = horizontalScrollbarThumbBounds();
-  if (!horizontal.isEmpty() && horizontal.contains(event.position)) {
-    mDraggingHorizontalThumb = true;
-    mThumbDragStartY = event.position.x;
-    mThumbDragStartScroll = mScrollX;
-    return true;
+  if (!horizontal.isEmpty()) {
+    const Rect track = Rect::MakeXYWH(bounds().getLeft(), bounds().getBottom() - 12.0f,
+      bounds().getWidth(), 12.0f);
+    if (track.contains(event.position)) {
+      const float trackWidth = bounds().getWidth();
+      const float thumbWidth = horizontal.getWidth();
+      const float travel = std::max(1.0f, trackWidth - thumbWidth);
+      const float maxScroll = std::max(0.0f, mContentSize.width - trackWidth);
+      if (!horizontal.contains(event.position)) {
+        setScrollOffset(std::clamp((event.position.x - bounds().getLeft() -
+          thumbWidth * 0.5f) / travel, 0.0f, 1.0f) * maxScroll, mScrollY);
+      }
+      mDraggingHorizontalThumb = true;
+      mThumbDragStartY = event.position.x;
+      mThumbDragStartScroll = mScrollX;
+      return true;
+    }
   }
   const Rect thumb = scrollbarThumbBounds();
-  if (thumb.isEmpty() || !thumb.contains(event.position)) return false;
-  mDraggingThumb = true;
-  mThumbDragStartY = event.position.y;
-  mThumbDragStartScroll = mScrollY;
-  return true;
+  if (!thumb.isEmpty()) {
+    const Rect track = Rect::MakeXYWH(bounds().getRight() - 12.0f, bounds().getTop(),
+      12.0f, bounds().getHeight());
+    if (track.contains(event.position)) {
+      const float trackHeight = bounds().getHeight();
+      const float thumbHeight = thumb.getHeight();
+      const float travel = std::max(1.0f, trackHeight - thumbHeight);
+      const float maxScroll = std::max(0.0f, mContentSize.height - trackHeight);
+      if (!thumb.contains(event.position)) {
+        setScrollOffset(mScrollX, std::clamp((event.position.y - bounds().getTop() -
+          thumbHeight * 0.5f) / travel, 0.0f, 1.0f) * maxScroll);
+      }
+      mDraggingThumb = true;
+      mThumbDragStartY = event.position.y;
+      mThumbDragStartScroll = mScrollY;
+      return true;
+    }
+  }
+  return false;
 }
 
 bool ScrollView::onPointerMove(const PointerEvent& event) {

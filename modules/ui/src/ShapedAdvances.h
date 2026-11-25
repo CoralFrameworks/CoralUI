@@ -23,6 +23,7 @@
 
 #include <cstddef>
 #include <string_view>
+#include <span>
 #include <vector>
 
 namespace coral::ui::detail {
@@ -46,7 +47,8 @@ class ShapedAdvances {
 
   /** Shapes @p text with @p font once. Invalid when the font has no usable metrics. */
   [[nodiscard]] static ShapedAdvances fromFont(const graphics::Font& font, std::string_view text,
-    graphics::Font::Direction direction = graphics::Font::Direction::Auto);
+    graphics::Font::Direction direction = graphics::Font::Direction::Auto,
+    std::span<const graphics::FontFeature> features = {});
 
   /**
    * Shapes @p text through a fallback chain: each run is shaped with the face that covers it and the

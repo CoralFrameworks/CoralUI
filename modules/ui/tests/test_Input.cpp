@@ -17,6 +17,7 @@
 #include <ui/ColorLayer.h>
 #include <ui/Command.h>
 #include <ui/Flex.h>
+#include <ui/ScrollView.h>
 #include <ui/TextBidi.h>
 #include <ui/TextInput.h>
 #include <ui/TextLayer.h>
@@ -112,6 +113,66 @@ TEST(UiInput, GesturesAndScrollPhasesReachTheLayerUnderThePointer) {
   EXPECT_EQ(target->scroll.phase, ScrollPhase::Began);
   EXPECT_EQ(target->scroll.momentumPhase, ScrollPhase::Stationary);
   EXPECT_TRUE(target->scroll.precise);
+}
+
+TEST(UiInput, NestedScrollViewConsumesTheWheelFirst) {
+  Window::Options options;
+  options.headless = true;
+  options.width = 300;
+  options.height = 300;
+  auto window = Window::create(options);
+  ASSERT_NE(window, nullptr);
+  auto root = std::make_shared<ColorLayer>(Color::MakeRGBA8(0, 0, 0, 255));
+  auto outer = std::make_shared<ScrollView>();
+  auto outerContent = std::make_shared<ColorLayer>(Color::MakeRGBA8(20, 20, 20, 255));
+  outerContent->setBounds(Rect::MakeWH(200.0f, 600.0f));
+  auto inner = std::make_shared<ScrollView>();
+  auto innerContent = std::make_shared<ColorLayer>(Color::MakeRGBA8(40, 40, 40, 255));
+  innerContent->setBounds(Rect::MakeWH(100.0f, 400.0f));
+  inner->setContent(innerContent);
+  inner->setBounds(Rect::MakeXYWH(50.0f, 50.0f, 100.0f, 100.0f));
+  outerContent->addChild(inner);
+  outer->setContent(outerContent);
+  outer->setBounds(Rect::MakeWH(200.0f, 200.0f));
+  root->addChild(outer);
+  window->setRoot(root);
+  outer->layout();
+  inner->layout();
+
+  ScrollEvent event;
+  event.position = { 100.0f, 100.0f };
+  event.deltaY = -40.0f;
+  event.precise = true;
+  EXPECT_TRUE(window->scroll(event));
+  EXPECT_GT(inner->scrollY(), 0.0f);
+  EXPECT_FLOAT_EQ(outer->scrollY(), 0.0f);
+
+  inner->setScrollOffset(0.0f, 1000.0f);
+  EXPECT_TRUE(window->scroll(event));
+  EXPECT_GT(outer->scrollY(), 0.0f) << "a wheel at the inner edge bubbles to the outer list";
+}
+
+TEST(UiInput, RemovingAHoveredLayerDropsTheBarePointer) {
+  Window::Options options;
+  options.headless = true;
+  options.width = 100;
+  options.height = 100;
+  auto window = Window::create(options);
+  ASSERT_NE(window, nullptr);
+  auto root = std::make_shared<ColorLayer>(Color::MakeRGBA8(0, 0, 0, 255));
+  root->setBounds(Rect::MakeWH(100.0f, 100.0f));
+  auto hovered = std::make_shared<ColorLayer>(Color::MakeRGBA8(40, 40, 40, 255));
+  hovered->setBounds(Rect::MakeWH(60.0f, 60.0f));
+  root->addChild(hovered);
+  window->setRoot(root);
+
+  PointerEvent move;
+  move.position = { 20.0f, 20.0f };
+  window->pointerMove(move);
+  root->removeChild(hovered);
+  hovered.reset();
+  EXPECT_NO_THROW(window->pointerMove(move))
+    << "a recycled row must not leave a dangling hover target";
 }
 
 TEST(UiInput, AClickFocusesTheFocusableLayerAndKeysReachIt) {

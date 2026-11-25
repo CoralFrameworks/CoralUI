@@ -217,6 +217,20 @@ std::string CommandRegistry::shortcutLabelFor(const std::string& name) const {
   return entry != nullptr ? shortcutLabel(entry->shortcut) : std::string();
 }
 
+void CommandRegistry::setInfo(const std::string& name, Info info) {
+  Entry* entry = find(name);
+  if (entry == nullptr) return;
+  entry->hasInfo = true;
+  entry->info = std::move(info);
+  notifyChanged();
+}
+
+std::optional<CommandRegistry::Info> CommandRegistry::info(const std::string& name) const {
+  const Entry* entry = find(name);
+  if (entry == nullptr || !entry->hasInfo) return std::nullopt;
+  return entry->info;
+}
+
 std::vector<std::string> CommandRegistry::names() const {
   std::vector<std::string> result;
   result.reserve(mCommands.size());

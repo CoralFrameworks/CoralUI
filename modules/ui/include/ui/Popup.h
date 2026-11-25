@@ -46,6 +46,10 @@ class Popup final : public Layer {
     return mContent;
   }
   void setColors(Color background, Color border);
+  /** Close when a pointer press lands outside the panel (default true). */
+  void setDismissOnOutsideClick(bool dismiss) {
+    mDismissOnOutsideClick = dismiss;
+  }
 
   void showAt(const Point& position);
   void showAt(const Rect& anchor);
@@ -58,6 +62,13 @@ class Popup final : public Layer {
   void layout() override;
   void drawSelf(RenderContext& context) override;
   bool onPointerDown(const PointerEvent& event) override;
+  [[nodiscard]] bool isPopup() const override {
+    return true;
+  }
+
+  [[nodiscard]] const char* defaultStyleName() const override {
+    return "popup";
+  }
 
  protected:
   void applyTheme(const Theme& theme) override;
@@ -69,6 +80,7 @@ class Popup final : public Layer {
   Shadow mShadow;
   float mPadding = 8.0f;
   float mRadius = 4.0f;
+  bool mDismissOnOutsideClick = true;
 };
 
 } // namespace coral::ui

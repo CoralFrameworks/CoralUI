@@ -49,6 +49,19 @@ graphics::Image systemSymbolImage(const std::string_view name, const SystemImage
       NSImage* configured = [symbol imageWithSymbolConfiguration:configuration];
       if (configured == nil) configured = symbol;
       [configured setTemplate:YES];
+      if (options.tint.has_value()) {
+        const graphics::Color tint = *options.tint;
+        NSImage* tinted = [NSImage imageWithSize:configured.size flipped:NO
+          drawingHandler:^BOOL(NSRect rect) {
+            [configured drawInRect:rect fromRect:NSZeroRect
+                         operation:NSCompositingOperationSourceOver fraction:1.0];
+            [[NSColor colorWithSRGBRed:tint.red green:tint.green blue:tint.blue
+                                alpha:tint.alpha] set];
+            NSRectFillUsingOperation(rect, NSCompositingOperationSourceAtop);
+            return YES;
+          }];
+        if (tinted != nil) configured = tinted;
+      }
       const NSSize pointSize = configured.size;
       if (pointSize.width <= 0.0 || pointSize.height <= 0.0) return {};
       const CGFloat scale = options.scale > 0.0f ? static_cast<CGFloat>(options.scale) : 2.0;

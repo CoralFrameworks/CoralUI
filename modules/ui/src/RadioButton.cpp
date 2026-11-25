@@ -72,32 +72,42 @@ Size RadioButton::measure(const Size& available) {
 void RadioButton::drawSelf(RenderContext& context) {
   auto& canvas = context.canvas();
   const float size = std::min(18.0f, bounds().getHeight() - 4.0f);
-  const float centerX = bounds().getLeft() + 2.0f + size * 0.5f;
+  // Leave room for the indicator and its focus ring inside the row. Anchoring at left + 2 put the
+  // focused ring one pixel outside bounds, where it was clipped into a flat edge.
+  const float centerX = bounds().getLeft() + size * 0.5f + 4.0f;
   const float centerY = bounds().getTop() + bounds().getHeight() * 0.5f;
   const float radius = size * 0.5f;
 
   // A named style replaces the theme copy for the dot, ring and label; the selected inner dot stays
   // white so it remains visible on the accent colour.
-  graphics::Color fill = mSelected ? mAccent : mBackground;
-  graphics::Color ringColor = mSelected ? mAccent : mBorder;
+  graphics::Color fill = mSelected ? mAccent : mBorder;
   graphics::Color labelColor = mForeground;
   float borderWidth = 1.5f;
   if (const auto styled = resolvedStyle()) {
     fill = mSelected ? styled->border : styled->background;
-    ringColor = mSelected ? styled->border : styled->border;
     labelColor = styled->foreground;
     borderWidth = styled->borderWidth;
   }
+  // Draw the indicator with filled circles rather than a stroked path. A stroked circle was the
+  // source of a stray horizontal rule under the selected row in the GPU path renderer.
+  if (mFocused) {
+    graphics::Paint focus;
+    focus.color = mFocus;
+    focus.style = graphics::Paint::Style::kFill;
+    canvas.drawCircle(centerX, centerY, radius + 3.0f, focus);
+  }
+
   graphics::Paint outer;
   outer.color = fill;
   outer.style = graphics::Paint::Style::kFill;
   canvas.drawCircle(centerX, centerY, radius, outer);
 
-  graphics::Paint ring;
-  ring.color = ringColor;
-  ring.style = graphics::Paint::Style::kStroke;
-  ring.strokeWidth = borderWidth;
-  canvas.drawCircle(centerX, centerY, radius, ring);
+  if (!mSelected) {
+    graphics::Paint inner;
+    inner.color = mBackground;
+    inner.style = graphics::Paint::Style::kFill;
+    canvas.drawCircle(centerX, centerY, radius - borderWidth, inner);
+  }
 
   if (mSelected) {
     graphics::Paint dot;
@@ -110,7 +120,6 @@ void RadioButton::drawSelf(RenderContext& context) {
     detail::drawLabel(context, mLabel, bounds(), *mFont, labelColor,
       bounds().getLeft() + size + mGap);
   }
-  detail::drawFocusRing(canvas, bounds(), mFocused, mFocus, mRadius, focusRingWidth());
 }
 
 bool RadioButton::onPointerDown(const PointerEvent& event) {

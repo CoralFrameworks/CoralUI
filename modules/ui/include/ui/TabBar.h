@@ -68,6 +68,12 @@ class TabBar final : public Layer {
   bool onPointerDown(const PointerEvent& event) override;
   bool onKeyDown(const KeyEvent& event) override;
   void onFocusChanged(bool focused) override;
+  bool performAccessibilityAction(AccessibilityAction action,
+    std::string_view value) override;
+
+  [[nodiscard]] const char* defaultStyleName() const override {
+    return "tabbar";
+  }
 
  protected:
   void applyTheme(const Theme& theme) override;
@@ -76,6 +82,7 @@ class TabBar final : public Layer {
   struct Tab {
     std::string label;
     std::shared_ptr<Layer> content;
+    std::shared_ptr<Layer> accessibilityItem;
     Rect bounds{};
   };
 

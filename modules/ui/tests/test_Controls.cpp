@@ -17,35 +17,89 @@
 #include <ui/Accessibility.h>
 #include <ui/AccessibilityAtSpi.h>
 #include <ui/Button.h>
+#include <ui/Avatar.h>
+#include <ui/AvatarGroup.h>
+#include <ui/Badge.h>
+#include <ui/Banner.h>
+#include <ui/Breadcrumb.h>
 #include <ui/ColorButton.h>
+#include <ui/Clipboard.h>
 #include <ui/ColorInput.h>
 #include <ui/ColorLayer.h>
 #include <ui/Dialog.h>
+#include <ui/Divider.h>
 #include <ui/DragDrop.h>
 #include <ui/ColorPicker.h>
+#include <ui/Card.h>
 #include <ui/CheckBox.h>
+#include <ui/CheckBoxGroup.h>
+#include <ui/Chip.h>
 #include <ui/Command.h>
 #include <ui/IconButton.h>
 #include <ui/Menu.h>
 #include <ui/MenuBar.h>
 #include <ui/IconTheme.h>
+#include <ui/Calendar.h>
+#include <ui/ComboBox.h>
+#include <ui/DateField.h>
+#include <ui/DateRangeField.h>
+#include <ui/DateTimeField.h>
+#include <ui/NativeViewLayer.h>
+#include <ui/Icon.h>
+#include <ui/Kbd.h>
+#include <ui/Link.h>
+#include <ui/Meter.h>
+#include <ui/MultiSelect.h>
 #include <ui/NumberField.h>
+#include <ui/Pagination.h>
+#include <ui/PasswordField.h>
 #include <ui/Popup.h>
 #include <ui/Positioner.h>
 #include <ui/ProgressBar.h>
+#include <ui/ProgressRing.h>
+#include <ui/PropertyRow.h>
 #include <ui/RadioButton.h>
+#include <ui/RadioGroup.h>
+#include <ui/RangeSlider.h>
+#include <ui/Rating.h>
 #include <ui/SearchField.h>
 #include <ui/SegmentedControl.h>
+#include <ui/TabBar.h>
+#include <ui/SectionHeader.h>
+#include <ui/Select.h>
+#include <ui/Skeleton.h>
+#include <ui/Spinner.h>
+#include <ui/Stat.h>
+#include <ui/StepIndicator.h>
+#include <ui/StatusBar.h>
+#include <ui/StatusIndicator.h>
 #include <ui/Slider.h>
+#include <ui/SplitButton.h>
+#include <ui/Stepper.h>
 #include <ui/Toast.h>
+#include <ui/ToastStack.h>
+#include <ui/TagInput.h>
+#include <ui/TagList.h>
 #include <ui/TextInput.h>
+#include <ui/Timeline.h>
+#include <ui/TimeField.h>
+#include <ui/TimeRangeField.h>
+#include <ui/SystemSettings.h>
+#include <ui/TimePicker.h>
 #include <ui/TextLayer.h>
 #include <ui/Theme.h>
 #include <ui/Toggle.h>
+#include <ui/ToggleButton.h>
+#include <ui/ToggleGroup.h>
+#include <ui/Toolbar.h>
 #include <ui/Undo.h>
 #include <ui/Tooltip.h>
 #include <ui/TreeView.h>
+#include <ui/DropZone.h>
+#include <ui/EmptyState.h>
+#include <ui/Expander.h>
 #include <ui/Flex.h>
+#include <ui/FormField.h>
 #include <ui/Window.h>
 
 #include <graphics/Bitmap.h>
@@ -54,6 +108,7 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <cmath>
 #include <memory>
 #include <string>
 
@@ -72,6 +127,21 @@ PointerEvent pointerAt(const float x, const float y) {
   event.position = { x, y };
   event.button = PointerButton::Primary;
   return event;
+}
+
+double relativeLuminance(const Color color) {
+  const auto channel = [](float value) {
+    const double c = std::clamp(static_cast<double>(value), 0.0, 1.0);
+    return c <= 0.04045 ? c / 12.92 : std::pow((c + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * channel(color.red) + 0.7152 * channel(color.green) +
+    0.0722 * channel(color.blue);
+}
+
+double contrastRatio(const Color first, const Color second) {
+  const double a = relativeLuminance(first);
+  const double b = relativeLuminance(second);
+  return (std::max(a, b) + 0.05) / (std::min(a, b) + 0.05);
 }
 
 KeyEvent key(Key key) {
@@ -142,6 +212,706 @@ TEST(UiControls, ThemeExposesElevationTokens) {
   EXPECT_GT(theme.shadow.md.color.alpha, 0.0f);
 }
 
+TEST(UiControls, CrossPlatformHIGDefaults) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  Toolbar toolbar;
+  EXPECT_EQ(toolbar.measure({ 400.0f, 0.0f }).height, 44.0f);
+  StatusBar status(font);
+  EXPECT_EQ(status.measure({ 400.0f, 0.0f }).height, 24.0f);
+  Divider divider;
+  EXPECT_EQ(divider.measure({ 200.0f, 0.0f }).height, 1.0f);
+  divider.setInset(8.0f);
+  ProgressRing ring;
+  EXPECT_EQ(ring.measure({}).width, 36.0f);
+  Rating rating;
+  EXPECT_EQ(rating.measure({}).height, 20.0f);
+  EXPECT_EQ(rating.measure({}).width, 116.0f);
+  MultiSelect multi({ "One", "Two" }, font);
+  EXPECT_GE(multi.measure({}).height, 28.0f);
+
+  Button fallbackButton("OK", nullptr);
+  EXPECT_EQ(fallbackButton.measure({}).width, 96.0f);
+  EXPECT_EQ(fallbackButton.measure({}).height, 36.0f);
+  TextInput fallbackInput("", nullptr);
+  EXPECT_EQ(fallbackInput.measure({}).height, 32.0f);
+  CheckBox fallbackCheck("", nullptr);
+  EXPECT_EQ(fallbackCheck.measure({}).height, 26.0f);
+  ProgressBar fallbackProgress(nullptr);
+  EXPECT_EQ(fallbackProgress.measure({}).height, 20.0f);
+  Banner fallbackBanner("", nullptr);
+  EXPECT_EQ(fallbackBanner.measure({}).height, 36.0f);
+  Chip fallbackChip("", nullptr);
+  EXPECT_EQ(fallbackChip.measure({}).height, 24.0f);
+  Badge fallbackBadge("", nullptr);
+  EXPECT_EQ(fallbackBadge.measure({}).height, 18.0f);
+  Link fallbackLink("", nullptr);
+  EXPECT_EQ(fallbackLink.measure({}).height, 20.0f);
+  RangeSlider fallbackRange;
+  EXPECT_EQ(fallbackRange.measure({}).height, 28.0f);
+  ToggleButton fallbackToggle("", nullptr);
+  EXPECT_EQ(fallbackToggle.measure({}).width, 96.0f);
+  EXPECT_EQ(fallbackToggle.measure({}).height, 36.0f);
+  Pagination fallbackPagination(nullptr, 10, 0);
+  EXPECT_EQ(fallbackPagination.measure({}).height, 30.0f);
+  AvatarGroup fallbackGroup({ "A", "B" }, nullptr, 2, 28.0f);
+  EXPECT_EQ(fallbackGroup.measure({}).height, 28.0f);
+  StatusIndicator fallbackStatus("", nullptr);
+  EXPECT_EQ(fallbackStatus.measure({}).height, 18.0f);
+  Kbd fallbackKbd("", nullptr);
+  EXPECT_EQ(fallbackKbd.measure({}).height, 22.0f);
+  PasswordField fallbackPassword("", nullptr);
+  EXPECT_EQ(fallbackPassword.measure({}).height, 32.0f);
+  TagList fallbackTags({ "A" }, nullptr, 1);
+  EXPECT_EQ(fallbackTags.measure({}).height, 26.0f);
+  PropertyRow fallbackRow("", "", nullptr);
+  EXPECT_EQ(fallbackRow.measure({}).height, 18.0f);
+  Icon fallbackIcon;
+  EXPECT_EQ(fallbackIcon.measure({}).width, 20.0f);
+  SectionHeader fallbackHeader("", nullptr);
+  EXPECT_EQ(fallbackHeader.measure({}).height, 18.0f);
+  Stat fallbackStat("", "", nullptr);
+  EXPECT_EQ(fallbackStat.measure({}).height, 44.0f);
+  StepIndicator fallbackSteps({ "One" }, nullptr);
+  EXPECT_EQ(fallbackSteps.measure({}).height, 46.0f);
+  Timeline fallbackTimeline({ { "One", "Detail", "", TimelineState::Pending } }, nullptr);
+  EXPECT_EQ(fallbackTimeline.measure({}).height, 46.0f);
+  DropZone fallbackDropZone("", nullptr);
+  EXPECT_EQ(fallbackDropZone.measure({}).height, 80.0f);
+  TagInput fallbackTagInput(nullptr);
+  EXPECT_EQ(fallbackTagInput.measure({}).height, 34.0f);
+
+  const float lineHeight = font->metrics().ascent + font->metrics().descent;
+  Button fontButton("OK", font);
+  EXPECT_FLOAT_EQ(fontButton.measure({}).height, lineHeight + 20.0f);
+  TextInput fontInput("", font);
+  EXPECT_FLOAT_EQ(fontInput.measure({}).height, lineHeight + 18.0f);
+  Link fontLink("Link", font);
+  EXPECT_FLOAT_EQ(fontLink.measure({}).height, lineHeight);
+  MultiSelect fontMulti({ "One" }, font);
+  EXPECT_FLOAT_EQ(fontMulti.measure({}).height, std::max(28.0f, lineHeight + 14.0f));
+  RangeSlider fontRange;
+  EXPECT_FLOAT_EQ(fontRange.measure({}).height, 28.0f);
+  ToggleButton fontToggle("Bold", font);
+  EXPECT_FLOAT_EQ(fontToggle.measure({}).height, lineHeight + 20.0f);
+  Pagination fontPagination(font, 10, 0);
+  EXPECT_FLOAT_EQ(fontPagination.measure({}).height, 30.0f);
+  CheckBox fontCheck("Check", font);
+  EXPECT_FLOAT_EQ(fontCheck.measure({}).height, std::max(24.0f, lineHeight + 8.0f));
+  Chip fontChip("Chip", font);
+  EXPECT_FLOAT_EQ(fontChip.measure({}).height, std::max(24.0f, lineHeight + 10.0f));
+  Badge fontBadge("1", font);
+  EXPECT_FLOAT_EQ(fontBadge.measure({}).height, std::max(18.0f, lineHeight + 6.0f));
+  Banner fontBanner("Banner", font);
+  EXPECT_FLOAT_EQ(fontBanner.measure({}).height, std::max(34.0f, lineHeight + 24.0f));
+  ProgressBar fontProgress(font, 0.5);
+  EXPECT_FLOAT_EQ(fontProgress.measure({}).height, std::max(16.0f, lineHeight + 8.0f));
+  AvatarGroup fontAvatars({ "A", "B" }, font, 2, 28.0f);
+  EXPECT_FLOAT_EQ(fontAvatars.measure({}).height, 28.0f);
+  Kbd fontKbd("K", font);
+  EXPECT_FLOAT_EQ(fontKbd.measure({}).height, lineHeight + 8.0f);
+  PasswordField fontPassword("", font);
+  EXPECT_FLOAT_EQ(fontPassword.measure({}).height, std::max(32.0f, lineHeight + 18.0f));
+  SearchField fontSearch("Search", font);
+  EXPECT_FLOAT_EQ(fontSearch.measure({}).height, lineHeight + 22.0f);
+  Select fontSelect({ "One" }, font);
+  EXPECT_FLOAT_EQ(fontSelect.measure({}).height, std::max(28.0f, lineHeight + 14.0f));
+  Toast fontToast("Toast", font);
+  EXPECT_FLOAT_EQ(fontToast.measure({}).height, std::max(24.0f, lineHeight + 14.0f));
+  Tooltip fontTooltip("Tip", font);
+  EXPECT_FLOAT_EQ(fontTooltip.measure({}).height, std::max(24.0f, lineHeight + 10.0f));
+  SectionHeader fontSection("Section", font);
+  EXPECT_FLOAT_EQ(fontSection.measure({}).height, lineHeight);
+  StepIndicator fontSteps({ "One" }, font);
+  EXPECT_FLOAT_EQ(fontSteps.measure({}).height, lineHeight + 28.0f);
+  Timeline fontTimeline({ { "One", "Detail", "", TimelineState::Pending } }, font);
+  EXPECT_FLOAT_EQ(fontTimeline.measure({}).height, lineHeight * 2.0f + 10.0f);
+}
+
+TEST(UiControls, NativeViewLayerHonorsPreferredSize) {
+  NativeViewLayer layer;
+  layer.setPreferredSize({ 120.0f, 20.0f });
+  EXPECT_EQ(layer.measure({}).width, 120.0f);
+  EXPECT_EQ(layer.measure({}).height, 20.0f);
+  layer.setPreferredSize({ 0.0f, 20.0f });
+  EXPECT_EQ(layer.measure({ 180.0f, 0.0f }).width, 180.0f);
+  EXPECT_EQ(layer.measure({ 180.0f, 0.0f }).height, 20.0f);
+  EXPECT_EQ(layer.intrinsicSize().width, 0.0f);
+  EXPECT_EQ(layer.intrinsicSize().height, 20.0f);
+}
+
+TEST(UiControls, ThemeContrastKeepsTextReadable) {
+  for (const Theme& theme: { Theme::dark(), Theme::light() }) {
+    EXPECT_GE(contrastRatio(theme.text, theme.background), 4.5);
+    EXPECT_GE(contrastRatio(theme.textMuted, theme.background), 3.0);
+    EXPECT_GE(contrastRatio(theme.textMuted, theme.surface), 3.0);
+    EXPECT_GE(contrastRatio(theme.textMuted, theme.surfaceRaised), 3.0);
+    EXPECT_GE(contrastRatio(theme.controls.foreground, theme.controls.background), 4.5);
+    EXPECT_GE(contrastRatio(theme.accent, theme.background), 3.0);
+    EXPECT_GE(contrastRatio(theme.text, theme.surface), 4.5);
+    EXPECT_GE(contrastRatio(theme.text, theme.surfaceRaised), 4.5);
+    EXPECT_EQ(themeColor(theme, ThemeColorRole::Text), theme.text);
+    EXPECT_EQ(themeColor(theme, ThemeColorRole::ControlBackground), theme.controls.background);
+  }
+}
+
+TEST(UiControls, TagInputTurnsSubmitIntoAToken) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  TagInput input(font);
+  input.setBounds(Rect::MakeWH(260.0f, 34.0f));
+  input.input()->setText("design");
+  EXPECT_TRUE(input.input()->onKeyDown(key(Key::Enter)));
+  EXPECT_EQ(input.tokens().size(), 1u);
+  EXPECT_EQ(input.tokens().front(), "design");
+  EXPECT_EQ(input.input()->text(), "");
+  EXPECT_EQ(input.accessibleValue(), "1");
+  input.setTokens({ "a", "b" });
+  EXPECT_EQ(input.tokens().size(), 2u);
+  EXPECT_EQ(input.measure({}).height, 34.0f);
+  EXPECT_STREQ(input.defaultStyleName(), "taginput");
+}
+
+TEST(UiControls, TagListShowsOverflowCount) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  TagList tags({ "A", "B", "C", "D", "E" }, font, 3);
+  EXPECT_EQ(tags.tags().size(), 5u);
+  EXPECT_EQ(tags.children().size(), 4u);
+  EXPECT_EQ(tags.accessibleValue(), "5");
+  EXPECT_GT(tags.measure({}).width, 0.0f);
+  tags.setMaxVisible(2);
+  EXPECT_EQ(tags.children().size(), 3u);
+  EXPECT_STREQ(tags.defaultStyleName(), "taglist");
+}
+
+TEST(UiControls, DropZoneAcceptsFilesAndText) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  std::vector<std::string> dropped;
+  std::string text;
+  DropZone zone("Drop files", font);
+  zone.setOnFilesDropped([&dropped](std::vector<std::string> paths) { dropped = std::move(paths); });
+  zone.setOnTextDropped([&text](std::string value) { text = std::move(value); });
+  DragEvent enter;
+  enter.payload = DragPayload::files({ "/tmp/a.txt" });
+  EXPECT_EQ(zone.onDragEnter(enter), DragEffect::Copy);
+  DropEvent drop;
+  drop.paths = { "/tmp/a.txt" };
+  EXPECT_TRUE(zone.onDrop(drop));
+  EXPECT_EQ(dropped.size(), 1u);
+  DropEvent textDrop;
+  textDrop.payload = DragPayload::text("hello");
+  EXPECT_TRUE(zone.onDrop(textDrop));
+  EXPECT_EQ(text, "hello");
+  EXPECT_EQ(zone.measure({}).height, 80.0f);
+  EXPECT_STREQ(zone.defaultStyleName(), "dropzone");
+}
+
+TEST(UiControls, TimelineLaysOutEntriesAndStates) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  Timeline timeline({
+    { "Created", "Project created", "09:00", TimelineState::Complete },
+    { "Review", "Waiting for review", "10:30", TimelineState::Current },
+    { "Ship", "", "Later", TimelineState::Pending },
+  }, font);
+  EXPECT_EQ(timeline.entries().size(), 3u);
+  EXPECT_EQ(timeline.accessibleValue(), "3");
+  EXPECT_GT(timeline.measure({}).height, 100.0f);
+  EXPECT_STREQ(timeline.defaultStyleName(), "timeline");
+}
+
+TEST(UiControls, StepIndicatorTracksCurrentStep) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  int changed = -1;
+  StepIndicator steps({ "Account", "Profile", "Done" }, font, 1);
+  steps.setOnChanged([&changed](int index) { changed = index; });
+  EXPECT_EQ(steps.current(), 1);
+  EXPECT_EQ(steps.accessibleValue(), "Profile");
+  EXPECT_GT(steps.measure({}).height, 40.0f);
+  steps.setBounds(Rect::MakeWH(steps.measure({}).width, steps.measure({}).height));
+  steps.setCurrent(2);
+  EXPECT_EQ(steps.current(), 2);
+  EXPECT_EQ(steps.accessibleValue(), "Done");
+  PointerEvent event;
+  event.position = { 10.0f, 10.0f };
+  EXPECT_TRUE(steps.onPointerDown(event));
+  EXPECT_EQ(changed, 0);
+  EXPECT_STREQ(steps.defaultStyleName(), "stepindicator");
+}
+
+TEST(UiControls, StatShowsLabelValueAndTrend) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  Stat stat("Users", "1,240", font, "+12%", StatTrend::Up);
+  EXPECT_EQ(stat.accessibleName(), "Users");
+  EXPECT_EQ(stat.accessibleValue(), "1,240");
+  EXPECT_GT(stat.measure({}).height, 40.0f);
+  stat.setValue("1,300");
+  EXPECT_EQ(stat.accessibleValue(), "1,300");
+  stat.setTrend(StatTrend::Down);
+  stat.setCaption("-3%");
+  EXPECT_STREQ(stat.defaultStyleName(), "stat");
+}
+
+TEST(UiControls, SectionHeaderLaysOutSubtitleAndAction) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  auto action = std::make_shared<Button>("Edit", font);
+  SectionHeader header("Settings", font, "Preferences", action);
+  header.setBounds(Rect::MakeWH(320.0f, header.measure({}).height));
+  header.layout();
+  EXPECT_EQ(header.accessibleName(), "Settings");
+  EXPECT_LT(action->bounds().getLeft(), header.bounds().getRight());
+  EXPECT_GT(action->bounds().getLeft(), 200.0f);
+  EXPECT_STREQ(header.defaultStyleName(), "sectionheader");
+}
+
+TEST(UiControls, PropertyRowShowsLabelAndValue) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  PropertyRow row("Version", "1.4.2", font);
+  row.setBounds(Rect::MakeWH(280.0f, row.measure({}).height));
+  EXPECT_EQ(row.accessibleName(), "Version");
+  EXPECT_EQ(row.accessibleValue(), "1.4.2");
+  const float oneLine = row.measure({}).height;
+  row.setHelpText("Build 42");
+  EXPECT_GT(row.measure({}).height, oneLine);
+  row.setValue("1.5.0");
+  EXPECT_EQ(row.accessibleValue(), "1.5.0");
+  EXPECT_STREQ(row.defaultStyleName(), "propertyrow");
+}
+
+TEST(UiControls, FormFieldLaysOutLabelContentAndError) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  auto input = std::make_shared<TextInput>("", font);
+  FormField field("Email", input, font);
+  field.setHelpText("We never share it");
+  field.setBounds(Rect::MakeWH(240.0f, field.measure({ 240.0f, 0.0f }).height));
+  field.layout();
+  EXPECT_GT(input->bounds().getTop(), field.bounds().getTop());
+  EXPECT_EQ(field.accessibleName(), "Email");
+  field.setErrorText("Required");
+  EXPECT_GT(field.measure({ 240.0f, 0.0f }).height, input->bounds().getHeight());
+  EXPECT_STREQ(field.defaultStyleName(), "formfield");
+}
+
+TEST(UiControls, PasswordFieldMasksAndEditsText) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  PasswordField field("Password", font);
+  EXPECT_GE(field.measure({}).height, 32.0f);
+  EXPECT_TRUE(field.onTextInput(U's'));
+  EXPECT_TRUE(field.onTextInput(U'e'));
+  EXPECT_TRUE(field.onTextInput(U'c'));
+  EXPECT_EQ(field.text(), "sec");
+  EXPECT_EQ(field.accessibleValue(), "•••");
+  EXPECT_TRUE(field.onKeyDown(key(Key::Backspace)));
+  EXPECT_EQ(field.text(), "se");
+  EXPECT_TRUE(field.onTextInput(0x4E2D));
+  EXPECT_EQ(field.text(), "se中");
+  EXPECT_EQ(field.accessibleValue(), "•••");
+  EXPECT_STREQ(field.defaultStyleName(), "password");
+
+  EXPECT_TRUE(field.onTextComposition("zhong"));
+  EXPECT_EQ(field.accessibleValue().size(), 8u * 3u);
+  EXPECT_TRUE(field.onTextCommit("中"));
+  EXPECT_EQ(field.text(), "se中中");
+  EXPECT_GT(field.imeCursorRect().getWidth(), 0.0f);
+
+  Clipboard::system()->setText("12");
+  KeyEvent paste;
+  paste.key = Key::V;
+  paste.meta = true;
+  EXPECT_TRUE(field.onKeyDown(paste));
+  EXPECT_EQ(field.text(), "se中中12");
+  KeyEvent copy;
+  copy.key = Key::C;
+  copy.meta = true;
+  EXPECT_TRUE(field.onKeyDown(copy));
+  EXPECT_EQ(Clipboard::system()->getText(), "12");
+  EXPECT_TRUE(field.onTextDelete(-1, 1));
+  EXPECT_EQ(field.text(), "se中中1");
+}
+
+TEST(UiControls, IconMeasuresAndThemes) {
+  Icon icon;
+  EXPECT_EQ(icon.measure({}).width, 20.0f);
+  EXPECT_EQ(icon.measure({}).height, 20.0f);
+  icon.setSize(32.0f);
+  icon.setColor(Color::MakeRGBA8(255, 0, 0, 255));
+  EXPECT_EQ(icon.measure({}).width, 32.0f);
+  EXPECT_STREQ(icon.defaultStyleName(), "icon");
+}
+
+TEST(UiControls, KbdMeasuresAShortcut) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  Kbd kbd("⌘K", font);
+  EXPECT_EQ(kbd.accessibleName(), "⌘K");
+  EXPECT_GT(kbd.measure({}).width, 18.0f);
+  EXPECT_GE(kbd.measure({}).height, 22.0f);
+  kbd.setLabel("Esc");
+  EXPECT_EQ(kbd.accessibleName(), "Esc");
+  EXPECT_STREQ(kbd.defaultStyleName(), "kbd");
+}
+
+TEST(UiControls, ToastStackCapsAndClearsToasts) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  ToastStack stack(font, 2);
+  stack.setBounds(Rect::MakeWH(240.0f, 120.0f));
+  stack.show("One", std::chrono::milliseconds(1000));
+  stack.show("Two", std::chrono::milliseconds(1000));
+  stack.show("Three", std::chrono::milliseconds(1000));
+  EXPECT_EQ(stack.count(), 2);
+  EXPECT_EQ(stack.children().size(), 2u);
+  stack.layout();
+  EXPECT_GT(stack.measure({ 240.0f, 0.0f }).height, 0.0f);
+  stack.clear();
+  EXPECT_EQ(stack.count(), 0);
+  EXPECT_STREQ(stack.defaultStyleName(), "toaststack");
+}
+
+TEST(UiControls, StatusIndicatorReportsLabelAndState) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  StatusIndicator status("Online", font, StatusKind::Online);
+  EXPECT_EQ(status.accessibleName(), "Online");
+  EXPECT_GE(status.measure({}).height, 18.0f);
+  status.setStatus(StatusKind::Busy);
+  EXPECT_EQ(status.status(), StatusKind::Busy);
+  status.setLabel("Busy");
+  EXPECT_EQ(status.accessibleName(), "Busy");
+  EXPECT_STREQ(status.defaultStyleName(), "status");
+}
+
+TEST(UiControls, AvatarGroupCountsOverflow) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  AvatarGroup group({ "CL", "JD", "AK", "MR" }, font, 3, 28.0f);
+  EXPECT_EQ(group.initials().size(), 4u);
+  EXPECT_EQ(group.accessibleValue(), "4");
+  EXPECT_EQ(group.children().size(), 4u);
+  EXPECT_GT(group.measure({}).width, 80.0f);
+  group.setMaxVisible(2);
+  EXPECT_EQ(group.children().size(), 3u);
+  EXPECT_STREQ(group.defaultStyleName(), "avatargroup");
+}
+
+TEST(UiControls, PaginationMovesAndClampsPages) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  int changed = -1;
+  Pagination pagination(font, 10, 0);
+  pagination.setOnChanged([&changed](int page) { changed = page; });
+  pagination.setBounds(Rect::MakeWH(pagination.measure({}).width, 30.0f));
+  EXPECT_EQ(pagination.accessibleValue(), "1 / 10");
+  EXPECT_TRUE(pagination.onKeyDown(key(Key::Right)));
+  EXPECT_EQ(pagination.page(), 1);
+  EXPECT_EQ(changed, 1);
+  EXPECT_TRUE(pagination.onKeyDown(key(Key::End)));
+  EXPECT_EQ(pagination.page(), 9);
+  EXPECT_TRUE(pagination.performAccessibilityAction(AccessibilityAction::SetValue, "3"));
+  EXPECT_EQ(pagination.page(), 2);
+  EXPECT_STREQ(pagination.defaultStyleName(), "pagination");
+}
+
+TEST(UiControls, MeterClampsAndExposesRange) {
+  Meter meter(0.0, 100.0, 70.0);
+  meter.setBounds(Rect::MakeWH(220.0f, 10.0f));
+  EXPECT_EQ(meter.measure({}).height, 10.0f);
+  EXPECT_DOUBLE_EQ(meter.value(), 70.0);
+  ASSERT_TRUE(meter.accessibleRange().has_value());
+  EXPECT_DOUBLE_EQ(meter.accessibleRange()->maximum, 100.0);
+  meter.setValue(120.0);
+  EXPECT_DOUBLE_EQ(meter.value(), 100.0);
+  meter.setThresholds(0.6, 0.85);
+  EXPECT_STREQ(meter.defaultStyleName(), "meter");
+}
+
+TEST(UiControls, ToggleButtonFlipsByPointerAndAccessibility) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  ToggleButton button("Bold", font, false);
+  button.setBounds(Rect::MakeWH(button.measure({}).width, button.measure({}).height));
+  EXPECT_FALSE(button.selected());
+  EXPECT_TRUE(button.onPointerDown(pointerAt(10.0f, 10.0f)));
+  EXPECT_TRUE(button.selected());
+  EXPECT_TRUE(button.performAccessibilityAction(AccessibilityAction::Toggle, {}));
+  EXPECT_FALSE(button.selected());
+  EXPECT_TRUE(button.onKeyDown(key(Key::Space)));
+  EXPECT_TRUE(button.selected());
+  EXPECT_STREQ(button.defaultStyleName(), "togglebutton");
+}
+
+TEST(UiControls, ToggleGroupTracksMultipleSelection) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  ToggleGroup group({ "B", "I", "U" }, font);
+  group.setSelectedIndices({ 0, 2 });
+  EXPECT_EQ(group.selectedIndices().size(), 2u);
+  EXPECT_EQ(group.children().size(), 3u);
+  EXPECT_EQ(group.accessibleValue(), "2");
+  EXPECT_GT(group.measure({}).width, 0.0f);
+  group.setSelectedIndices({ 1 });
+  EXPECT_EQ(group.accessibleValue(), "1");
+  EXPECT_STREQ(group.defaultStyleName(), "togglegroup");
+}
+
+TEST(UiControls, CheckBoxGroupTracksMultipleSelection) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  CheckBoxGroup group({ "One", "Two", "Three" }, font);
+  group.setSelectedIndices({ 2, 0 });
+  EXPECT_EQ(group.selectedIndices().size(), 2u);
+  EXPECT_EQ(group.selectedIndices()[0], 0);
+  EXPECT_EQ(group.selectedIndices()[1], 2);
+  EXPECT_EQ(group.accessibleValue(), "2");
+  EXPECT_EQ(group.children().size(), 3u);
+  group.setSelectedIndices({ 1 });
+  EXPECT_EQ(group.selectedIndices().size(), 1u);
+  EXPECT_EQ(group.accessibleValue(), "1");
+  EXPECT_STREQ(group.defaultStyleName(), "checkboxgroup");
+}
+
+TEST(UiControls, RadioGroupKeepsOneSelection) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  int changed = -1;
+  RadioGroup group({ "One", "Two", "Three" }, font, 1);
+  group.setOnChanged([&changed](int index) { changed = index; });
+  group.setBounds(Rect::MakeWH(group.measure({}).width, group.measure({}).height));
+  EXPECT_EQ(group.selectedIndex(), 1);
+  EXPECT_EQ(group.accessibleValue(), "Two");
+  EXPECT_EQ(group.children().size(), 3u);
+  group.setSelectedIndex(2);
+  EXPECT_EQ(group.selectedIndex(), 2);
+  EXPECT_EQ(group.accessibleValue(), "Three");
+  EXPECT_EQ(changed, 2);
+  EXPECT_STREQ(group.defaultStyleName(), "radiogroup");
+}
+
+TEST(UiControls, RangeSliderClampsAndMovesHandles) {
+  RangeSlider slider(0.0, 100.0, 20.0, 80.0, 1.0);
+  slider.setBounds(Rect::MakeWH(220.0f, 28.0f));
+  EXPECT_EQ(slider.measure({}).height, 28.0f);
+  EXPECT_TRUE(slider.onKeyDown(key(Key::Right)));
+  EXPECT_DOUBLE_EQ(slider.low(), 21.0);
+  EXPECT_TRUE(slider.onKeyDown(key(Key::Tab)));
+  EXPECT_TRUE(slider.onKeyDown(key(Key::Right)));
+  EXPECT_DOUBLE_EQ(slider.high(), 81.0);
+  EXPECT_TRUE(slider.onKeyDown(key(Key::End)));
+  EXPECT_DOUBLE_EQ(slider.high(), 100.0);
+  EXPECT_TRUE(slider.performAccessibilityAction(AccessibilityAction::SetValue, "10,90"));
+  EXPECT_DOUBLE_EQ(slider.low(), 10.0);
+  EXPECT_DOUBLE_EQ(slider.high(), 90.0);
+  EXPECT_STREQ(slider.defaultStyleName(), "rangeslider");
+}
+
+TEST(UiControls, LinkActivatesByPointerKeyboardAndAccessibility) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  int activations = 0;
+  Link link("Open documentation", font, [&activations] { ++activations; });
+  link.setBounds(Rect::MakeWH(link.measure({}).width, 22.0f));
+  EXPECT_EQ(link.accessibleName(), "Open documentation");
+  EXPECT_TRUE(link.onPointerDown(pointerAt(10.0f, 10.0f)));
+  EXPECT_EQ(activations, 1);
+  EXPECT_TRUE(link.onKeyDown(key(Key::Enter)));
+  EXPECT_EQ(activations, 2);
+  EXPECT_TRUE(link.performAccessibilityAction(AccessibilityAction::Invoke, {}));
+  EXPECT_EQ(activations, 3);
+  EXPECT_STREQ(link.defaultStyleName(), "link");
+}
+
+TEST(UiControls, TimeRangeFieldKeepsStartBeforeEnd) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  TimeRangeField range(font, 9, 0, 17, 0);
+  range.setBounds(Rect::MakeWH(300.0f, range.measure({}).height));
+  EXPECT_EQ(range.startHour(), 9);
+  EXPECT_EQ(range.endHour(), 17);
+  range.setEnd(8, 0);
+  EXPECT_EQ(range.startHour(), 8);
+  EXPECT_EQ(range.endHour(), 8);
+  range.setStart(18, 0);
+  EXPECT_EQ(range.endHour(), 18);
+  EXPECT_STREQ(range.defaultStyleName(), "timerangefield");
+}
+
+TEST(UiControls, DateTimeFieldCarriesDateAndTime) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  using namespace std::chrono;
+  DateTimeField field(font, year_month_day{ year{2026}, November, day{24} }, 13, 45);
+  field.setBounds(Rect::MakeWH(300.0f, field.measure({}).height));
+  EXPECT_EQ(field.date(), (year_month_day{ year{2026}, November, day{24} }));
+  EXPECT_EQ(field.hour(), 13);
+  EXPECT_EQ(field.minute(), 45);
+  field.setTime(9, 5);
+  EXPECT_EQ(field.hour(), 9);
+  EXPECT_EQ(field.minute(), 5);
+  field.setDate(year_month_day{ year{2026}, December, day{1} });
+  EXPECT_EQ(field.date(), (year_month_day{ year{2026}, December, day{1} }));
+  EXPECT_STREQ(field.defaultStyleName(), "datetimefield");
+}
+
+TEST(UiControls, DateRangeFieldKeepsStartBeforeEnd) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  using namespace std::chrono;
+  DateRangeField range(font, year_month_day{ year{2026}, November, day{24} },
+    year_month_day{ year{2026}, November, day{30} });
+  range.setBounds(Rect::MakeWH(380.0f, range.measure({}).height));
+  EXPECT_EQ(range.start(), (year_month_day{ year{2026}, November, day{24} }));
+  EXPECT_EQ(range.end(), (year_month_day{ year{2026}, November, day{30} }));
+  range.setEnd(year_month_day{ year{2026}, November, day{20} });
+  EXPECT_EQ(range.start(), (year_month_day{ year{2026}, November, day{20} }));
+  EXPECT_EQ(range.end(), (year_month_day{ year{2026}, November, day{20} }));
+  range.setStart(year_month_day{ year{2026}, December, day{1} });
+  EXPECT_EQ(range.end(), (year_month_day{ year{2026}, December, day{1} }));
+  EXPECT_STREQ(range.defaultStyleName(), "daterangefield");
+}
+
+TEST(UiControls, MultiSelectSummarizesSelection) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  MultiSelect select({ "One", "Two", "Three" }, font);
+  select.setSelectedIndices({ 2, 0 });
+  EXPECT_EQ(select.selectedIndices().size(), 2u);
+  EXPECT_EQ(select.selectedIndices()[0], 0);
+  EXPECT_EQ(select.summary(), "One, Three");
+  EXPECT_EQ(select.accessibleValue(), "One, Three");
+  EXPECT_GT(select.measure({}).height, 28.0f);
+  EXPECT_STREQ(select.defaultStyleName(), "multiselect");
+}
+
+TEST(UiControls, MultiSelectOpensAMenuForKeyboardNavigation) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  Window::Options options;
+  options.headless = true;
+  options.width = 400;
+  options.height = 300;
+  auto window = Window::create(options);
+  ASSERT_NE(window, nullptr);
+  auto root = std::make_shared<Flex>(Axis::Column);
+  auto select = std::make_shared<MultiSelect>(
+    std::vector<std::string>{ "One", "Two", "Three" }, font);
+  select->setBounds(Rect::MakeXYWH(20.0f, 20.0f, 180.0f, 32.0f));
+  root->addChild(select);
+  window->setRoot(root);
+  ASSERT_TRUE(window->renderFrame());
+  EXPECT_TRUE(select->onKeyDown(key(Key::Down)));
+  std::shared_ptr<Menu> menu;
+  for (const auto& child: root->children()) {
+    menu = std::dynamic_pointer_cast<Menu>(child);
+    if (menu != nullptr) break;
+  }
+  ASSERT_NE(menu, nullptr);
+  EXPECT_TRUE(menu->isOpen());
+  EXPECT_TRUE(window->keyDown(key(Key::Enter)));
+  EXPECT_TRUE(std::find(select->selectedIndices().begin(), select->selectedIndices().end(), 0) !=
+    select->selectedIndices().end());
+}
+
+TEST(UiControls, RatingSelectsStarsWithPointerAndKeys) {
+  Rating rating(5, 2);
+  rating.setBounds(Rect::MakeWH(rating.measure({}).width, 20.0f));
+  EXPECT_EQ(rating.accessibleValue(), "2");
+  EXPECT_TRUE(rating.onPointerDown(pointerAt(10.0f, 10.0f)));
+  EXPECT_EQ(rating.value(), 1);
+  EXPECT_TRUE(rating.onPointerUp(pointerAt(10.0f, 10.0f)));
+  EXPECT_TRUE(rating.onKeyDown(key(Key::End)));
+  EXPECT_EQ(rating.value(), 5);
+  EXPECT_TRUE(rating.performAccessibilityAction(AccessibilityAction::SetValue, "3"));
+  EXPECT_EQ(rating.value(), 3);
+  EXPECT_EQ(rating.defaultStyleName(), "rating");
+  EXPECT_EQ(rating.accessibleRange()->maximum, 5.0);
+  rating.setReadOnly(true);
+  EXPECT_TRUE(rating.readOnly());
+  EXPECT_FALSE(rating.focusable());
+  EXPECT_TRUE(rating.onPointerDown(pointerAt(10.0f, 10.0f)));
+  EXPECT_EQ(rating.value(), 3);
+  EXPECT_FALSE(rating.performAccessibilityAction(AccessibilityAction::SetValue, "5"));
+
+  Rating half(5, 0);
+  half.setHalfSteps(true);
+  double halfChange = 0.0;
+  half.setOnRatingChanged([&halfChange](double value) { halfChange = value; });
+  half.setRating(3.5);
+  EXPECT_DOUBLE_EQ(halfChange, 3.5);
+  EXPECT_DOUBLE_EQ(half.rating(), 3.5);
+  EXPECT_EQ(half.accessibleValue(), "3.5");
+  EXPECT_EQ(half.value(), 3);
+  EXPECT_DOUBLE_EQ(half.accessibleRange()->step, 0.5);
+  half.setRating(3.8);
+  EXPECT_DOUBLE_EQ(half.rating(), 4.0);
+  half.setHalfSteps(false);
+  EXPECT_DOUBLE_EQ(half.rating(), 4.0);
+
+  Rating resized(5, 5);
+  resized.setStars(3);
+  EXPECT_EQ(resized.value(), 3);
+  EXPECT_EQ(resized.accessibleValue(), "3");
+}
+
 TEST(UiControls, ColorPickerSelectsASwatch) {
   ColorPicker picker({ Color::MakeRGBA8(10, 20, 30, 255),
     Color::MakeRGBA8(40, 50, 60, 255) });
@@ -158,6 +928,15 @@ TEST(UiControls, ColorPickerSelectsASwatch) {
   EXPECT_EQ(picker.selected(), 1);
   EXPECT_NEAR(selected.red, 40.0f / 255.0f, 1e-5f);
   EXPECT_NEAR(picker.selectedColor().green, 50.0f / 255.0f, 1e-5f);
+  EXPECT_EQ(picker.accessibleName(), "Color");
+  EXPECT_EQ(picker.accessibleValue(), "#28323C");
+  EXPECT_TRUE(picker.performAccessibilityAction(AccessibilityAction::SetValue, "#0A141E"));
+  EXPECT_EQ(picker.selected(), 0);
+  EXPECT_EQ(picker.accessibleValue(), "#0A141E");
+  EXPECT_TRUE(picker.performAccessibilityAction(AccessibilityAction::SetValue, "#FF0000"));
+  EXPECT_EQ(picker.accessibleValue(), "#FF0000");
+  EXPECT_GT(picker.color().red, 0.99f);
+  EXPECT_STREQ(picker.defaultStyleName(), "colorpicker");
 }
 
 TEST(UiControls, HsvColorPickerTracksHueAndSaturation) {
@@ -327,6 +1106,23 @@ TEST(UiControls, CheckBoxTogglesByClickAndKeyboard) {
   EXPECT_FALSE(check.checked());
 }
 
+TEST(UiControls, CheckBoxSupportsIndeterminate) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  CheckBox check("Select all", font);
+  check.setBounds(Rect::MakeWH(180.0f, 28.0f));
+  check.setIndeterminate(true);
+  EXPECT_TRUE(check.indeterminate());
+  EXPECT_EQ(check.accessibleValue(), "Mixed");
+  check.onPointerDown(pointerAt(20.0f, 14.0f));
+  check.onPointerUp(pointerAt(20.0f, 14.0f));
+  EXPECT_FALSE(check.indeterminate());
+  EXPECT_TRUE(check.checked());
+  EXPECT_TRUE(check.accessibleValue().empty());
+}
+
 TEST(UiControls, ToggleAndRadioUseTheSameActivationContract) {
   const auto font = testFont();
   if (font == nullptr) {
@@ -367,6 +1163,10 @@ TEST(UiControls, SegmentedControlSelectsByPositionAndArrowKey) {
   control.onKeyDown(key(Key::Right));
   EXPECT_EQ(control.selectedIndex(), 0);
   control.onKeyDown(key(Key::Left));
+  EXPECT_EQ(control.selectedIndex(), 2);
+  control.onKeyDown(key(Key::Home));
+  EXPECT_EQ(control.selectedIndex(), 0);
+  control.onKeyDown(key(Key::End));
   EXPECT_EQ(control.selectedIndex(), 2);
 }
 
@@ -427,6 +1227,753 @@ TEST(UiControls, NumberFieldStepsAndCommitsTypedValues) {
   EXPECT_DOUBLE_EQ(field.value(), 5.0);
 }
 
+TEST(UiControls, DateFieldOpensTheCrossPlatformCalendar) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  Window::Options options;
+  options.headless = true;
+  options.width = 400;
+  options.height = 300;
+  auto window = Window::create(options);
+  ASSERT_NE(window, nullptr);
+  auto root = std::make_shared<Flex>(Axis::Column);
+  auto field = std::make_shared<DateField>(font, std::chrono::year_month_day{
+    std::chrono::year{2026}, std::chrono::November, std::chrono::day{24} });
+  field->setBounds(Rect::MakeXYWH(20.0f, 20.0f, 180.0f, 32.0f));
+  root->addChild(field);
+  window->setRoot(root);
+  ASSERT_TRUE(window->renderFrame());
+  const size_t before = root->children().size();
+  EXPECT_TRUE(field->onPointerDown(pointerAt(40.0f, 36.0f)));
+  ASSERT_TRUE(window->renderFrame());
+  EXPECT_GT(root->children().size(), before);
+  std::shared_ptr<Popup> popup;
+  for (const auto& child: root->children()) {
+    popup = std::dynamic_pointer_cast<Popup>(child);
+    if (popup != nullptr) break;
+  }
+  ASSERT_NE(popup, nullptr);
+  ASSERT_TRUE(popup->isOpen());
+  auto* calendar = dynamic_cast<Calendar*>(window->focusedLayer());
+  ASSERT_NE(calendar, nullptr);
+  EXPECT_TRUE(window->keyDown(key(Key::Right)));
+  EXPECT_EQ(static_cast<unsigned>(calendar->date().day()), 25u);
+  EXPECT_TRUE(window->keyDown(key(Key::Escape)));
+  EXPECT_FALSE(popup->isOpen());
+  EXPECT_EQ(window->focusedLayer(), field.get());
+}
+
+TEST(UiControls, DateFieldFormatsAndMovesByDay) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  DateField field(font, std::chrono::year_month_day{ std::chrono::year{2026},
+    std::chrono::November, std::chrono::day{24} });
+  field.setFormat(coral::ui::dateFormatIso());
+  EXPECT_EQ(field.text(), "2026-11-24");
+  int changes = 0;
+  field.setOnChanged([&changes](std::chrono::year_month_day) { ++changes; });
+  field.onFocusChanged(true);
+  field.onKeyDown(key(Key::Up));
+  const auto next = field.date();
+  EXPECT_EQ(static_cast<int>(next.year()), 2026);
+  EXPECT_EQ(static_cast<unsigned>(next.month()), 11u);
+  EXPECT_EQ(static_cast<unsigned>(next.day()), 25u);
+  EXPECT_EQ(changes, 1);
+  EXPECT_EQ(field.text(), "2026-11-25");
+}
+
+TEST(UiControls, SegmentedAndTabsExposeSelectedValues) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  SegmentedControl segmented({ "One", "Two" }, font);
+  segmented.setSelectedIndex(1);
+  EXPECT_EQ(segmented.accessibleValue(), "Two");
+  EXPECT_TRUE(segmented.performAccessibilityAction(AccessibilityAction::Select, "0"));
+  EXPECT_EQ(segmented.selectedIndex(), 0);
+
+  TabBar tabs(font);
+  tabs.addTab("Alpha", nullptr);
+  tabs.addTab("Beta", nullptr);
+  tabs.setActiveTab(1);
+  const AccessibilityNode segmentedTree = accessibilityTree(segmented);
+  ASSERT_EQ(segmentedTree.children.size(), 2u);
+  EXPECT_EQ(segmentedTree.children[0].role, AccessibilityRole::ListItem);
+  EXPECT_TRUE(segmentedTree.children[0].selected);
+  ASSERT_GE(segmented.children().size(), 2u);
+  EXPECT_TRUE(segmented.children()[1]->performAccessibilityAction(
+    AccessibilityAction::Select, {}));
+  EXPECT_EQ(segmented.selectedIndex(), 1);
+  EXPECT_TRUE(segmented.children()[0]->performAccessibilityAction(
+    AccessibilityAction::Invoke, {}));
+  EXPECT_EQ(segmented.selectedIndex(), 0);
+  const AccessibilityNode tabsTree = accessibilityTree(tabs);
+  ASSERT_GE(tabsTree.children.size(), 2u);
+  EXPECT_EQ(tabsTree.children[0].role, AccessibilityRole::ListItem);
+  EXPECT_EQ(tabs.accessibleValue(), "Beta");
+  ASSERT_FALSE(tabs.children().empty());
+  EXPECT_TRUE(tabs.children()[0]->performAccessibilityAction(
+    AccessibilityAction::Select, {}));
+  EXPECT_EQ(tabs.activeIndex(), 0);
+  EXPECT_EQ(tabs.accessibleValue(), "Alpha");
+  EXPECT_TRUE(tabs.children()[1]->performAccessibilityAction(
+    AccessibilityAction::Invoke, {}));
+  EXPECT_EQ(tabs.activeIndex(), 1);
+  EXPECT_TRUE(tabs.performAccessibilityAction(AccessibilityAction::Select, "Alpha"));
+  EXPECT_EQ(tabs.activeIndex(), 0);
+  EXPECT_EQ(tabs.accessibleValue(), "Alpha");
+}
+
+TEST(UiControls, SelectChangesItsOption) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  Select select({ "Alpha", "Beta", "Gamma" }, font);
+  select.setBounds(Rect::MakeWH(180.0f, 32.0f));
+  EXPECT_EQ(select.selectedText(), "Alpha");
+  select.setSelectedIndex(2);
+  EXPECT_EQ(select.selectedIndex(), 2);
+  EXPECT_EQ(select.selectedText(), "Gamma");
+  int changes = 0;
+  select.setOnChanged([&changes](int) { ++changes; });
+  select.onFocusChanged(true);
+  select.onKeyDown(key(Key::Down));
+  EXPECT_EQ(select.selectedIndex(), 0);
+  EXPECT_EQ(changes, 1);
+  Select empty({}, font);
+  EXPECT_TRUE(empty.selectedText().empty());
+  EXPECT_EQ(empty.placeholder(), "Select...");
+  select.setEnabled(false);
+  EXPECT_TRUE(select.onPointerDown(pointerAt(20.0f, 16.0f)));
+  EXPECT_FALSE(select.onKeyDown(key(Key::Down)));
+  select.setEnabled(true);
+  select.setSelectedIndex(1);
+  EXPECT_EQ(select.accessibleValue(), "Beta");
+}
+
+TEST(UiControls, SelectOpensAMenuAndActivatesAnItem) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  Window::Options options;
+  options.headless = true;
+  options.width = 400;
+  options.height = 300;
+  auto window = Window::create(options);
+  ASSERT_NE(window, nullptr);
+  auto root = std::make_shared<Flex>(Axis::Column);
+  auto select = std::make_shared<Select>(std::vector<std::string>{ "Alpha", "Beta", "Gamma" }, font);
+  select->setBounds(Rect::MakeXYWH(20.0f, 20.0f, 180.0f, 32.0f));
+  root->addChild(select);
+  window->setRoot(root);
+  ASSERT_TRUE(window->renderFrame());
+  int changed = -1;
+  select->setSelectedIndex(1);
+  select->setOnChanged([&changed](int index) { changed = index; });
+  EXPECT_TRUE(select->onPointerDown(pointerAt(40.0f, 36.0f)));
+  ASSERT_TRUE(window->renderFrame());
+  std::shared_ptr<Menu> menu;
+  for (const auto& child: root->children()) {
+    menu = std::dynamic_pointer_cast<Menu>(child);
+    if (menu != nullptr) break;
+  }
+  ASSERT_NE(menu, nullptr);
+  ASSERT_TRUE(menu->isOpen());
+  Point click{ menu->panelBounds().getLeft() + 8.0f, menu->panelBounds().getTop() + 8.0f };
+  int item = menu->itemAt(click);
+  for (int offset = 1; item < 0 && offset < 40; ++offset) {
+    click.y = menu->panelBounds().getTop() + static_cast<float>(offset);
+    item = menu->itemAt(click);
+  }
+  ASSERT_GE(item, 0);
+  PointerEvent down = pointerAt(click.x, click.y);
+  EXPECT_TRUE(window->pointerDown(down));
+  EXPECT_FALSE(menu->isOpen());
+  EXPECT_EQ(changed, item);
+}
+
+TEST(UiControls, SplitButtonRunsPrimaryAndAlternativeActions) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  Window::Options options;
+  options.headless = true;
+  options.width = 400;
+  options.height = 300;
+  auto window = Window::create(options);
+  ASSERT_NE(window, nullptr);
+  auto root = std::make_shared<Flex>(Axis::Column);
+  int primary = 0;
+  int alternative = -1;
+  auto split = std::make_shared<SplitButton>("Save", font,
+    std::vector<std::string>{ "Save As", "Export" });
+  split->setBounds(Rect::MakeXYWH(20.0f, 20.0f, 180.0f, 32.0f));
+  split->setOnClick([&primary] { ++primary; });
+  split->setOnOption([&alternative](int index, std::string_view) { alternative = index; });
+  root->addChild(split);
+  window->setRoot(root);
+  ASSERT_TRUE(window->renderFrame());
+  ASSERT_TRUE(split->onPointerDown(pointerAt(40.0f, 36.0f)));
+  EXPECT_EQ(primary, 1);
+  ASSERT_TRUE(split->onPointerDown(pointerAt(188.0f, 36.0f)));
+  ASSERT_TRUE(window->renderFrame());
+  std::shared_ptr<Menu> menu;
+  for (const auto& child: root->children()) {
+    menu = std::dynamic_pointer_cast<Menu>(child);
+    if (menu != nullptr) break;
+  }
+  ASSERT_NE(menu, nullptr);
+  Point click{ menu->panelBounds().getLeft() + 8.0f, menu->panelBounds().getTop() + 8.0f };
+  if (menu->itemAt(click) < 0) {
+    click.y = menu->panelBounds().getTop() + 20.0f;
+  }
+  ASSERT_GE(menu->itemAt(click), 0);
+  window->pointerDown(pointerAt(click.x, click.y));
+  EXPECT_EQ(alternative, 0);
+}
+
+TEST(UiControls, ComboBoxEditsAndSelectsOptions) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  ComboBox combo({ "Alpha", "Beta", "Gamma" }, font, "custom");
+  combo.setBounds(Rect::MakeWH(180.0f, 32.0f));
+  EXPECT_EQ(combo.text(), "custom");
+  int changed = -1;
+  std::string changedText;
+  combo.setOnChanged([&changed, &changedText](int index, std::string_view text) {
+    changed = index;
+    changedText = std::string(text);
+  });
+  combo.onFocusChanged(true);
+  EXPECT_TRUE(combo.onKeyDown(key(Key::Down)));
+  EXPECT_EQ(changed, 0);
+  EXPECT_EQ(changedText, "Alpha");
+  EXPECT_EQ(combo.text(), "Alpha");
+  combo.setSelectedIndex(2);
+  EXPECT_EQ(combo.text(), "Gamma");
+  combo.setText("typed");
+  EXPECT_EQ(combo.text(), "typed");
+  EXPECT_EQ(combo.accessibleValue(), "typed");
+  combo.setText("");
+  EXPECT_TRUE(combo.onTextInput(U'x'));
+  EXPECT_EQ(combo.text(), "x");
+  EXPECT_EQ(combo.accessibleValue(), "x");
+}
+
+TEST(UiControls, TimeFieldFormatsAndNudgesTime) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  TimeField field(font, 13, 45, true);
+  TimeField localized(font, 13, 45);
+  EXPECT_EQ(localized.uses24HourClock(), currentSystemLocale().uses24HourClock);
+  field.setBounds(Rect::MakeWH(150.0f, 32.0f));
+  EXPECT_EQ(field.text(), "13:45");
+  int hour = 0;
+  int minute = 0;
+  int changes = 0;
+  field.setOnChanged([&](int h, int m) {
+    hour = h;
+    minute = m;
+    ++changes;
+  });
+  EXPECT_TRUE(field.onKeyDown(key(Key::Up)));
+  EXPECT_EQ(field.text(), "13:46");
+  EXPECT_EQ(hour, 13);
+  EXPECT_EQ(minute, 46);
+  EXPECT_TRUE(field.onKeyDown(key(Key::PageUp)));
+  EXPECT_EQ(field.text(), "14:46");
+  field.setUse24HourClock(false);
+  EXPECT_EQ(field.text(), "2:46 PM");
+  EXPECT_TRUE(field.performAccessibilityAction(AccessibilityAction::SetValue, "11:05 PM"));
+  EXPECT_EQ(field.hour(), 23);
+  EXPECT_EQ(field.minute(), 5);
+  EXPECT_EQ(field.text(), "11:05 PM");
+  EXPECT_GE(changes, 3);
+}
+
+TEST(UiControls, TimeFieldOpensAndDismissesItsPicker) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  Window::Options options;
+  options.headless = true;
+  options.width = 400;
+  options.height = 300;
+  auto window = Window::create(options);
+  ASSERT_NE(window, nullptr);
+  auto root = std::make_shared<Flex>(Axis::Column);
+  auto field = std::make_shared<TimeField>(font, 13, 45, true);
+  field->setBounds(Rect::MakeXYWH(20.0f, 20.0f, 174.0f, 32.0f));
+  root->addChild(field);
+  window->setRoot(root);
+  ASSERT_TRUE(window->renderFrame());
+  ASSERT_TRUE(field->onPointerDown(pointerAt(186.0f, 36.0f)));
+  ASSERT_TRUE(window->renderFrame());
+  std::shared_ptr<Popup> popup;
+  for (const auto& child: root->children()) {
+    popup = std::dynamic_pointer_cast<Popup>(child);
+    if (popup != nullptr) break;
+  }
+  ASSERT_NE(popup, nullptr);
+  EXPECT_TRUE(popup->isOpen());
+  EXPECT_NE(window->focusedLayer(), nullptr);
+  EXPECT_TRUE(window->keyDown(key(Key::Right)));
+  EXPECT_EQ(field->minute(), 46);
+  EXPECT_EQ(field->text(), "13:46");
+  EXPECT_TRUE(window->keyDown(key(Key::Escape)));
+  EXPECT_FALSE(popup->isOpen());
+  EXPECT_EQ(window->focusedLayer(), field.get());
+  ASSERT_TRUE(field->onPointerDown(pointerAt(186.0f, 36.0f)));
+  ASSERT_TRUE(window->renderFrame());
+  EXPECT_TRUE(window->pointerDown(pointerAt(360.0f, 260.0f)));
+  EXPECT_FALSE(popup->isOpen());
+}
+
+TEST(UiControls, TimePickerExposesItsAccessibleTime) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  TimePicker picker(font, 13, 45, true);
+  EXPECT_EQ(picker.valueText(), "13:45");
+  EXPECT_EQ(picker.accessibleValue(), "13:45");
+  picker.setTime(7, 5);
+  EXPECT_EQ(picker.accessibleValue(), "07:05");
+  picker.setUse24HourClock(false);
+  EXPECT_EQ(picker.accessibleValue(), "7:05 AM");
+  int done = 0;
+  picker.setOnDone([&done] { ++done; });
+  EXPECT_TRUE(picker.onKeyDown(key(Key::Enter)));
+  EXPECT_EQ(done, 1);
+}
+
+TEST(UiControls, StatusBarCarriesLeftAndRightText) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  StatusBar bar(font, "Ready", "1 item");
+  EXPECT_EQ(bar.leftText(), "Ready");
+  EXPECT_EQ(bar.rightText(), "1 item");
+  EXPECT_EQ(bar.measure({ 400.0f, 0.0f }).height, 24.0f);
+  EXPECT_EQ(bar.defaultStyleName(), "statusbar");
+  bar.setLeftText("Busy");
+  EXPECT_EQ(bar.accessibleValue(), "Busy");
+  bar.setHeight(28.0f);
+  EXPECT_EQ(bar.height(), 28.0f);
+  auto trailing = std::make_shared<Button>("Log", font);
+  bar.setTrailingItem(trailing);
+  bar.setBounds(Rect::MakeWH(400.0f, 28.0f));
+  bar.layout();
+  EXPECT_GT(trailing->bounds().getLeft(), 300.0f);
+  auto help = std::make_shared<Button>("Help", font);
+  bar.addTrailingItem(help);
+  bar.layout();
+  EXPECT_EQ(bar.trailingItemCount(), 2);
+  EXPECT_GT(help->bounds().getLeft(), trailing->bounds().getLeft());
+  auto leading = std::make_shared<Button>("Info", font);
+  bar.addLeadingItem(leading);
+  bar.layout();
+  EXPECT_EQ(bar.leadingItemCount(), 1);
+  EXPECT_LT(leading->bounds().getLeft(), trailing->bounds().getLeft());
+  EXPECT_EQ(leading->tabOrder(), 0);
+  EXPECT_EQ(trailing->tabOrder(), 1);
+  EXPECT_EQ(help->tabOrder(), 2);
+}
+
+TEST(UiControls, ToolbarLaysOutFixedAndFlexibleItems) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  Toolbar toolbar;
+  auto fixed = std::make_shared<Button>("Open", font);
+  auto flexible = std::make_shared<Button>("Wide", font);
+  toolbar.addItem(fixed);
+  toolbar.addSeparator();
+  toolbar.addItem(flexible, true);
+  toolbar.setBounds(Rect::MakeWH(320.0f, 44.0f));
+  toolbar.layout();
+  EXPECT_EQ(toolbar.itemCount(), 3);
+  EXPECT_GT(fixed->bounds().getWidth(), 0.0f);
+  EXPECT_GT(flexible->bounds().getWidth(), fixed->bounds().getWidth());
+  EXPECT_EQ(toolbar.defaultStyleName(), "toolbar");
+  toolbar.setBounds(Rect::MakeWH(320.0f, 120.0f));
+  toolbar.layout();
+  EXPECT_LT(fixed->bounds().getHeight(), 100.0f);
+  toolbar.setHeight(52.0f);
+  toolbar.layout();
+  EXPECT_EQ(toolbar.height(), 52.0f);
+  EXPECT_LT(fixed->bounds().getHeight(), 52.0f);
+
+  Toolbar narrow(font);
+  narrow.setOverflowMenu(std::make_shared<Menu>(font));
+  for (int index = 0; index < 8; ++index) {
+    narrow.addItem(std::make_shared<Button>("Item", font));
+  }
+  narrow.setBounds(Rect::MakeWH(160.0f, 44.0f));
+  narrow.layout();
+  EXPECT_TRUE(narrow.hasOverflow());
+
+  Toolbar automatic(font);
+  for (int index = 0; index < 8; ++index) {
+    automatic.addItem(std::make_shared<Button>("Item", font), false, "Item", [] {});
+  }
+  automatic.setBounds(Rect::MakeWH(160.0f, 44.0f));
+  automatic.layout();
+  EXPECT_TRUE(automatic.hasOverflow());
+  ASSERT_NE(automatic.overflowMenu(), nullptr);
+  EXPECT_EQ(automatic.overflowMenu()->itemLabel(0), "Item");
+  auto overflowMenu = automatic.overflowMenu();
+  automatic.clear();
+  EXPECT_TRUE(overflowMenu->itemLabel(0).empty());
+}
+
+TEST(UiControls, BreadcrumbReportsTheClickedCrumb) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  Breadcrumb breadcrumb({ "Home", "Library", "Document" }, font);
+  breadcrumb.setBounds(Rect::MakeWH(breadcrumb.measure({}).width, 28.0f));
+  EXPECT_EQ(breadcrumb.accessibleValue(), "Document");
+  int index = -1;
+  std::string title;
+  breadcrumb.setOnSelect([&](int chosen, std::string_view text) {
+    index = chosen;
+    title = std::string(text);
+  });
+  EXPECT_TRUE(breadcrumb.onPointerDown(pointerAt(4.0f, 14.0f)));
+  EXPECT_EQ(index, 0);
+  EXPECT_EQ(title, "Home");
+  EXPECT_EQ(breadcrumb.accessibleValue(), "Home");
+  breadcrumb.onFocusChanged(true);
+  EXPECT_TRUE(breadcrumb.onKeyDown(key(Key::Right)));
+  EXPECT_EQ(breadcrumb.currentIndex(), 1);
+  EXPECT_TRUE(breadcrumb.onKeyDown(key(Key::Enter)));
+  EXPECT_EQ(index, 1);
+  EXPECT_EQ(title, "Library");
+  EXPECT_EQ(breadcrumb.accessibleValue(), "Library");
+}
+
+TEST(UiControls, ChipRemovesByClickOrDelete) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  Chip chip("Filter", font);
+  chip.setBounds(Rect::MakeWH(chip.measure({}).width, 24.0f));
+  int removed = 0;
+  chip.setOnRemove([&removed] { ++removed; });
+  EXPECT_TRUE(chip.onPointerDown(pointerAt(chip.bounds().getRight() - 4.0f, 12.0f)));
+  EXPECT_EQ(removed, 1);
+  chip.onFocusChanged(true);
+  EXPECT_TRUE(chip.onKeyDown(key(Key::Delete)));
+  EXPECT_EQ(removed, 2);
+  chip.setRemovable(false);
+  EXPECT_FALSE(chip.removable());
+  EXPECT_TRUE(chip.onPointerDown(pointerAt(chip.bounds().getRight() - 4.0f, 12.0f)));
+  EXPECT_EQ(removed, 2);
+  chip.setSelected(true);
+  EXPECT_TRUE(chip.selected());
+  EXPECT_TRUE(chip.accessibleSelected());
+  chip.setSelected(false);
+  EXPECT_FALSE(chip.accessibleSelected());
+  chip.setVariant(ChipVariant::Danger);
+  EXPECT_EQ(chip.variant(), ChipVariant::Danger);
+  EXPECT_EQ(chip.icon(), nullptr);
+}
+
+TEST(UiControls, DividerMeasuresBothOrientations) {
+  Divider horizontal(Divider::Orientation::Horizontal);
+  EXPECT_EQ(horizontal.measure({ 200.0f, 100.0f }).height, 1.0f);
+  Divider vertical(Divider::Orientation::Vertical);
+  vertical.setThickness(2.0f);
+  EXPECT_EQ(vertical.measure({ 200.0f, 100.0f }).width, 2.0f);
+  EXPECT_EQ(vertical.orientation(), Divider::Orientation::Vertical);
+  EXPECT_STREQ(vertical.defaultStyleName(), "divider");
+}
+
+TEST(UiControls, BannerRunsActionAndDismiss) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  Banner banner("Saved", font, BannerSeverity::Success);
+  banner.setAction("Undo", [] {});
+  banner.setBounds(Rect::MakeWH(360.0f, 40.0f));
+  EXPECT_EQ(banner.accessibleValue(), "Saved");
+  EXPECT_TRUE(banner.measure({}).height >= 34.0f);
+  banner.setSeverity(BannerSeverity::Danger);
+  EXPECT_EQ(banner.severity(), BannerSeverity::Danger);
+  EXPECT_EQ(banner.icon(), nullptr);
+  int dismissed = 0;
+  banner.setOnDismiss([&dismissed] { ++dismissed; });
+  EXPECT_TRUE(banner.onKeyDown(key(Key::Escape)));
+  EXPECT_FALSE(banner.visible());
+  EXPECT_EQ(dismissed, 1);
+  banner.playEnterAnimation();
+  EXPECT_FLOAT_EQ(banner.opacity(), 0.0f);
+  banner.onFrame(std::chrono::steady_clock::now() + std::chrono::milliseconds(250));
+  EXPECT_GT(banner.opacity(), 0.5f);
+  banner.setVisible(true);
+  banner.playExitAnimation();
+  EXPECT_TRUE(banner.hasRunningAnimation());
+  banner.onFrame(std::chrono::steady_clock::now() + std::chrono::milliseconds(250));
+  EXPECT_FALSE(banner.hasRunningAnimation());
+  EXPECT_FALSE(banner.visible());
+  EXPECT_EQ(dismissed, 2);
+}
+
+TEST(UiControls, AvatarMeasuresAndReportsInitials) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  Avatar avatar("CL", font, 40.0f);
+  EXPECT_EQ(avatar.initials(), "CL");
+  EXPECT_EQ(avatar.accessibleValue(), "CL");
+  EXPECT_EQ(avatar.measure({}).width, 40.0f);
+  EXPECT_EQ(avatar.measure({}).height, 40.0f);
+  EXPECT_EQ(avatar.image(), nullptr);
+  avatar.setInitials("AB");
+  EXPECT_EQ(avatar.accessibleValue(), "AB");
+  avatar.setStatusVisible(true);
+  EXPECT_TRUE(avatar.statusVisible());
+  avatar.setStatusColor(graphics::Color::MakeRGBA8(255, 80, 80, 255));
+}
+
+TEST(UiControls, SpinnerExposesLoadingSemantics) {
+  Spinner spinner;
+  EXPECT_EQ(spinner.accessibleRole(), AccessibilityRole::ProgressIndicator);
+  EXPECT_EQ(spinner.accessibleValue(), "Loading");
+  EXPECT_EQ(spinner.defaultStyleName(), "spinner");
+  spinner.setColor(graphics::Color::MakeRGBA8(255, 100, 50, 255));
+  EXPECT_TRUE(spinner.spinning() == false);
+  spinner.start();
+  EXPECT_TRUE(spinner.spinning());
+}
+
+TEST(UiControls, SkeletonPulsesAndMeasures) {
+  Skeleton skeleton(120.0f, 12.0f);
+  EXPECT_EQ(skeleton.measure({}).width, 120.0f);
+  EXPECT_EQ(skeleton.measure({}).height, 12.0f);
+  EXPECT_TRUE(skeleton.animating());
+  EXPECT_TRUE(skeleton.hasRunningAnimation());
+  skeleton.onFrame(std::chrono::steady_clock::now());
+  skeleton.onFrame(std::chrono::steady_clock::now() + std::chrono::milliseconds(100));
+  EXPECT_LT(skeleton.opacity(), 1.0f);
+  skeleton.setAnimating(false);
+  EXPECT_FALSE(skeleton.animating());
+  EXPECT_FALSE(skeleton.hasRunningAnimation());
+  EXPECT_FLOAT_EQ(skeleton.opacity(), 1.0f);
+  skeleton.setShape(Skeleton::Shape::Circle);
+  EXPECT_EQ(skeleton.shape(), Skeleton::Shape::Circle);
+  skeleton.setSize(120.0f, 10.0f);
+  skeleton.setLines(3);
+  skeleton.setLineGap(5.0f);
+  EXPECT_EQ(skeleton.lines(), 3);
+  EXPECT_EQ(skeleton.measure({}).height, 40.0f);
+}
+
+TEST(UiControls, BadgeMeasuresItsText) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  Badge badge("12", font);
+  const Size size = badge.measure({});
+  EXPECT_GT(size.width, 0.0f);
+  EXPECT_GE(size.height, 18.0f);
+  EXPECT_EQ(badge.text(), "12");
+  EXPECT_EQ(badge.accessibleValue(), "12");
+  EXPECT_EQ(badge.defaultStyleName(), "badge");
+  badge.setText("999+");
+  EXPECT_EQ(badge.accessibleValue(), "999+");
+  badge.setDot(true);
+  EXPECT_TRUE(badge.dot());
+  EXPECT_EQ(badge.measure({}).width, 10.0f);
+  EXPECT_EQ(badge.measure({}).height, 10.0f);
+  EXPECT_EQ(badge.icon(), nullptr);
+}
+
+TEST(UiControls, CardLaysOutItsTitleAndContent) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  auto content = std::make_shared<TextLayer>("Body", font);
+  Card card(font, "Title", content);
+  auto headerAction = std::make_shared<Button>("More", font);
+  card.setHeaderAction(headerAction);
+  const Size measured = card.measure({ 320.0f, 240.0f });
+  EXPECT_GT(measured.height, content->measure({}).height);
+  card.setBounds(Rect::MakeWH(measured.width, measured.height));
+  card.layout();
+  EXPECT_GT(content->bounds().getTop(), card.bounds().getTop());
+  EXPECT_LT(headerAction->bounds().getRight(), card.bounds().getRight());
+  EXPECT_GE(headerAction->bounds().getTop(), card.bounds().getTop());
+  EXPECT_EQ(card.defaultStyleName(), "card");
+  card.setHeaderHeight(40.0f);
+  card.setRadius(8.0f);
+  card.setBounds(Rect::MakeWH(300.0f, 160.0f));
+  card.layout();
+  EXPECT_GT(card.measure({ 300.0f, 0.0f }).height, 40.0f);
+}
+
+TEST(UiControls, EmptyStateLaysOutTitleAndAction) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  auto action = std::make_shared<Button>("Create", font);
+  EmptyState empty(font, "Nothing here", "Create the first item", action);
+  const Size measured = empty.measure({ 300.0f, 200.0f });
+  EXPECT_GT(measured.height, 40.0f);
+  empty.setBounds(Rect::MakeWH(measured.width, measured.height));
+  empty.layout();
+  EXPECT_GT(action->bounds().getTop(), empty.bounds().getTop());
+  EXPECT_EQ(empty.accessibleName(), "Nothing here");
+  EXPECT_EQ(empty.defaultStyleName(), "emptystate");
+  EXPECT_EQ(empty.icon(), nullptr);
+  auto content = std::make_shared<TextLayer>("Extra", font);
+  empty.setContent(content);
+  EXPECT_GT(empty.measure({ 300.0f, 200.0f }).height, measured.height);
+  empty.layout();
+  EXPECT_GT(content->bounds().getWidth(), 0.0f);
+}
+
+TEST(UiControls, ExpanderTogglesItsContent) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  auto content = std::make_shared<TextLayer>("Body", font);
+  Expander expander("Details", font, content);
+  expander.setBounds(Rect::MakeWH(240.0f, expander.measure({}).height));
+  EXPECT_TRUE(expander.expanded());
+  EXPECT_EQ(expander.accessibleValue(), "Expanded");
+  const float openHeight = expander.measuredSize().height;
+  int changes = 0;
+  expander.setOnChanged([&changes](bool) { ++changes; });
+  EXPECT_TRUE(expander.onKeyDown(key(Key::Left)));
+  EXPECT_FALSE(expander.expanded());
+  EXPECT_EQ(expander.accessibleValue(), "Collapsed");
+  EXPECT_EQ(changes, 1);
+  EXPECT_TRUE(expander.onPointerDown(pointerAt(20.0f, 10.0f)));
+  EXPECT_TRUE(expander.expanded());
+  EXPECT_GE(expander.measure({}).height, openHeight);
+  EXPECT_TRUE(expander.performAccessibilityAction(AccessibilityAction::Toggle, {}));
+  EXPECT_FALSE(expander.expanded());
+  expander.setHeaderHeight(40.0f);
+  EXPECT_EQ(expander.headerHeight(), 40.0f);
+  EXPECT_GE(expander.measure({ 240.0f, 0.0f }).height, 40.0f);
+}
+
+TEST(UiControls, ExpanderAnimatesContentHeight) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  auto content = std::make_shared<TextLayer>("Body", font);
+  Expander expander("Details", font, content);
+  expander.setAnimated(true);
+  expander.setBounds(Rect::MakeWH(240.0f, 120.0f));
+  expander.layout();
+  const auto start = std::chrono::steady_clock::now();
+  expander.setExpanded(false);
+  EXPECT_TRUE(expander.hasRunningAnimation());
+  EXPECT_GT(expander.measure({}).height, 0.0f);
+  expander.onFrame(start + std::chrono::milliseconds(200));
+  EXPECT_FALSE(expander.hasRunningAnimation());
+  EXPECT_FALSE(content->visible());
+  expander.setExpanded(true);
+  expander.onFrame(start + std::chrono::milliseconds(400));
+  EXPECT_TRUE(content->visible());
+}
+
+TEST(UiControls, CalendarMovesAndSelectsDates) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  Calendar calendar(std::chrono::year_month_day{ std::chrono::year{2026},
+    std::chrono::November, std::chrono::day{24} }, font);
+  calendar.setBounds(Rect::MakeWH(280.0f, 230.0f));
+  EXPECT_EQ(static_cast<unsigned>(calendar.date().day()), 24u);
+  EXPECT_TRUE(calendar.onKeyDown(key(Key::Right)));
+  EXPECT_EQ(static_cast<unsigned>(calendar.date().day()), 25u);
+  EXPECT_TRUE(calendar.onKeyDown(key(Key::Down)));
+  EXPECT_EQ(static_cast<unsigned>(calendar.date().day()), 2u);
+  int selected = 0;
+  calendar.setOnSelect([&selected](std::chrono::year_month_day) { ++selected; });
+  EXPECT_TRUE(calendar.onKeyDown(key(Key::Enter)));
+  EXPECT_EQ(selected, 1);
+  EXPECT_EQ(calendar.accessibleValue(), "2026-12-02");
+  EXPECT_TRUE(calendar.performAccessibilityAction(AccessibilityAction::SetValue, "2027-01-02"));
+  EXPECT_EQ(calendar.accessibleValue(), "2027-01-02");
+  EXPECT_EQ(selected, 2);
+}
+
+TEST(UiControls, CalendarHitTestUsesTheFirstWeekdaySlot) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  Calendar calendar(std::chrono::year_month_day{ std::chrono::year{2027},
+    std::chrono::January, std::chrono::day{1} }, font);
+  calendar.setBounds(Rect::MakeWH(280.0f, 230.0f));
+  // January 2027 starts on Friday; Saturday the 2nd is the rightmost cell of the first row.
+  const float cellWidth = (280.0f - 20.0f) / 7.0f;
+  calendar.onPointerDown(pointerAt(10.0f + cellWidth * 6.0f + cellWidth * 0.5f, 79.0f));
+  EXPECT_EQ(calendar.accessibleValue(), "2027-01-02");
+}
+
+TEST(UiControls, StepperClampsAndReportsChanges) {
+  Stepper stepper(0.0, 10.0, 5.0);
+  stepper.setBounds(Rect::MakeWH(96.0f, 30.0f));
+  int changes = 0;
+  stepper.setOnChanged([&changes](double) { ++changes; });
+  EXPECT_TRUE(stepper.onPointerDown(pointerAt(80.0f, 15.0f)));
+  EXPECT_DOUBLE_EQ(stepper.value(), 6.0);
+  EXPECT_TRUE(stepper.onKeyDown(key(Key::Down)));
+  EXPECT_DOUBLE_EQ(stepper.value(), 5.0);
+  EXPECT_EQ(changes, 2);
+  stepper.setValue(10.0);
+  EXPECT_TRUE(stepper.onPointerDown(pointerAt(80.0f, 15.0f)));
+  EXPECT_DOUBLE_EQ(stepper.value(), 10.0);
+  EXPECT_EQ(changes, 2);
+  stepper.setValue(0.0);
+  EXPECT_TRUE(stepper.onPointerDown(pointerAt(10.0f, 15.0f)));
+  EXPECT_DOUBLE_EQ(stepper.value(), 0.0);
+  EXPECT_EQ(changes, 2);
+  stepper.setEnabled(false);
+  EXPECT_TRUE(stepper.onPointerDown(pointerAt(80.0f, 15.0f)));
+  EXPECT_FALSE(stepper.onKeyDown(key(Key::Up)));
+  EXPECT_DOUBLE_EQ(stepper.value(), 0.0);
+  EXPECT_EQ(changes, 2);
+  stepper.setEnabled(true);
+  EXPECT_TRUE(stepper.onKeyDown(key(Key::Up)));
+  EXPECT_DOUBLE_EQ(stepper.value(), 1.0);
+  ASSERT_TRUE(stepper.accessibleRange().has_value());
+  EXPECT_EQ(stepper.accessibleRange()->maximum, 10.0);
+  EXPECT_TRUE(stepper.performAccessibilityAction(AccessibilityAction::SetValue, "7"));
+  EXPECT_DOUBLE_EQ(stepper.value(), 7.0);
+}
+
 TEST(UiControls, SpinBoxStepsFromItsRightEdge) {
   const auto font = testFont();
   if (font == nullptr) {
@@ -475,11 +2022,60 @@ TEST(UiControls, ToastHidesWhenItsDeadlinePasses) {
   const auto start = std::chrono::steady_clock::now();
   toast.showFor("Saved", std::chrono::milliseconds(20));
   EXPECT_TRUE(toast.isOpen());
+  EXPECT_TRUE(toast.hasRunningAnimation());
   toast.onFrame(start);
   EXPECT_TRUE(toast.isOpen());
   toast.onFrame(start + std::chrono::milliseconds(30));
   EXPECT_FALSE(toast.isOpen());
+  EXPECT_FALSE(toast.hasRunningAnimation());
   EXPECT_EQ(dismissed, 1);
+}
+
+TEST(UiControls, MultilineTextInputInsertsNewlines) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  TextInput input("", font);
+  input.setMultiline(true);
+  input.setBounds(Rect::MakeWH(240.0f, 96.0f));
+  input.setText("first");
+  input.onFocusChanged(true);
+  EXPECT_TRUE(input.onKeyDown(key(Key::Enter)));
+  EXPECT_NE(input.text().find('\n'), std::string::npos);
+  EXPECT_GT(input.measure({ 240.0f, 96.0f }).height, 32.0f);
+}
+
+TEST(UiControls, FocusedTextInputSchedulesCaretFrames) {
+  const auto font = testFont();
+  if (font == nullptr) {
+    GTEST_SKIP() << "the UI test font is not available";
+  }
+  TextInput input("", font);
+  input.setCaretBlinkInterval(std::chrono::milliseconds(500));
+  input.onFocusChanged(true);
+  EXPECT_TRUE(input.hasRunningAnimation());
+  input.onFocusChanged(false);
+  EXPECT_FALSE(input.hasRunningAnimation());
+}
+
+TEST(UiControls, ProgressRingClampsAndExposesRange) {
+  ProgressRing ring(48.0f, 0.4);
+  EXPECT_EQ(ring.measure({}).width, 48.0f);
+  EXPECT_DOUBLE_EQ(ring.value(), 0.4);
+  ring.setValue(2.0);
+  EXPECT_DOUBLE_EQ(ring.value(), 1.0);
+  ASSERT_TRUE(ring.accessibleRange().has_value());
+  EXPECT_DOUBLE_EQ(ring.accessibleRange()->maximum, 1.0);
+  EXPECT_EQ(ring.defaultStyleName(), "progressring");
+  ring.setIndeterminate(true);
+  EXPECT_TRUE(ring.indeterminate());
+  EXPECT_EQ(ring.accessibleValue(), "Loading");
+  EXPECT_TRUE(ring.hasRunningAnimation());
+  ring.onFrame(std::chrono::steady_clock::now());
+  ring.setIndeterminate(false);
+  EXPECT_TRUE(ring.accessibleValue().empty());
+  EXPECT_FALSE(ring.hasRunningAnimation());
 }
 
 TEST(UiControls, ProgressBarClampsAndTooltipAnchors) {
@@ -492,6 +2088,18 @@ TEST(UiControls, ProgressBarClampsAndTooltipAnchors) {
   EXPECT_DOUBLE_EQ(progress.value(), 1.0);
   progress.setValue(-1.0);
   EXPECT_DOUBLE_EQ(progress.value(), 0.0);
+  EXPECT_EQ(progress.accessibleRole(), AccessibilityRole::ProgressIndicator);
+  ASSERT_TRUE(progress.accessibleRange().has_value());
+  EXPECT_DOUBLE_EQ(progress.accessibleRange()->maximum, 1.0);
+  progress.setIndeterminate(true);
+  EXPECT_TRUE(progress.indeterminate());
+  EXPECT_TRUE(progress.hasRunningAnimation());
+  const auto now = std::chrono::steady_clock::now();
+  progress.onFrame(now);
+  progress.onFrame(now + std::chrono::seconds(1));
+  progress.setIndeterminate(false);
+  EXPECT_FALSE(progress.indeterminate());
+  EXPECT_FALSE(progress.hasRunningAnimation());
 
   Tooltip tooltip("Tip", font);
   tooltip.showAt({ 40.0f, 50.0f });
@@ -1280,6 +2888,7 @@ TEST(UiControls, TooltipShowsAfterItsHoverDelayAndCanBeCancelled) {
   Tooltip tooltip("Hint", font);
   const auto start = std::chrono::steady_clock::now();
   tooltip.scheduleShowAt(Point{ 10.0f, 20.0f }, std::chrono::milliseconds(100));
+  EXPECT_TRUE(tooltip.hasRunningAnimation());
   EXPECT_TRUE(tooltip.scheduled());
   tooltip.onFrame(start + std::chrono::milliseconds(50));
   EXPECT_FALSE(tooltip.isOpen()) << "the delay has not elapsed yet";

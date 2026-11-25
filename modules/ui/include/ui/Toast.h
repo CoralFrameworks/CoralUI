@@ -66,6 +66,13 @@ class Toast final : public Layer {
   Size measure(const Size& available) override;
   void drawSelf(RenderContext& context) override;
   void onFrame(std::chrono::steady_clock::time_point now) override;
+  [[nodiscard]] bool hasRunningAnimation() const override {
+    return visible() && mDeadline.has_value();
+  }
+
+  [[nodiscard]] const char* defaultStyleName() const override {
+    return "toast";
+  }
 
  protected:
   void applyTheme(const Theme& theme) override;

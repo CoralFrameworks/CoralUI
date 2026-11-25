@@ -81,7 +81,9 @@ void MenuBar::openMenu(const int index) {
   mOpen = index;
   Menu& menu = *mEntries[static_cast<size_t>(index)].menu;
   if (parent() != nullptr && menu.parent() != parent()) parent()->addChild(mEntries[static_cast<size_t>(index)].menu);
-  menu.showAt(labelBounds(index));
+  const Rect bar = boundsInWindow();
+  const Entry& entry = mEntries[static_cast<size_t>(index)];
+  menu.showAt(Rect::MakeXYWH(bar.getLeft() + entry.left, bar.getTop(), entry.width, mHeight));
   setNeedsPaint();
 }
 

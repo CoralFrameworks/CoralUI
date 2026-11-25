@@ -102,6 +102,8 @@ class WindowHost {
     return DragEffect::None;
   }
   virtual void platformResized(int width, int height) = 0;
+  /** macOS titlebar/toolbar safe area changed without necessarily changing the backing size. */
+  virtual void platformSafeAreaChanged(const Insets& insets) { (void)insets; }
   /**
    * The OS hid the window (occluded by another app, app hidden, minimised on a platform that reports
    * it this way). An automatic loop stops producing frames until it is visible again; an explicit
@@ -114,6 +116,10 @@ class WindowHost {
   virtual void renderFrameNow() = 0;
   /** Requests a frame for the next UI-loop iteration. */
   virtual void requestFrame() = 0;
+  /** The window's command table, for native menu generation; null on hosts without one. */
+  [[nodiscard]] virtual CommandRegistry* commandRegistry() {
+    return nullptr;
+  }
   virtual bool canClose() const = 0;
   virtual void requestClose() = 0;
   /** Closes without consulting the interceptor; only call after `canClose()` returned true. */
@@ -278,6 +284,9 @@ class WindowPlatform {
   [[nodiscard]] virtual bool outputIsHdr() const {
     return false;
   }
+  [[nodiscard]] virtual OutputColorSpace outputColorSpace() const {
+    return OutputColorSpace::Srgb;
+  }
 
   /** Submits the frame with only @p damage written; the rest is loaded from the previous frame. */
   virtual bool presentDamage(const Rect& damage) {
@@ -316,6 +325,7 @@ class WindowPlatform {
   virtual void setDecorations(Window::Decorations decorations) { (void)decorations; }
   virtual void setToolbarItems(std::vector<Window::ToolbarItem> items) { (void)items; }
   virtual void setToolbarVisible(bool visible) { (void)visible; }
+  virtual void setToolbarAutoHideInFullScreen(bool enabled) { (void)enabled; }
   virtual void setToolbarActionHandler(std::function<void(std::string_view)> handler) {
     (void)handler;
   }
@@ -324,6 +334,46 @@ class WindowPlatform {
   }
   virtual void setTitlebarAccessorySelectionHandler(std::function<void(int)> handler) {
     (void)handler;
+  }
+  virtual void setToolbarStyle(Window::ToolbarStyle style) {
+    (void)style;
+  }
+  virtual void setTitlebarVisible(bool visible) {
+    (void)visible;
+  }
+  virtual void setWindowButtonsVisible(bool visible) {
+    (void)visible;
+  }
+  virtual void showNativePopover(void* nativeView, Rect anchor) {
+    (void)nativeView;
+    (void)anchor;
+  }
+  virtual void hideNativePopover() {}
+  [[nodiscard]] virtual bool isNativePopoverVisible() const {
+    return false;
+  }
+  [[nodiscard]] virtual bool supportsNativePopover() const {
+    return false;
+  }
+  virtual void setNativeViewBounds(void* nativeView, Rect bounds, bool visible) {
+    (void)nativeView;
+    (void)bounds;
+    (void)visible;
+  }
+  virtual void removeNativeView(void* nativeView) {
+    (void)nativeView;
+  }
+  virtual void setTitlebarAccessoryView(void* nativeView) {
+    (void)nativeView;
+  }
+  virtual void showNativeContextMenu(std::vector<Window::NativeMenuItem> items, Point position,
+      std::function<void(std::string_view)> handler) {
+    (void)items;
+    (void)position;
+    (void)handler;
+  }
+  [[nodiscard]] virtual Insets safeAreaInsets() const {
+    return {};
   }
   virtual void setSidebarItems(std::vector<Window::SidebarItem> items) {
     (void)items;
@@ -334,8 +384,65 @@ class WindowPlatform {
   virtual void setSidebarSelectionHandler(std::function<void(std::string_view)> handler) {
     (void)handler;
   }
+  virtual void setSidebarEditHandler(
+      std::function<void(std::string_view, std::string_view)> handler) {
+    (void)handler;
+  }
+  virtual void setSidebarMoveHandler(
+      std::function<void(std::string_view, std::string_view, int)> handler) {
+    (void)handler;
+  }
+  virtual bool moveSidebarItem(std::string_view id, std::string_view parentId, int index) {
+    (void)id;
+    (void)parentId;
+    (void)index;
+    return false;
+  }
+  virtual void setSidebarContextActions(std::vector<Window::SidebarContextAction> actions) {
+    (void)actions;
+  }
+  virtual void setSidebarContextActionHandler(
+      std::function<void(std::string_view, std::string_view)> handler) {
+    (void)handler;
+  }
   [[nodiscard]] virtual std::string selectedSidebarItem() const {
     return {};
+  }
+  virtual bool captureWindow(graphics::Bitmap* out) {
+    (void)out;
+    return false;
+  }
+  [[nodiscard]] virtual bool supportsWindowCapture() const {
+    return false;
+  }
+  virtual bool printWindow() {
+    return false;
+  }
+  virtual bool printToFile(std::string_view path) {
+    (void)path;
+    return false;
+  }
+  [[nodiscard]] virtual bool supportsPrinting() const {
+    return false;
+  }
+  virtual void setContentFocusRingEnabled(bool enabled) {
+    (void)enabled;
+  }
+  virtual void setBackgroundMaterial(Window::BackgroundMaterial material) {
+    (void)material;
+  }
+  virtual void showShareSheet(std::string_view text, Rect anchor) {
+    (void)text;
+    (void)anchor;
+  }
+  [[nodiscard]] virtual bool supportsShareSheet() const {
+    return false;
+  }
+  virtual void setDockBadge(std::string_view text) {
+    (void)text;
+  }
+  virtual void requestUserAttention(bool critical) {
+    (void)critical;
   }
   virtual void setSecureInputEnabled(bool enabled) {
     (void)enabled;
@@ -391,6 +498,9 @@ class WindowPlatform {
   [[nodiscard]] virtual graphics::gpu::NativeDisplay nativeDisplay() const = 0;
 
   /** The platform window handle (HWND, X11 Window, wl_surface), or null for headless. */
+  [[nodiscard]] virtual void* nativeWindowHandle() const {
+    return nativeWindow();
+  }
   [[nodiscard]] virtual void* nativeWindow() const { return nullptr; }
 
   /** A portal `parent_window` handle (`x11:<id>` or `wayland:<handle>`), or empty. */

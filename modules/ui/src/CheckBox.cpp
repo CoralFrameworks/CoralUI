@@ -55,7 +55,22 @@ void CheckBox::setColors(const graphics::Color background, const graphics::Color
   setNeedsPaint();
 }
 
+void CheckBox::setIndeterminate(const bool indeterminate) {
+  if (mIndeterminate == indeterminate) return;
+  mIndeterminate = indeterminate;
+  if (mIndeterminate) {
+    setAccessibleValue("Mixed");
+    setAccessibleSelected(false);
+  } else {
+    setAccessibleValue({});
+    setAccessibleSelected(mChecked);
+  }
+  setNeedsPaint();
+}
+
 void CheckBox::setChecked(const bool checked) {
+  mIndeterminate = false;
+  setAccessibleValue({});
   if (mChecked == checked) {
     return;
   }
@@ -106,7 +121,16 @@ void CheckBox::drawSelf(RenderContext& context) {
   borderPaint.strokeWidth = borderWidth;
   canvas.drawRoundRect(graphics::RoundRect::MakeRectRadius(box, radius), borderPaint);
 
-  if (mChecked) {
+  if (mIndeterminate) {
+    graphics::Paint dash;
+    dash.color = graphics::Color::White();
+    dash.style = graphics::Paint::Style::kStroke;
+    dash.strokeWidth = 2.0f;
+    canvas.drawLine({ box.getLeft() + box.getWidth() * 0.25f,
+        box.getTop() + box.getHeight() * 0.5f },
+      { box.getRight() - box.getWidth() * 0.25f,
+        box.getTop() + box.getHeight() * 0.5f }, dash);
+  } else if (mChecked) {
     detail::drawCheckMark(canvas, box, graphics::Color::White());
   }
 
@@ -160,7 +184,15 @@ void CheckBox::applyTheme(const Theme& theme) {
 
 void CheckBox::activate() {
   ++mActivations;
-  mChecked = !mChecked;
+  if (mIndeterminate) {
+    mIndeterminate = false;
+    mChecked = true;
+  } else {
+    mChecked = !mChecked;
+  }
+  setAccessibleValue({});
+  setAccessibleSelected(mChecked);
+  notifyAccessibilityEvent(*this, AccessibilityEvent::ToggleChanged);
   setNeedsPaint();
   if (mOnChanged) {
     mOnChanged(mChecked);
@@ -170,7 +202,11 @@ void CheckBox::activate() {
 bool CheckBox::performAccessibilityAction(const AccessibilityAction action, const std::string_view value) {
   (void)value;
   if (action != AccessibilityAction::Toggle) return false;
-  setChecked(!mChecked);
+  if (mIndeterminate) {
+    activate();
+  } else {
+    setChecked(!mChecked);
+  }
   return true;
 }
 

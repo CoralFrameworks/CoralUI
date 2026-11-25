@@ -53,6 +53,9 @@ struct DateFormatOptions {
  */
 [[nodiscard]] DateFormatOptions dateFormatForLocale(const Locale& locale);
 
+/** The date order for the current OS locale (falling back to ISO). */
+[[nodiscard]] DateFormatOptions systemDateFormat();
+
 /**
  * Formats @p date (for example `std::chrono::year_month_day{ 2026y, November, 16d }`).
  *

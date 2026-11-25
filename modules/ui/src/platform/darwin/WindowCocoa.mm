@@ -33,8 +33,14 @@
 
 #include "../../WindowPlatform.h"
 #include "../../ApplicationLifecycleInternal.h"
+#include "../../WindowRestorationInternal.h"
+
+#include <ui/Command.h>
 
 #include <gpu/WindowSurface.h>
+#include <graphics/Image.h>
+#import <ScreenCaptureKit/ScreenCaptureKit.h>
+#include <dispatch/dispatch.h>
 
 #import <Cocoa/Cocoa.h>
 #import <Carbon/Carbon.h>
@@ -55,6 +61,15 @@
 #include <vector>
 
 namespace coral::ui::detail {
+
+/** `CORAL_UI_AX=0` disables the AppKit accessibility bridge for profiling or host conflicts. */
+bool cocoaAccessibilityEnabled() {
+  static const bool enabled = [] {
+    const char* value = std::getenv("CORAL_UI_AX");
+    return value == nullptr || std::string(value) != "0";
+  }();
+  return enabled;
+}
 
 class CocoaPlatform;
 
@@ -265,10 +280,18 @@ uint32_t argbFromColor(NSColor* color) {
 @interface CoralAppDelegate : NSObject <NSApplicationDelegate>
 @end
 
+static NSMenu* __strong gCoralDockMenu = nil;
+
 /** The source side of an outgoing drag: CoralUI -> Finder / another application. */
 @interface CoralDragSource : NSObject <NSDraggingSource>
 @property(nonatomic, assign) void* platform;
 @property(nonatomic, assign) NSDragOperation allowed;
+@end
+
+@interface CoralCommandTarget : NSObject
+@property(nonatomic, assign) void* platform;
+@property(nonatomic, copy) NSString* commandName;
+- (void)invokeCommand:(id)sender;
 @end
 
 @interface CoralTitlebarAccessoryTarget : NSObject
@@ -277,13 +300,26 @@ uint32_t argbFromColor(NSColor* color) {
 - (void)changed:(id)sender;
 @end
 
-@interface CoralSidebarController : NSObject <NSTableViewDataSource, NSTableViewDelegate>
+@interface CoralSidebarNode : NSObject
+@property(nonatomic, copy) NSString* identifier;
+@property(nonatomic, copy) NSString* label;
+@property(nonatomic, copy) NSString* symbol;
+@property(nonatomic, assign) BOOL group;
+@property(nonatomic, assign) BOOL editable;
+@property(nonatomic, strong) NSArray<CoralSidebarNode*>* children;
+@end
+
+@interface CoralSidebarContextAction : NSObject
+@property(nonatomic, copy) NSString* identifier;
+@property(nonatomic, copy) NSString* title;
+@end
+
+@interface CoralSidebarController : NSObject <NSOutlineViewDataSource, NSOutlineViewDelegate, NSMenuDelegate>
 @property(nonatomic, assign) void* platform;
-@property(nonatomic, strong) NSArray<NSString*>* identifiers;
-@property(nonatomic, strong) NSArray<NSString*>* labels;
-@property(nonatomic, strong) NSArray<NSString*>* symbols;
-@property(nonatomic, strong) NSIndexSet* groupRows;
-@property(nonatomic, strong) NSTableView* table;
+@property(nonatomic, strong) NSArray<CoralSidebarNode*>* roots;
+@property(nonatomic, strong) NSOutlineView* outline;
+@property(nonatomic, strong) NSArray<CoralSidebarContextAction*>* contextActions;
+- (void)updateContextMenu;
 @end
 
 /** Forwards split-pane resizes to the platform so the Metal layer follows the content pane. */
@@ -296,12 +332,36 @@ uint32_t argbFromColor(NSColor* color) {
 - (void)activate:(id)sender;
 @end
 
+@interface CoralNativeMenuTarget : NSObject
+@property(nonatomic, assign) void* platform;
+- (void)select:(NSMenuItem*)item;
+@end
+
+/** A 1px vertical separator that survives NSToolbar unified-style merging. */
+@interface CoralToolbarSeparatorView : NSView
+@end
+
+@implementation CoralToolbarSeparatorView
+
+- (void)drawRect:(NSRect)dirtyRect {
+  (void)dirtyRect;
+  [[NSColor separatorColor] setFill];
+  const NSRect line = NSMakeRect(NSMidX(self.bounds) - 0.5, 4.0, 1.0,
+    MAX(1.0, self.bounds.size.height - 8.0));
+  NSRectFill(line);
+}
+
+@end
+
 /** Builds and owns the NSToolbar items for one Cocoa window. */
 @interface CoralToolbarDelegate : NSObject <NSToolbarDelegate>
 @property(nonatomic, assign) void* platform;
 @property(nonatomic, strong) NSArray<NSString*>* identifiers;
 @property(nonatomic, strong) NSDictionary<NSString*, NSToolbarItem*>* items;
 @property(nonatomic, strong) CoralToolbarTarget* target;
+@end
+
+@interface CoralWindowRestoration : NSObject <NSWindowRestoration>
 @end
 
 /** The window delegate: resize/DPI/appearance callbacks and close interception. */
@@ -346,6 +406,16 @@ class CocoaPlatform final : public WindowPlatform {
       mToolbarDelegate.platform = nullptr;
       mToolbarDelegate.target.platform = nullptr;
     }
+    if (mCommandRegistry != nullptr && mCommandToken != 0) {
+      mCommandRegistry->removeChangedHandler(mCommandToken);
+      mCommandToken = 0;
+      mCommandRegistry = nullptr;
+    }
+    mCommandTargets = nil;
+    mGeneratedCommandItems = nil;
+    mCommandMenuItem = nil;
+    if (gCoralDockMenu == mDockMenu) gCoralDockMenu = nil;
+    mDockMenu = nil;
     if (mTitlebarTarget != nil) mTitlebarTarget.platform = nullptr;
     if (mTitlebarAccessory != nil && mWindow != nil) {
       [mWindow removeTitlebarAccessoryViewControllerAtIndex:0];
@@ -360,6 +430,9 @@ class CocoaPlatform final : public WindowPlatform {
       mSidebarController = nil;
       mSidebarSplitItem = nil;
     }
+    if (mPopover != nil) [mPopover close];
+    mPopover = nil;
+    mPopoverController = nil;
     if (mWindow != nil) {
       mWindow.toolbar = nil;
       mWindow.delegate = nil;
@@ -367,6 +440,8 @@ class CocoaPlatform final : public WindowPlatform {
       [mWindow close];
       mWindow = nil;
     }
+    for (NSView* view in mNativeViews) [view removeFromSuperview];
+    [mNativeViews removeAllObjects];
     mView = nil;
     mDelegate = nil;
     unregisterWindow(this);
@@ -409,6 +484,7 @@ class CocoaPlatform final : public WindowPlatform {
       static_cast<CGFloat>(mHeight));
     NSWindowStyleMask style = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
       NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable;
+    if (mOptions.fullSizeContentView) style |= NSWindowStyleMaskFullSizeContentView;
     mWindow = [[CoralWindow alloc] initWithContentRect:NSMakeRect(0, 0, contentPoints.width,
                                                           contentPoints.height)
                                              styleMask:style
@@ -421,6 +497,12 @@ class CocoaPlatform final : public WindowPlatform {
     }
     mWindow.releasedWhenClosed = NO;
     mWindow.title = [NSString stringWithUTF8String:mOptions.title.c_str()];
+    if (!mOptions.restorationIdentifier.empty()) {
+      mWindow.restorable = YES;
+      mWindow.identifier = (NSUserInterfaceItemIdentifier)
+        [NSString stringWithUTF8String:mOptions.restorationIdentifier.c_str()];
+      mWindow.restorationClass = [CoralWindowRestoration class];
+    }
     // Native tabbing and frame autosave are window-server features: the same NSWindow API that
     // Finder/AppKit apps use, not a CoralUI-side position cache.
     switch (mOptions.tabbingMode) {
@@ -542,6 +624,7 @@ class CocoaPlatform final : public WindowPlatform {
 
   bool pump(WindowHost& host) override {
     mHost = &host;
+    ensureCommandMenu();
     bool alive = true;
     @autoreleasepool {
       for (;;) {
@@ -630,9 +713,9 @@ class CocoaPlatform final : public WindowPlatform {
   }
 
   [[nodiscard]] bool supportsBoundarySubmission() const override {
-    // Opt-in until the Metal multi-list path has as much mileage as the Linux window path.
-    static const bool enabled = std::getenv("CORAL_UI_FRAME_PLAN_WINDOW") != nullptr;
-    return enabled && mSurface != nullptr;
+    // The Metal multi-list path reuses the open frame and has passed the UI/native suites; enable it
+    // by default now that the paravirtual-GPU fallback and plan presentation are stable.
+    return mSurface != nullptr;
   }
 
   bool presentBoundaries(
@@ -693,6 +776,202 @@ class CocoaPlatform final : public WindowPlatform {
     return createSurface();
   }
 
+  void ensureCommandMenu() {
+    if (mCommandBound || mHost == nullptr) return;
+    CommandRegistry* registry = mHost->commandRegistry();
+    if (registry == nullptr) return;
+    mCommandBound = true;
+    mCommandRegistry = registry;
+    mCommandToken = registry->addChangedHandler([this] { rebuildCommandMenu(); });
+    rebuildCommandMenu();
+  }
+
+  void invokeCommand(const std::string_view name) {
+    if (mHost == nullptr) return;
+    if (CommandRegistry* registry = mHost->commandRegistry()) registry->invoke(std::string(name));
+  }
+
+  [[nodiscard]] bool commandEnabled(const std::string_view name) const {
+    if (mHost == nullptr) return false;
+    CommandRegistry* registry = mHost->commandRegistry();
+    return registry != nullptr && registry->isEnabled(std::string(name));
+  }
+
+  [[nodiscard]] bool commandChecked(const std::string_view name) const {
+    if (mHost == nullptr) return false;
+    CommandRegistry* registry = mHost->commandRegistry();
+    return registry != nullptr && registry->isChecked(std::string(name));
+  }
+
+  /** A registry group named after a standard menu is appended to that menu, not Commands. */
+  NSMenu* standardMenuForGroup(NSString* group) {
+    NSMenu* mainMenu = [NSApp mainMenu];
+    if (mainMenu == nil || group.length == 0) return nil;
+    if ([group isEqualToString:@"App"]) {
+      return mainMenu.itemArray.firstObject.submenu;
+    }
+    for (NSMenuItem* item in mainMenu.itemArray) {
+      if ([item.title isEqualToString:group]) return item.submenu;
+    }
+    return nil;
+  }
+
+  void rebuildCommandMenu() {
+    if (mHost == nullptr) return;
+    CommandRegistry* registry = mHost->commandRegistry();
+    NSMenu* mainMenu = [NSApp mainMenu];
+    if (registry == nullptr || mainMenu == nil) return;
+    if (mCommandMenuItem != nil) {
+      [mainMenu removeItem:mCommandMenuItem];
+      mCommandMenuItem = nil;
+    }
+    for (NSMenuItem* item in mGeneratedCommandItems) {
+      if (item.menu != nil) [item.menu removeItem:item];
+    }
+    mGeneratedCommandItems = [NSMutableArray array];
+    mCommandTargets = [NSMutableArray array];
+    NSMutableSet<NSMenu*>* separatedMenus = [NSMutableSet set];
+
+    struct Group {
+      NSString* name = nil;
+      NSMutableArray<NSMenuItem*>* items = nil;
+    };
+    struct Entry {
+      std::string name;
+      CommandRegistry::Info info;
+    };
+    std::vector<Entry> entries;
+    for (const std::string& name: registry->names()) {
+      const std::optional<CommandRegistry::Info> info = registry->info(name);
+      if (info.has_value() && !info->title.empty()) entries.push_back({ name, *info });
+    }
+    std::stable_sort(entries.begin(), entries.end(), [](const Entry& left, const Entry& right) {
+      if (left.info.order != right.info.order) return left.info.order < right.info.order;
+      return left.name < right.name;
+    });
+    std::vector<Group> groups;
+    for (const Entry& entry: entries) {
+      const std::string& name = entry.name;
+      const CommandRegistry::Info* info = &entry.info;
+      NSString* groupName = info->group.empty()
+        ? @"Commands" : [NSString stringWithUTF8String:info->group.c_str()];
+      Group* group = nullptr;
+      for (Group& candidate: groups) {
+        if ([candidate.name isEqualToString:groupName]) { group = &candidate; break; }
+      }
+      if (group == nullptr) {
+        Group created;
+        created.name = groupName;
+        created.items = [NSMutableArray array];
+        groups.push_back(created);
+        group = &groups.back();
+      }
+      CoralCommandTarget* target = [[CoralCommandTarget alloc] init];
+      target.platform = this;
+      target.commandName = [NSString stringWithUTF8String:name.c_str()];
+      [mCommandTargets addObject:target];
+      NSString* title = [NSString stringWithUTF8String:info->title.c_str()];
+      const Shortcut shortcut = registry->shortcutFor(name);
+      NSString* key = nil;
+      NSEventModifierFlags modifiers = 0;
+      if (shortcut.key >= Key::A && shortcut.key <= Key::Z) {
+        key = [NSString stringWithFormat:@"%c", static_cast<char>('a' + (static_cast<int>(shortcut.key) - static_cast<int>(Key::A)))];
+      } else if (shortcut.key >= Key::Digit0 && shortcut.key <= Key::Digit9) {
+        key = [NSString stringWithFormat:@"%d", static_cast<int>(shortcut.key) - static_cast<int>(Key::Digit0)];
+      }
+      if (key != nil) {
+        if (shortcut.meta) modifiers |= NSEventModifierFlagCommand;
+        if (shortcut.control) modifiers |= NSEventModifierFlagControl;
+        if (shortcut.alt) modifiers |= NSEventModifierFlagOption;
+        if (shortcut.shift) modifiers |= NSEventModifierFlagShift;
+      }
+      NSMenuItem* item = [[NSMenuItem alloc] initWithTitle:title
+        action:@selector(invokeCommand:) keyEquivalent:key != nil ? key : @""];
+      item.target = target;
+      item.keyEquivalentModifierMask = modifiers;
+      if (!info->icon.empty() && @available(macOS 11.0, *)) {
+        item.image = [NSImage imageWithSystemSymbolName:
+          [NSString stringWithUTF8String:info->icon.c_str()] accessibilityDescription:nil];
+      }
+      NSMenu* standard = standardMenuForGroup(groupName);
+      if (standard != nil) {
+        if (info->separatorBefore ||
+            ![separatedMenus containsObject:standard]) {
+          NSMenuItem* separator = [NSMenuItem separatorItem];
+          const NSInteger separatorIndex = info->menuIndex >= 0
+            ? std::min<NSInteger>(info->menuIndex, standard.numberOfItems)
+            : standard.numberOfItems;
+          [standard insertItem:separator atIndex:separatorIndex];
+          [mGeneratedCommandItems addObject:separator];
+          [separatedMenus addObject:standard];
+        }
+        const NSInteger index = info->menuIndex >= 0
+          ? std::min<NSInteger>(info->menuIndex, standard.numberOfItems)
+          : standard.numberOfItems;
+        [standard insertItem:item atIndex:index];
+        [mGeneratedCommandItems addObject:item];
+      } else {
+        [group->items addObject:item];
+        [mGeneratedCommandItems addObject:item];
+      }
+    }
+
+    NSMenu* commands = [[NSMenu alloc] initWithTitle:@"Commands"];
+    bool hasCommands = false;
+    for (Group& group: groups) {
+      if (group.items.count == 0) continue;
+      hasCommands = true;
+      NSMenu* submenu = [[NSMenu alloc] initWithTitle:group.name];
+      for (NSMenuItem* item in group.items) [submenu addItem:item];
+      NSMenuItem* groupItem = [[NSMenuItem alloc] initWithTitle:group.name action:nil keyEquivalent:@""];
+      groupItem.submenu = submenu;
+      [commands addItem:groupItem];
+    }
+    if (hasCommands) {
+      mCommandMenuItem = [[NSMenuItem alloc] initWithTitle:@"Commands" action:nil keyEquivalent:@""];
+      mCommandMenuItem.submenu = commands;
+      [mainMenu addItem:mCommandMenuItem];
+    }
+
+    // The Dock menu mirrors the registry's commands for the key window. It has no key equivalents:
+    // the Dock is a pointer target and AppKit's menu bar owns the shortcuts.
+    NSMenu* dock = [[NSMenu alloc] initWithTitle:@"Dock"];
+    NSMutableDictionary<NSString*, NSMenu*>* dockGroups = [NSMutableDictionary dictionary];
+    NSMutableArray<NSString*>* dockGroupOrder = [NSMutableArray array];
+    for (const Entry& entry: entries) {
+      CoralCommandTarget* target = [[CoralCommandTarget alloc] init];
+      target.platform = this;
+      target.commandName = [NSString stringWithUTF8String:entry.name.c_str()];
+      [mCommandTargets addObject:target];
+      NSString* title = [NSString stringWithUTF8String:entry.info.title.c_str()];
+      NSMenuItem* item = [[NSMenuItem alloc] initWithTitle:title
+        action:@selector(invokeCommand:) keyEquivalent:@""];
+      item.target = target;
+      if (!entry.info.icon.empty() && @available(macOS 11.0, *)) {
+        item.image = [NSImage imageWithSystemSymbolName:
+          [NSString stringWithUTF8String:entry.info.icon.c_str()] accessibilityDescription:nil];
+      }
+      NSString* groupName = entry.info.group.empty()
+        ? @"Commands" : [NSString stringWithUTF8String:entry.info.group.c_str()];
+      NSMenu* groupMenu = dockGroups[groupName];
+      if (groupMenu == nil) {
+        groupMenu = [[NSMenu alloc] initWithTitle:groupName];
+        dockGroups[groupName] = groupMenu;
+        [dockGroupOrder addObject:groupName];
+      }
+      [groupMenu addItem:item];
+    }
+    for (NSString* groupName in dockGroupOrder) {
+      NSMenu* groupMenu = dockGroups[groupName];
+      NSMenuItem* groupItem = [[NSMenuItem alloc] initWithTitle:groupName
+        action:nil keyEquivalent:@""];
+      groupItem.submenu = groupMenu;
+      [dock addItem:groupItem];
+    }
+    mDockMenu = dock.itemArray.count > 0 ? dock : nil;
+    gCoralDockMenu = mDockMenu;
+  }
+
   void setTitlebarAccessoryItems(std::vector<Window::TitlebarAccessoryItem> items) override {
     mTitlebarItems = std::move(items);
     applyTitlebarAccessory();
@@ -700,6 +979,11 @@ class CocoaPlatform final : public WindowPlatform {
 
   void setTitlebarAccessorySelectionHandler(std::function<void(int)> handler) override {
     mTitlebarAccessorySelection = std::move(handler);
+  }
+
+  void setTitlebarAccessoryView(void* nativeView) override {
+    mTitlebarCustomView = nativeView;
+    applyTitlebarAccessory();
   }
 
   void titlebarAccessorySelected(const int index) {
@@ -713,6 +997,16 @@ class CocoaPlatform final : public WindowPlatform {
       mTitlebarAccessory = nil;
       mTitlebarControl = nil;
       mTitlebarTarget = nil;
+    }
+    if (mTitlebarCustomView != nullptr) {
+      NSView* view = (__bridge NSView*)mTitlebarCustomView;
+      if (view != nil) {
+        mTitlebarAccessory = [[NSTitlebarAccessoryViewController alloc] init];
+        mTitlebarAccessory.view = view;
+        mTitlebarAccessory.layoutAttribute = NSLayoutAttributeTrailing;
+        [mWindow addTitlebarAccessoryViewController:mTitlebarAccessory];
+      }
+      return;
     }
     if (mTitlebarItems.empty()) return;
     CoralTitlebarAccessoryTarget* target = [[CoralTitlebarAccessoryTarget alloc] init];
@@ -745,6 +1039,49 @@ class CocoaPlatform final : public WindowPlatform {
     [mWindow addTitlebarAccessoryViewController:mTitlebarAccessory];
   }
 
+  void showNativeContextMenu(std::vector<Window::NativeMenuItem> items, const Point position,
+      std::function<void(std::string_view)> handler) override {
+    if (mView == nil || items.empty()) return;
+    if (mNativeMenuTarget == nil) mNativeMenuTarget = [[CoralNativeMenuTarget alloc] init];
+    mNativeMenuTarget.platform = this;
+    mNativeContextAction = std::move(handler);
+    NSMenu* menu = buildNativeMenu(items, mNativeMenuTarget);
+    if (menu == nil) return;
+    [menu popUpMenuPositioningItem:nil
+                         atLocation:NSMakePoint(position.x, mView.bounds.size.height - position.y)
+                             inView:mView];
+    mNativeContextAction = {};
+  }
+
+  void nativeContextMenuSelected(const std::string_view identifier) {
+    if (mNativeContextAction) mNativeContextAction(identifier);
+  }
+
+  NSMenu* buildNativeMenu(const std::vector<Window::NativeMenuItem>& items,
+      CoralNativeMenuTarget* target) {
+    NSMenu* menu = [[NSMenu alloc] initWithTitle:@"Coral"];
+    for (const Window::NativeMenuItem& item: items) {
+      if (item.separator) {
+        [menu addItem:[NSMenuItem separatorItem]];
+        continue;
+      }
+      NSString* title = item.title.empty() ? [NSString stringWithUTF8String:item.id.c_str()]
+        : [NSString stringWithUTF8String:item.title.c_str()];
+      NSMenuItem* native = [[NSMenuItem alloc] initWithTitle:title ?: @""
+        action:@selector(select:) keyEquivalent:@""];
+      native.target = target;
+      native.representedObject = item.id.empty() ? nil
+        : [NSString stringWithUTF8String:item.id.c_str()];
+      native.enabled = item.enabled ? YES : NO;
+      native.state = item.checked ? NSControlStateValueOn : NSControlStateValueOff;
+      if (!item.children.empty()) {
+        native.submenu = buildNativeMenu(item.children, target);
+      }
+      [menu addItem:native];
+    }
+    return menu;
+  }
+
   void setSidebarItems(std::vector<Window::SidebarItem> items) override {
     mSidebarItems = std::move(items);
     applySidebar();
@@ -757,6 +1094,64 @@ class CocoaPlatform final : public WindowPlatform {
 
   void setSidebarSelectionHandler(std::function<void(std::string_view)> handler) override {
     mSidebarSelection = std::move(handler);
+  }
+
+  void setSidebarEditHandler(
+      std::function<void(std::string_view, std::string_view)> handler) override {
+    mSidebarEdit = std::move(handler);
+  }
+
+  void sidebarLabelEdited(const std::string_view identifier, const std::string_view label) {
+    if (mSidebarEdit) mSidebarEdit(identifier, label);
+  }
+
+  void setSidebarMoveHandler(
+      std::function<void(std::string_view, std::string_view, int)> handler) override {
+    mSidebarMove = std::move(handler);
+  }
+
+  void setSidebarContextActions(std::vector<Window::SidebarContextAction> actions) override {
+    mSidebarContextActions = std::move(actions);
+    applySidebarContextActions();
+  }
+
+  void setSidebarContextActionHandler(
+      std::function<void(std::string_view, std::string_view)> handler) override {
+    mSidebarContextAction = std::move(handler);
+  }
+
+  void sidebarContextActionTriggered(const std::string_view itemId,
+      const std::string_view actionId) {
+    if (mSidebarContextAction) mSidebarContextAction(itemId, actionId);
+  }
+
+  void applySidebarContextActions() {
+    if (mSidebarController == nil) return;
+    NSMutableArray<CoralSidebarContextAction*>* actions =
+      [NSMutableArray arrayWithCapacity:mSidebarContextActions.size()];
+    for (const Window::SidebarContextAction& action: mSidebarContextActions) {
+      CoralSidebarContextAction* target = [[CoralSidebarContextAction alloc] init];
+      target.identifier = [NSString stringWithUTF8String:action.id.c_str()];
+      target.title = [NSString stringWithUTF8String:action.title.c_str()];
+      [actions addObject:target];
+    }
+    mSidebarController.contextActions = actions;
+    [mSidebarController updateContextMenu];
+  }
+
+  bool moveSidebarItem(const std::string_view id, const std::string_view parentId,
+      const int index) override {
+    if (id.empty()) return false;
+    const Window::SidebarItem* moved = findSidebarItem(mSidebarItems, id);
+    if (moved == nullptr) return false;
+    if (!parentId.empty() && findSidebarItem(mSidebarItems, parentId) == nullptr) return false;
+    if (!parentId.empty() && containsSidebarId(*moved, parentId)) return false;
+    Window::SidebarItem taken;
+    if (!takeSidebarItem(mSidebarItems, id, taken)) return false;
+    if (!insertSidebarItem(mSidebarItems, parentId, index, std::move(taken))) return false;
+    applySidebar();
+    if (mSidebarMove) mSidebarMove(id, parentId, index);
+    return true;
   }
 
   [[nodiscard]] std::string selectedSidebarItem() const override {
@@ -786,27 +1181,33 @@ class CocoaPlatform final : public WindowPlatform {
       mSidebarController = [[CoralSidebarController alloc] init];
       mSidebarController.platform = this;
     }
-    NSMutableArray<NSString*>* identifiers = [NSMutableArray arrayWithCapacity:mSidebarItems.size()];
-    NSMutableArray<NSString*>* labels = [NSMutableArray arrayWithCapacity:mSidebarItems.size()];
-    NSMutableArray<NSString*>* symbols = [NSMutableArray arrayWithCapacity:mSidebarItems.size()];
-    NSMutableIndexSet* groupRows = [NSMutableIndexSet indexSet];
-    for (std::size_t index = 0; index < mSidebarItems.size(); ++index) {
-      const Window::SidebarItem& item = mSidebarItems[index];
-      if (item.group) [groupRows addIndex:index];
-      [identifiers addObject:item.id.empty()
-        ? [NSString stringWithFormat:@"coral.sidebar.%zu", identifiers.count]
-        : [NSString stringWithUTF8String:item.id.c_str()]];
-      [labels addObject:item.label.empty()
-        ? [NSString stringWithUTF8String:item.id.c_str()]
-        : [NSString stringWithUTF8String:item.label.c_str()]];
-      [symbols addObject:item.symbol.empty() ? @"" :
-        [NSString stringWithUTF8String:item.symbol.c_str()]];
+    std::size_t generatedId = 0;
+    std::function<CoralSidebarNode*(const Window::SidebarItem&)> makeNode =
+      [&](const Window::SidebarItem& item) -> CoralSidebarNode* {
+        CoralSidebarNode* node = [[CoralSidebarNode alloc] init];
+        node.identifier = item.id.empty()
+          ? [NSString stringWithFormat:@"coral.sidebar.%zu", generatedId++]
+          : [NSString stringWithUTF8String:item.id.c_str()];
+        node.label = item.label.empty()
+          ? node.identifier : [NSString stringWithUTF8String:item.label.c_str()];
+        node.symbol = item.symbol.empty() ? @"" :
+          [NSString stringWithUTF8String:item.symbol.c_str()];
+        node.group = item.group;
+        node.editable = item.editable;
+        NSMutableArray<CoralSidebarNode*>* children =
+          [NSMutableArray arrayWithCapacity:item.children.size()];
+        for (const Window::SidebarItem& child: item.children) {
+          [children addObject:makeNode(child)];
+        }
+        node.children = children;
+        return node;
+      };
+    NSMutableArray<CoralSidebarNode*>* roots =
+      [NSMutableArray arrayWithCapacity:mSidebarItems.size()];
+    for (const Window::SidebarItem& item: mSidebarItems) {
+      [roots addObject:makeNode(item)];
     }
-    mSidebarController.identifiers = identifiers;
-    mSidebarController.labels = labels;
-    mSidebarController.symbols = symbols;
-    mSidebarController.groupRows = groupRows;
-    [mSidebarController.table reloadData];
+    mSidebarController.roots = roots;
     if (mSidebarSplitItem == nil) {
       NSViewController* sidebar = [[NSViewController alloc] init];
       NSVisualEffectView* background = [[NSVisualEffectView alloc]
@@ -819,17 +1220,22 @@ class CocoaPlatform final : public WindowPlatform {
       scroll.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
       scroll.hasVerticalScroller = YES;
       scroll.drawsBackground = NO;
-      NSTableView* table = [[NSTableView alloc] initWithFrame:scroll.bounds];
+      NSOutlineView* table = [[NSOutlineView alloc] initWithFrame:scroll.bounds];
       table.headerView = nil;
       table.rowSizeStyle = NSTableViewRowSizeStyleMedium;
       table.selectionHighlightStyle = NSTableViewSelectionHighlightStyleSourceList;
       table.allowsMultipleSelection = NO;
+      table.indentationPerLevel = 14.0;
       NSTableColumn* column = [[NSTableColumn alloc] initWithIdentifier:@"coral.sidebar.column"];
       column.width = 220.0;
       [table addTableColumn:column];
+      table.outlineTableColumn = column;
+      [table registerForDraggedTypes:@[ @"com.coral.sidebar.item" ]];
+      [table setDraggingSourceOperationMask:NSDragOperationMove forLocal:YES];
+      [table setDraggingSourceOperationMask:NSDragOperationMove forLocal:NO];
       table.delegate = mSidebarController;
       table.dataSource = mSidebarController;
-      mSidebarController.table = table;
+      mSidebarController.outline = table;
       scroll.documentView = table;
       [background addSubview:scroll];
       sidebar.view = background;
@@ -839,7 +1245,203 @@ class CocoaPlatform final : public WindowPlatform {
       mSidebarSplitItem.maximumThickness = 320.0;
       [mSplitController insertSplitViewItem:mSidebarSplitItem atIndex:0];
     }
+    // The first call creates the outline after roots were assigned; reload/expand once the view
+    // exists, otherwise the initial tree is collapsed and numberOfRows only counts the roots.
+    [mSidebarController.outline reloadData];
+    [mSidebarController.outline expandItem:nil expandChildren:YES];
     mSidebarSplitItem.collapsed = !mSidebarVisible;
+    applySidebarContextActions();
+  }
+
+  bool captureWindow(graphics::Bitmap* out) override {
+    if (out == nullptr || mWindow == nil) return false;
+    if (@available(macOS 14.0, *)) {
+      __block SCShareableContent* content = nil;
+      dispatch_semaphore_t contentReady = dispatch_semaphore_create(0);
+      [SCShareableContent getShareableContentExcludingDesktopWindows:YES
+        onScreenWindowsOnly:YES completionHandler:^(SCShareableContent* shareable, NSError* error) {
+          (void)error;
+          content = shareable;
+          dispatch_semaphore_signal(contentReady);
+        }];
+      if (dispatch_semaphore_wait(contentReady,
+          dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)) != 0 || content == nil) {
+        return false;
+      }
+      SCWindow* target = nil;
+      for (SCWindow* window in content.windows) {
+        if (window.windowID == static_cast<CGWindowID>(mWindow.windowNumber)) {
+          target = window;
+          break;
+        }
+      }
+      if (target == nil) return false;
+      SCContentFilter* filter = [[SCContentFilter alloc] initWithDesktopIndependentWindow:target];
+      if (filter == nil) return false;
+      SCStreamConfiguration* configuration = [[SCStreamConfiguration alloc] init];
+      const CGFloat scale = std::max<CGFloat>(1.0, mWindow.backingScaleFactor);
+      configuration.width = static_cast<size_t>(std::max<CGFloat>(1.0, target.frame.size.width) * scale);
+      configuration.height = static_cast<size_t>(std::max<CGFloat>(1.0, target.frame.size.height) * scale);
+      configuration.showsCursor = NO;
+      configuration.capturesAudio = NO;
+      configuration.captureResolution = SCCaptureResolutionBest;
+      __block CGImageRef captured = nullptr;
+      dispatch_semaphore_t imageReady = dispatch_semaphore_create(0);
+      [SCScreenshotManager captureImageWithFilter:filter configuration:configuration
+        completionHandler:^(CGImageRef image, NSError* error) {
+          (void)error;
+          if (image != nullptr) captured = CGImageRetain(image);
+          dispatch_semaphore_signal(imageReady);
+        }];
+      if (dispatch_semaphore_wait(imageReady,
+          dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)) != 0 || captured == nullptr) {
+        return false;
+      }
+      NSBitmapImageRep* representation = [[NSBitmapImageRep alloc] initWithCGImage:captured];
+      CGImageRelease(captured);
+      if (representation == nil) return false;
+      NSData* png = [representation representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
+      if (png == nil || png.length == 0) return false;
+      std::string error;
+      graphics::Image decoded = graphics::Image::decode(
+        graphics::Data::makeCopy(png.bytes, static_cast<size_t>(png.length)), &error);
+      if (decoded.isEmpty()) return false;
+      *out = decoded.makeBitmap();
+      return !out->isEmpty();
+    }
+    return false;
+  }
+
+  [[nodiscard]] bool supportsWindowCapture() const override {
+    if (@available(macOS 14.0, *)) return true;
+    return false;
+  }
+
+  NSImageView* makePrintView() {
+    if (mSurface == nullptr || mView == nil) return nil;
+    graphics::Bitmap bitmap;
+    if (!mSurface->readback(&bitmap) || bitmap.isEmpty()) return nil;
+    graphics::Image image = graphics::Image::fromBitmap(bitmap);
+    std::string error;
+    graphics::Data png = image.encode(graphics::ImageFormat::PNG, 100, &error);
+    if (png.isEmpty()) return nil;
+    NSData* data = [NSData dataWithBytes:png.bytes() length:png.size()];
+    NSImage* nativeImage = [[NSImage alloc] initWithData:data];
+    if (nativeImage == nil) return nil;
+    NSImageView* view = [[NSImageView alloc] initWithFrame:NSMakeRect(0.0, 0.0,
+      mWidth / std::max(1.0f, mDpiScale), mHeight / std::max(1.0f, mDpiScale))];
+    view.image = nativeImage;
+    view.imageScaling = NSImageScaleProportionallyUpOrDown;
+    return view;
+  }
+
+  bool printWindow() override {
+    NSImageView* view = makePrintView();
+    if (view == nil) return false;
+    NSPrintOperation* operation = [NSPrintOperation printOperationWithView:view
+                                                               printInfo:[NSPrintInfo sharedPrintInfo]];
+    [operation runOperation];
+    return true;
+  }
+
+  bool printToFile(const std::string_view path) override {
+    NSImageView* view = makePrintView();
+    if (view == nil || path.empty()) return false;
+    NSPrintInfo* info = [[NSPrintInfo sharedPrintInfo] copy];
+    info.jobDisposition = NSPrintSaveJob;
+    info.dictionary[NSPrintSavePath] = [NSString stringWithUTF8String:std::string(path).c_str()];
+    NSPrintOperation* operation = [NSPrintOperation printOperationWithView:view printInfo:info];
+    operation.showsPrintPanel = NO;
+    operation.showsProgressPanel = NO;
+    return [operation runOperation];
+  }
+
+  [[nodiscard]] bool supportsPrinting() const override {
+    return true;
+  }
+
+  void setBackgroundMaterial(const Window::BackgroundMaterial material) override {
+    if (mWindow == nil) return;
+    if (material == Window::BackgroundMaterial::None) {
+      mBackgroundEffect.hidden = YES;
+      mMetalLayer.opaque = YES;
+      if (mView.layer != nil) mView.layer.opaque = YES;
+      mWindow.backgroundColor = [NSColor windowBackgroundColor];
+      return;
+    }
+    ensureMaterialContainer();
+    NSVisualEffectMaterial visual = NSVisualEffectMaterialUnderWindowBackground;
+    switch (material) {
+      case Window::BackgroundMaterial::Sidebar: visual = NSVisualEffectMaterialSidebar; break;
+      case Window::BackgroundMaterial::HeaderView: visual = NSVisualEffectMaterialHeaderView; break;
+      case Window::BackgroundMaterial::ContentBackground:
+        visual = NSVisualEffectMaterialContentBackground; break;
+      case Window::BackgroundMaterial::HUDWindow: visual = NSVisualEffectMaterialHUDWindow; break;
+      case Window::BackgroundMaterial::UnderWindowBackground:
+      case Window::BackgroundMaterial::None:
+      default: visual = NSVisualEffectMaterialUnderWindowBackground; break;
+    }
+    mBackgroundEffect.material = visual;
+    mBackgroundEffect.hidden = NO;
+    mMetalLayer.opaque = NO;
+    if (mView.layer != nil) mView.layer.opaque = NO;
+    mWindow.backgroundColor = [NSColor clearColor];
+  }
+
+  void ensureMaterialContainer() {
+    if (mMaterialController != nil) return;
+    NSViewController* root = [[NSViewController alloc] init];
+    NSView* container = [[NSView alloc] initWithFrame:mWindow.contentView.bounds];
+    container.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    mBackgroundEffect = [[NSVisualEffectView alloc] initWithFrame:container.bounds];
+    mBackgroundEffect.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    mBackgroundEffect.blendingMode = NSVisualEffectBlendingModeWithinWindow;
+    mBackgroundEffect.state = NSVisualEffectStateActive;
+    mBackgroundEffect.hidden = YES;
+    [container addSubview:mBackgroundEffect];
+    [root addChildViewController:mSplitController];
+    mSplitController.view.frame = container.bounds;
+    mSplitController.view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    if (mSplitController.view.layer != nil) {
+      mSplitController.view.layer.backgroundColor = [NSColor clearColor].CGColor;
+    }
+    [container addSubview:mSplitController.view];
+    root.view = container;
+    mMaterialController = root;
+    mWindow.contentViewController = root;
+  }
+
+  void showShareSheet(const std::string_view text, const Rect anchor) override {
+    if (text.empty() || mView == nil) return;
+    NSString* value = [NSString stringWithUTF8String:std::string(text).c_str()];
+    if (value.length == 0) return;
+    NSSharingServicePicker* picker = [[NSSharingServicePicker alloc] initWithItems:@[ value ]];
+    NSRect rect = NSMakeRect(mView.bounds.size.width * 0.5, mView.bounds.size.height * 0.5, 1.0, 1.0);
+    if (anchor.getWidth() > 0.0f && anchor.getHeight() > 0.0f) {
+      rect = NSMakeRect(anchor.getLeft(), mView.bounds.size.height - anchor.getBottom(),
+        anchor.getWidth(), anchor.getHeight());
+    }
+    mSharePicker = picker;
+    [picker showRelativeToRect:rect ofView:mView preferredEdge:NSRectEdgeMinY];
+  }
+
+  [[nodiscard]] bool supportsShareSheet() const override {
+    return true;
+  }
+
+  void setContentFocusRingEnabled(const bool enabled) override {
+    if (mView == nil) return;
+    mView.focusRingType = enabled ? NSFocusRingTypeExterior : NSFocusRingTypeDefault;
+    [mView setKeyboardFocusRingNeedsDisplayInRect:mView.bounds];
+  }
+
+  void setDockBadge(const std::string_view text) override {
+    NSString* badge = text.empty() ? nil : [NSString stringWithUTF8String:text.data()];
+    NSApp.dockTile.badgeLabel = badge;
+  }
+
+  void requestUserAttention(const bool critical) override {
+    [NSApp requestUserAttention:critical ? NSCriticalRequest : NSInformationalRequest];
   }
 
   void setSecureInputEnabled(const bool enabled) override {
@@ -858,6 +1460,103 @@ class CocoaPlatform final : public WindowPlatform {
     return IsSecureEventInputEnabled();
   }
 
+  void setToolbarStyle(const Window::ToolbarStyle style) override {
+    mOptions.toolbarStyle = style;
+    applyToolbarStyle();
+  }
+
+  void setTitlebarVisible(const bool visible) override {
+    mOptions.titlebarVisible = visible;
+    if (mWindow != nil) mWindow.titleVisibility = visible ? NSWindowTitleVisible : NSWindowTitleHidden;
+    notifySafeAreaChanged();
+  }
+
+  void setWindowButtonsVisible(const bool visible) override {
+    mOptions.windowButtonsVisible = visible;
+    if (mWindow == nil) return;
+    for (NSWindowButton button: { NSWindowCloseButton, NSWindowMiniaturizeButton,
+             NSWindowZoomButton }) {
+      [mWindow standardWindowButton:button].hidden = visible ? NO : YES;
+    }
+  }
+
+  void showNativePopover(void* nativeView, const Rect anchor) override {
+    if (mView == nil || nativeView == nullptr) return;
+    NSView* content = (__bridge NSView*)nativeView;
+    if (![content isKindOfClass:[NSView class]]) return;
+    if (mPopover == nil) {
+      mPopover = [[NSPopover alloc] init];
+      mPopover.behavior = NSPopoverBehaviorTransient;
+    }
+    NSViewController* controller = [[NSViewController alloc] init];
+    controller.view = content;
+    mPopover.contentViewController = controller;
+    mPopoverController = controller;
+    const NSRect rect = NSMakeRect(anchor.getLeft(),
+      mView.bounds.size.height - anchor.getBottom(), std::max(1.0f, anchor.getWidth()),
+      std::max(1.0f, anchor.getHeight()));
+    [mPopover showRelativeToRect:rect ofView:mView preferredEdge:NSRectEdgeMinY];
+  }
+
+  void hideNativePopover() override {
+    if (mPopover != nil) [mPopover close];
+    mPopover = nil;
+    mPopoverController = nil;
+  }
+
+  [[nodiscard]] bool isNativePopoverVisible() const override {
+    return mPopover != nil && mPopover.isShown;
+  }
+
+  [[nodiscard]] bool supportsNativePopover() const override {
+    return true;
+  }
+
+  void setNativeViewBounds(void* nativeView, const Rect bounds, const bool visible) override {
+    if (mView == nil || nativeView == nullptr) return;
+    NSView* view = (__bridge NSView*)nativeView;
+    if (![view isKindOfClass:[NSView class]]) return;
+    if (![mNativeViews containsObject:view]) {
+      [mView addSubview:view];
+      [mNativeViews addObject:view];
+    }
+    view.hidden = visible ? NO : YES;
+    view.frame = NSMakeRect(bounds.getLeft(),
+      mView.bounds.size.height - bounds.getBottom(),
+      std::max(0.0f, bounds.getWidth()), std::max(0.0f, bounds.getHeight()));
+  }
+
+  void removeNativeView(void* nativeView) override {
+    if (nativeView == nullptr) return;
+    NSView* view = (__bridge NSView*)nativeView;
+    if (![view isKindOfClass:[NSView class]]) return;
+    NSResponder* first = mWindow.firstResponder;
+    if (mView != nil && first != nil && [first isKindOfClass:[NSView class]] &&
+        [(NSView*)first isDescendantOf:view]) {
+      [mWindow makeFirstResponder:mView];
+    }
+    [view removeFromSuperview];
+    [mNativeViews removeObject:view];
+  }
+
+  void applyToolbarStyle() {
+    if (mWindow == nil) return;
+    if (@available(macOS 11.0, *)) {
+      switch (mOptions.toolbarStyle) {
+        case Window::ToolbarStyle::Expanded: mWindow.toolbarStyle = NSWindowToolbarStyleExpanded; break;
+        case Window::ToolbarStyle::Preference: mWindow.toolbarStyle = NSWindowToolbarStylePreference; break;
+        case Window::ToolbarStyle::Unified: mWindow.toolbarStyle = NSWindowToolbarStyleUnified; break;
+        case Window::ToolbarStyle::UnifiedCompact:
+          mWindow.toolbarStyle = NSWindowToolbarStyleUnifiedCompact; break;
+        case Window::ToolbarStyle::Automatic:
+        default: mWindow.toolbarStyle = NSWindowToolbarStyleUnified; break;
+      }
+    }
+    refreshContentLayout();
+    updateBackingSize(true);
+    notifySafeAreaChanged();
+  }
+
   void setToolbarItems(std::vector<Window::ToolbarItem> items) override {
     mToolbarItems = std::move(items);
     applyToolbar();
@@ -865,7 +1564,83 @@ class CocoaPlatform final : public WindowPlatform {
 
   void setToolbarVisible(const bool visible) override {
     mToolbarVisible = visible;
-    if (mWindow != nil) mWindow.toolbar = visible ? mToolbar : nil;
+    if (mWindow != nil) {
+      if (!visible) {
+        mWindow.toolbar = nil;
+        mFullscreenToolbarHidden = true;
+      } else if (mFullscreen && mOptions.fullscreenToolbarAutoHide) {
+        mToolbar.visible = NO;
+        mFullscreenToolbarHidden = true;
+      } else {
+        mWindow.toolbar = mToolbar;
+        mFullscreenToolbarHidden = false;
+      }
+    }
+    refreshContentLayout();
+    updateBackingSize(true);
+    notifySafeAreaChanged();
+  }
+
+  void setToolbarAutoHideInFullScreen(const bool enabled) override {
+    mOptions.fullscreenToolbarAutoHide = enabled;
+    if (mWindow == nil) return;
+    if (mFullscreen) {
+      if (enabled) {
+        hideFullscreenToolbar();
+      } else {
+        showFullscreenToolbar();
+      }
+    } else {
+      mFullscreenToolbarHidden = false;
+      mWindow.toolbar = mToolbarVisible ? mToolbar : nil;
+    }
+    refreshContentLayout();
+    updateBackingSize(true);
+  }
+
+  void notifySafeAreaChanged() {
+    if (mHost != nullptr) mHost->platformSafeAreaChanged(safeAreaInsets());
+  }
+
+  /** Hides the toolbar while full screen (the pointer leaves the top edge). */
+  void hideFullscreenToolbar() {
+    if (mWindow == nil || mToolbar == nil || !mToolbarVisible) return;
+    if (mFullscreenToolbarHidden && mToolbar.visible == NO) return;
+    mFullscreenToolbarHidden = true;
+    mToolbar.visible = NO;
+    refreshContentLayout();
+    updateBackingSize(true);
+    if (mHost != nullptr) mHost->platformResized(mWidth, mHeight);
+    notifySafeAreaChanged();
+  }
+
+  /** Reveals the toolbar when the pointer reaches the top edge in full screen. */
+  void showFullscreenToolbar() {
+    if (mWindow == nil || mToolbar == nil || !mToolbarVisible) return;
+    if (!mFullscreenToolbarHidden && mToolbar.visible) return;
+    mFullscreenToolbarHidden = false;
+    if (mWindow.toolbar != mToolbar) mWindow.toolbar = mToolbar;
+    mToolbar.visible = YES;
+    refreshContentLayout();
+    updateBackingSize(true);
+    if (mHost != nullptr) mHost->platformResized(mWidth, mHeight);
+    notifySafeAreaChanged();
+  }
+
+  void fullscreenMouseExited() {
+    if (mWindow == nil || !mFullscreen || !mOptions.fullscreenToolbarAutoHide) return;
+    hideFullscreenToolbar();
+  }
+
+  void fullscreenMouseMoved(const NSPoint locationInWindow) {
+    if (mWindow == nil || !mFullscreen || !mOptions.fullscreenToolbarAutoHide) return;
+    if (!mToolbarVisible || mToolbar == nil) return;
+    const CGFloat top = mWindow.frame.size.height;
+    if (locationInWindow.y >= top - 8.0) {
+      showFullscreenToolbar();
+    } else if (!mFullscreenToolbarHidden) {
+      hideFullscreenToolbar();
+    }
   }
 
   void setToolbarActionHandler(std::function<void(std::string_view)> handler) override {
@@ -894,6 +1669,27 @@ class CocoaPlatform final : public WindowPlatform {
         ? [NSString stringWithFormat:@"coral.toolbar.%zu", index]
         : [NSString stringWithUTF8String:item.id.c_str()];
       if (identifier.length == 0 || items[identifier] != nil) continue;
+      if (item.flexibleSpace) {
+        NSToolbarItem* nativeItem = [[NSToolbarItem alloc]
+          initWithItemIdentifier:NSToolbarFlexibleSpaceItemIdentifier];
+        items[NSToolbarFlexibleSpaceItemIdentifier] = nativeItem;
+        [identifiers addObject:NSToolbarFlexibleSpaceItemIdentifier];
+        continue;
+      }
+      if (item.separator) {
+        // AppKit's standard separator can be merged away in unified toolbars. A custom view keeps a
+        // deliberate 1px divider and still participates in item overflow.
+        NSToolbarItem* nativeItem = [[NSToolbarItem alloc] initWithItemIdentifier:identifier];
+        const CGFloat height = mWindow.toolbar != nil ? 22.0 : 24.0;
+        CoralToolbarSeparatorView* separator = [[CoralToolbarSeparatorView alloc]
+          initWithFrame:NSMakeRect(0, 0, 9, height)];
+        nativeItem.view = separator;
+        nativeItem.label = @"";
+        nativeItem.paletteLabel = @"";
+        items[identifier] = nativeItem;
+        [identifiers addObject:identifier];
+        continue;
+      }
       NSToolbarItem* nativeItem = [[NSToolbarItem alloc] initWithItemIdentifier:identifier];
       nativeItem.label = item.label.empty() ? identifier
         : [NSString stringWithUTF8String:item.label.c_str()];
@@ -904,6 +1700,10 @@ class CocoaPlatform final : public WindowPlatform {
       if (!item.symbol.empty() && @available(macOS 11.0, *)) {
         nativeItem.image = [NSImage imageWithSystemSymbolName:
           [NSString stringWithUTF8String:item.symbol.c_str()] accessibilityDescription:nil];
+      }
+      if (item.nativeView != nullptr) {
+        NSView* customView = (__bridge NSView*)item.nativeView;
+        if ([customView isKindOfClass:[NSView class]]) nativeItem.view = customView;
       }
       nativeItem.target = target;
       nativeItem.action = @selector(activate:);
@@ -921,8 +1721,13 @@ class CocoaPlatform final : public WindowPlatform {
     mToolbar.displayMode = NSToolbarDisplayModeIconAndLabel;
     mToolbar.allowsUserCustomization = YES;
     mToolbar.autosavesConfiguration = YES;
-    if (@available(macOS 11.0, *)) mWindow.toolbarStyle = NSWindowToolbarStyleUnified;
-    if (mToolbarVisible) mWindow.toolbar = mToolbar;
+    applyToolbarStyle();
+    if (mToolbarVisible && !(mFullscreen && mOptions.fullscreenToolbarAutoHide)) {
+      mWindow.toolbar = mToolbar;
+      mToolbar.visible = YES;
+    }
+    refreshContentLayout();
+    updateBackingSize(true);
   }
 
   void setTitle(std::string_view title) override {
@@ -1021,14 +1826,15 @@ class CocoaPlatform final : public WindowPlatform {
     // maps to the system frame on this backend.
     NSWindowStyleMask desired = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
       NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable;
+    if (mOptions.fullSizeContentView) desired |= NSWindowStyleMaskFullSizeContentView;
     if (mWindow.styleMask != desired) {
       mWindow.styleMask = desired;
     }
-    mWindow.titleVisibility = NSWindowTitleVisible;
-    mWindow.titlebarAppearsTransparent = NO;
+    mWindow.titleVisibility = mOptions.titlebarVisible ? NSWindowTitleVisible : NSWindowTitleHidden;
+    mWindow.titlebarAppearsTransparent = mOptions.fullSizeContentView ? YES : NO;
     for (NSWindowButton button: { NSWindowCloseButton, NSWindowMiniaturizeButton,
              NSWindowZoomButton }) {
-      [mWindow standardWindowButton:button].hidden = NO;
+      [mWindow standardWindowButton:button].hidden = mOptions.windowButtonsVisible ? NO : YES;
     }
   }
   void setOpacity(float opacity) override {
@@ -1085,6 +1891,9 @@ class CocoaPlatform final : public WindowPlatform {
     } else {
       appearance.preferDark = NO;
     }
+    if (@available(macOS 10.14, *)) {
+      appearance.accentColor = argbFromColor([NSColor controlAccentColor]);
+    }
     NSWorkspace* workspace = [NSWorkspace sharedWorkspace];
     if (@available(macOS 10.12, *)) {
       appearance.reduceMotion = workspace.accessibilityDisplayShouldReduceMotion;
@@ -1126,9 +1935,14 @@ class CocoaPlatform final : public WindowPlatform {
   }
 
   [[nodiscard]] graphics::gpu::NativeDisplay nativeDisplay() const override {
-    // CoralGraphics now has a macOS display-blank source (CVDisplayLink); the kind is enough for the
-    // per-window clock to select it. The RHI's render surface still travels through nativeWindow().
-    return graphics::gpu::NativeDisplay{ graphics::gpu::NativeDisplayKind::MacOS, nullptr, nullptr };
+    // CoralGraphics creates the CADisplayLink on the main thread and attaches it to its own run-loop
+    // thread, so the content view can select the window's actual screen.
+    return graphics::gpu::NativeDisplay{ graphics::gpu::NativeDisplayKind::MacOS, nullptr,
+      (__bridge void*) mView };
+  }
+
+  [[nodiscard]] void* nativeWindowHandle() const override {
+    return (__bridge void*) mWindow;
   }
 
   [[nodiscard]] void* nativeWindow() const override {
@@ -1159,8 +1973,32 @@ class CocoaPlatform final : public WindowPlatform {
       stages.total, mSurface->residentBytes() };
   }
 
+  [[nodiscard]] Insets safeAreaInsets() const override {
+    if (mWindow == nil || mWindow.contentView == nil) return {};
+    if (!mOptions.fullSizeContentView && !mFullscreen) return {};
+    const NSRect content = [mWindow.contentView convertRect:mWindow.contentView.bounds toView:nil];
+    const NSRect layout = mWindow.contentLayoutRect;
+    const CGFloat top = std::max<CGFloat>(0.0, NSMaxY(content) - NSMaxY(layout));
+    return Insets{ 0.0f, static_cast<float>(top), 0.0f, 0.0f };
+  }
+
   [[nodiscard]] bool outputIsHdr() const override {
-    return false;
+    if (mSurface == nullptr) return false;
+    const backend::SwapchainColorSpace space = mSurface->displayColorSpace();
+    return space == backend::SwapchainColorSpace::Hdr10Pq ||
+      space == backend::SwapchainColorSpace::ExtendedLinearP3;
+  }
+
+  [[nodiscard]] OutputColorSpace outputColorSpace() const override {
+    if (mSurface == nullptr) return mOptions.outputColorSpace;
+    switch (mSurface->displayColorSpace()) {
+      case backend::SwapchainColorSpace::DisplayP3: return OutputColorSpace::DisplayP3;
+      case backend::SwapchainColorSpace::ExtendedLinearP3:
+        return OutputColorSpace::ExtendedLinearP3;
+      case backend::SwapchainColorSpace::Hdr10Pq: return OutputColorSpace::Hdr10Pq;
+      case backend::SwapchainColorSpace::Srgb:
+      default: return OutputColorSpace::Srgb;
+    }
   }
 
   [[nodiscard]] uint32_t lastFrameCommandBuffers() const override {
@@ -1324,8 +2162,15 @@ class CocoaPlatform final : public WindowPlatform {
     const Key key = keyFromCode(event.keyCode);
     if (!isModifierKey(key)) return;
     const bool down = modifierIsDown(key, event.modifierFlags);
-    KeyEvent translated = keyEvent(event);
+    // A FlagsChanged event is not a key event: -isARepeat and -characters raise for it. Build the
+    // modifier state directly instead of routing it through keyEvent().
+    KeyEvent translated;
     translated.key = key;
+    const NSEventModifierFlags flags = event.modifierFlags;
+    translated.shift = (flags & NSEventModifierFlagShift) != 0;
+    translated.control = (flags & NSEventModifierFlagControl) != 0;
+    translated.alt = (flags & NSEventModifierFlagOption) != 0;
+    translated.meta = (flags & NSEventModifierFlagCommand) != 0;
     mHost->dispatchKey(translated, down);
   }
 
@@ -1335,8 +2180,17 @@ class CocoaPlatform final : public WindowPlatform {
     if (mView != nil) [mView.inputContext invalidateCharacterCoordinates];
   }
 
+  /** Lays out the AppKit content hierarchy before sampling the Metal view size. */
+  void refreshContentLayout() {
+    if (mWindow == nil) return;
+    [mWindow.contentView layoutSubtreeIfNeeded];
+    if (mSplitController != nil) [mSplitController.view layoutSubtreeIfNeeded];
+    if (mView != nil) [mView layoutSubtreeIfNeeded];
+  }
+
   void windowDidChangeGeometry() {
     if (mWindow == nil) return;
+    refreshContentLayout();
     const bool changed = updateBackingSize(true);
     if (!changed || mHost == nullptr || mWindow == nil || !mWindow.inLiveResize) return;
     // Render the size the user is looking at (including the very first resize event), but pace the
@@ -1401,13 +2255,23 @@ class CocoaPlatform final : public WindowPlatform {
 
   void windowStateChanged() {
     if (mWindow == nil) return;
+    const bool wasFullscreen = mFullscreen;
     mMaximized = [mWindow isZoomed] != NO;
     mMinimized = [mWindow isMiniaturized] != NO;
     mFullscreen = (mWindow.styleMask & NSWindowStyleMaskFullScreen) != 0;
+    if (mFullscreen && !wasFullscreen) {
+      mFullscreenToolbarHidden = true;
+      if (mOptions.fullscreenToolbarAutoHide && mToolbarVisible) mToolbar.visible = NO;
+    } else if (!mFullscreen && wasFullscreen) {
+      mFullscreenToolbarHidden = false;
+      if (mToolbarVisible && mToolbar != nil) mToolbar.visible = YES;
+    }
+    refreshContentLayout();
     if (mHost != nullptr) {
       mHost->platformStateChanged(mMaximized, mMinimized, mFullscreen);
     }
     updateBackingSize(true);
+    notifySafeAreaChanged();
   }
 
   void windowShouldCloseRequested() {
@@ -1451,6 +2315,24 @@ class CocoaPlatform final : public WindowPlatform {
     size_t cursor = 0;
     size_t anchor = 0;
     return mHost->surroundingText(&text, &cursor, &anchor);
+  }
+
+  /**
+   * True when the current input source is a plain keyboard layout (ABC, U.S., ...) rather than an
+   * input method (Pinyin, Kotoeri, ...).
+   *
+   * A keyboard layout does not need `interpretKeyEvents:` to compose text; dispatching the event's
+   * characters directly keeps AppKit's InputMethodKit lazy. That is what avoids the one-time TSM /
+   * IMKCFRunLoopWakeUpReliable diagnostics on the first plain-text key. An IME still takes the
+   * AppKit path, so Chinese/Japanese composition is unchanged.
+   */
+  [[nodiscard]] bool usesKeyboardLayout() const {
+    TISInputSourceRef source = TISCopyCurrentKeyboardInputSource();
+    if (source == nullptr) return false;
+    CFTypeRef type = TISGetInputSourceProperty(source, kTISPropertyInputSourceType);
+    const bool layout = type != nullptr && CFEqual(type, kTISTypeKeyboardLayout);
+    CFRelease(source);
+    return layout;
   }
 
   void requestCloseFromMenu() {
@@ -1653,6 +2535,18 @@ class CocoaPlatform final : public WindowPlatform {
     // Mailbox matches the Win32 window: the compositor keeps the newest queued frame instead of
     // making `nextDrawable` wait for the previous present.
     configuration.presentMode = backend::PresentMode::Mailbox;
+    switch (mOptions.outputColorSpace) {
+      case OutputColorSpace::DisplayP3:
+        configuration.outputColorSpace = backend::SwapchainColorSpace::DisplayP3; break;
+      case OutputColorSpace::ExtendedLinearP3:
+        configuration.outputColorSpace = backend::SwapchainColorSpace::ExtendedLinearP3; break;
+      case OutputColorSpace::Hdr10Pq:
+        configuration.outputColorSpace = backend::SwapchainColorSpace::Hdr10Pq; break;
+      case OutputColorSpace::Srgb:
+      default:
+        if (mOptions.hdrOutput) configuration.hdrOutput = true;
+        break;
+    }
     configuration.preferred = mOptions.rendererApi == RendererApi::Auto
       ? backend::Backend::Null : toBackend(mOptions.rendererApi);
     configuration.enableValidation = mOptions.enableValidation;
@@ -1698,6 +2592,7 @@ class CocoaPlatform final : public WindowPlatform {
 
     // ---- Application menu ----
     NSMenuItem* applicationItem = [[NSMenuItem alloc] init];
+    applicationItem.title = appName;
     NSMenu* applicationMenu = [[NSMenu alloc] initWithTitle:appName];
     [applicationMenu addItemWithTitle:[@"About " stringByAppendingString:appName]
                               action:@selector(orderFrontStandardAboutPanel:)
@@ -1734,6 +2629,7 @@ class CocoaPlatform final : public WindowPlatform {
 
     // ---- File menu ----
     NSMenuItem* fileItem = [[NSMenuItem alloc] init];
+    fileItem.title = @"File";
     NSMenu* fileMenu = [[NSMenu alloc] initWithTitle:@"File"];
     NSMenuItem* close = [fileMenu addItemWithTitle:@"Close"
                                             action:@selector(performClose:)
@@ -1744,6 +2640,7 @@ class CocoaPlatform final : public WindowPlatform {
 
     // ---- Edit menu ----
     NSMenuItem* editItem = [[NSMenuItem alloc] init];
+    editItem.title = @"Edit";
     NSMenu* editMenu = [[NSMenu alloc] initWithTitle:@"Edit"];
     NSMenuItem* undo = [editMenu addItemWithTitle:@"Undo"
                                            action:@selector(undo:)
@@ -1775,8 +2672,21 @@ class CocoaPlatform final : public WindowPlatform {
     editItem.submenu = editMenu;
     [menuBar addItem:editItem];
 
+    // ---- View menu ----
+    NSMenuItem* viewItem = [[NSMenuItem alloc] init];
+    viewItem.title = @"View";
+    NSMenu* viewMenu = [[NSMenu alloc] initWithTitle:@"View"];
+    [viewMenu addItemWithTitle:@"Enter Full Screen"
+                        action:@selector(toggleFullScreen:)
+                 keyEquivalent:@"f"];
+    viewMenu.itemArray.lastObject.keyEquivalentModifierMask =
+      NSEventModifierFlagCommand | NSEventModifierFlagControl;
+    viewItem.submenu = viewMenu;
+    [menuBar addItem:viewItem];
+
     // ---- Window menu ----
     NSMenuItem* windowItem = [[NSMenuItem alloc] init];
+    windowItem.title = @"Window";
     NSMenu* windowMenu = [[NSMenu alloc] initWithTitle:@"Window"];
     NSMenuItem* minimize = [windowMenu addItemWithTitle:@"Minimize"
                                                  action:@selector(performMiniaturize:)
@@ -1871,20 +2781,85 @@ class CocoaPlatform final : public WindowPlatform {
   static void registerWindow(CocoaPlatform* window);
   static void unregisterWindow(CocoaPlatform* window);
 
+  static const Window::SidebarItem* findSidebarItem(
+      const std::vector<Window::SidebarItem>& nodes, const std::string_view id) {
+    for (const Window::SidebarItem& item: nodes) {
+      if (item.id == id) return &item;
+      if (const Window::SidebarItem* nested = findSidebarItem(item.children, id)) return nested;
+    }
+    return nullptr;
+  }
+
+  static bool containsSidebarId(const Window::SidebarItem& item, const std::string_view id) {
+    if (item.id == id) return true;
+    for (const Window::SidebarItem& child: item.children) {
+      if (containsSidebarId(child, id)) return true;
+    }
+    return false;
+  }
+
+  static bool takeSidebarItem(std::vector<Window::SidebarItem>& nodes, const std::string_view id,
+      Window::SidebarItem& out) {
+    for (auto it = nodes.begin(); it != nodes.end(); ++it) {
+      if (it->id == id) {
+        out = std::move(*it);
+        nodes.erase(it);
+        return true;
+      }
+      if (takeSidebarItem(it->children, id, out)) return true;
+    }
+    return false;
+  }
+
+  static bool insertSidebarItem(std::vector<Window::SidebarItem>& nodes,
+      const std::string_view parentId, int index, Window::SidebarItem item) {
+    if (parentId.empty()) {
+      const int clamped = std::clamp(index, 0, static_cast<int>(nodes.size()));
+      nodes.insert(nodes.begin() + clamped, std::move(item));
+      return true;
+    }
+    for (Window::SidebarItem& node: nodes) {
+      if (node.id == parentId) {
+        const int clamped = std::clamp(index, 0, static_cast<int>(node.children.size()));
+        node.children.insert(node.children.begin() + clamped, std::move(item));
+        return true;
+      }
+      if (insertSidebarItem(node.children, parentId, index, item)) return true;
+    }
+    return false;
+  }
+
   [[nodiscard]] bool canClose() const {
     return mHost != nullptr && mHost->canClose();
   }
 
   WindowHost* mHost = nullptr;
   CoralDragSource* mActiveDragSource = nil;
+  NSSharingServicePicker* mSharePicker = nil;
+  NSViewController* mMaterialController = nil;
+  NSVisualEffectView* mBackgroundEffect = nil;
   NSToolbar* mToolbar = nil;
   CoralToolbarDelegate* mToolbarDelegate = nil;
   std::vector<Window::ToolbarItem> mToolbarItems;
+  bool mFullscreenToolbarHidden = false;
   std::function<void(std::string_view)> mToolbarAction;
   bool mToolbarVisible = true;
   bool mSecureInputEnabled = false;
+  CommandRegistry* mCommandRegistry = nullptr;
+  int mCommandToken = 0;
+  bool mCommandBound = false;
+  NSMenuItem* mCommandMenuItem = nil;
+  NSMenu* mDockMenu = nil;
+  NSMutableArray<NSMenuItem*>* mGeneratedCommandItems = nil;
+  NSMutableArray<CoralCommandTarget*>* mCommandTargets = nil;
   std::vector<Window::TitlebarAccessoryItem> mTitlebarItems;
   NSTitlebarAccessoryViewController* mTitlebarAccessory = nil;
+  void* mTitlebarCustomView = nullptr;
+  CoralNativeMenuTarget* mNativeMenuTarget = nil;
+  NSPopover* mPopover = nil;
+  NSViewController* mPopoverController = nil;
+  NSMutableArray<NSView*>* mNativeViews = [NSMutableArray array];
+  std::function<void(std::string_view)> mNativeContextAction;
   NSSegmentedControl* mTitlebarControl = nil;
   CoralTitlebarAccessoryTarget* mTitlebarTarget = nil;
   std::function<void(int)> mTitlebarAccessorySelection;
@@ -1893,6 +2868,10 @@ class CocoaPlatform final : public WindowPlatform {
   NSSplitViewItem* mSidebarSplitItem = nil;
   CoralSplitViewController* mSplitController = nil;
   std::function<void(std::string_view)> mSidebarSelection;
+  std::function<void(std::string_view, std::string_view)> mSidebarEdit;
+  std::function<void(std::string_view, std::string_view, int)> mSidebarMove;
+  std::vector<Window::SidebarContextAction> mSidebarContextActions;
+  std::function<void(std::string_view, std::string_view)> mSidebarContextAction;
   std::string mSelectedSidebarItem;
   bool mSidebarVisible = true;
   std::function<AccessibilityNode()> mAccessibilityProvider;
@@ -2083,6 +3062,11 @@ coral::ui::DragPayload payloadFromPasteboard(NSPasteboard* pasteboard) {
   return NO;
 }
 
+- (NSMenu*)applicationDockMenu:(NSApplication*)sender {
+  (void)sender;
+  return gCoralDockMenu;
+}
+
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication*)sender {
   (void)sender;
   if (!coral::ui::detail::dispatchShouldTerminate()) return NSTerminateCancel;
@@ -2122,6 +3106,29 @@ coral::ui::DragPayload payloadFromPasteboard(NSPasteboard* pasteboard) {
 
 @end
 
+@implementation CoralCommandTarget
+
+@synthesize platform = _platform;
+@synthesize commandName = _commandName;
+
+- (void)invokeCommand:(id)sender {
+  (void)sender;
+  if (_platform == nullptr || _commandName == nil) return;
+  static_cast<coral::ui::detail::CocoaPlatform*>(_platform)->invokeCommand(
+    _commandName.UTF8String != nullptr ? std::string_view(_commandName.UTF8String) : std::string_view());
+}
+
+- (BOOL)validateMenuItem:(NSMenuItem*)item {
+  if (_platform == nullptr || _commandName == nil) return NO;
+  auto* platform = static_cast<coral::ui::detail::CocoaPlatform*>(_platform);
+  const std::string_view name = _commandName.UTF8String != nullptr
+    ? std::string_view(_commandName.UTF8String) : std::string_view();
+  item.state = platform->commandChecked(name) ? NSControlStateValueOn : NSControlStateValueOff;
+  return platform->commandEnabled(name) ? YES : NO;
+}
+
+@end
+
 @implementation CoralTitlebarAccessoryTarget
 
 @synthesize platform = _platform;
@@ -2136,26 +3143,86 @@ coral::ui::DragPayload payloadFromPasteboard(NSPasteboard* pasteboard) {
 
 @end
 
+@implementation CoralSidebarNode
+@end
+
+@implementation CoralSidebarContextAction
+@end
+
 @implementation CoralSidebarController
 
 @synthesize platform = _platform;
-@synthesize identifiers = _identifiers;
-@synthesize labels = _labels;
-@synthesize symbols = _symbols;
-@synthesize groupRows = _groupRows;
-@synthesize table = _table;
+@synthesize roots = _roots;
+@synthesize outline = _outline;
+@synthesize contextActions = _contextActions;
 
-- (NSInteger)numberOfRowsInTableView:(NSTableView*)tableView {
-  (void)tableView;
-  return static_cast<NSInteger>(_labels.count);
+- (void)updateContextMenu {
+  if (_outline == nil) return;
+  if (_contextActions.count == 0) {
+    _outline.menu = nil;
+    return;
+  }
+  if (_outline.menu == nil) {
+    NSMenu* menu = [[NSMenu alloc] initWithTitle:@"Sidebar"];
+    menu.delegate = self;
+    _outline.menu = menu;
+  }
+  // Populate now as well: `menuNeedsUpdate:` otherwise only runs when the menu is about to open,
+  // which leaves an empty item array for callers and for the native smoke.
+  [self menuNeedsUpdate:_outline.menu];
 }
 
-- (NSView*)tableView:(NSTableView*)tableView viewForTableColumn:(NSTableColumn*)column
-    row:(NSInteger)row {
+- (void)menuNeedsUpdate:(NSMenu*)menu {
+  [menu removeAllItems];
+  for (CoralSidebarContextAction* action in _contextActions) {
+    NSMenuItem* item = [menu addItemWithTitle:action.title ?: @""
+                                        action:@selector(contextAction:)
+                                 keyEquivalent:@""];
+    item.target = self;
+    item.representedObject = action.identifier;
+  }
+}
+
+- (void)contextAction:(NSMenuItem*)item {
+  if (_platform == nullptr || _outline == nil) return;
+  NSInteger row = _outline.clickedRow;
+  if (row < 0) row = _outline.selectedRow;
+  CoralSidebarNode* node = row >= 0 ? [_outline itemAtRow:row] : nil;
+  NSString* identifier = node != nil ? node.identifier : nil;
+  NSString* action = [item.representedObject isKindOfClass:[NSString class]]
+    ? (NSString*)item.representedObject : nil;
+  if (identifier.length == 0 || action.length == 0) return;
+  static_cast<coral::ui::detail::CocoaPlatform*>(_platform)->sidebarContextActionTriggered(
+    identifier.UTF8String, action.UTF8String);
+}
+
+- (NSInteger)outlineView:(NSOutlineView*)outlineView numberOfChildrenOfItem:(id)item {
+  (void)outlineView;
+  NSArray<CoralSidebarNode*>* children = item != nil
+    ? ((CoralSidebarNode*)item).children : _roots;
+  return static_cast<NSInteger>(children.count);
+}
+
+- (id)outlineView:(NSOutlineView*)outlineView child:(NSInteger)index ofItem:(id)item {
+  (void)outlineView;
+  NSArray<CoralSidebarNode*>* children = item != nil
+    ? ((CoralSidebarNode*)item).children : _roots;
+  if (index < 0 || index >= static_cast<NSInteger>(children.count)) return nil;
+  return children[static_cast<NSUInteger>(index)];
+}
+
+- (BOOL)outlineView:(NSOutlineView*)outlineView isItemExpandable:(id)item {
+  (void)outlineView;
+  return item != nil && ((CoralSidebarNode*)item).children.count > 0;
+}
+
+- (NSView*)outlineView:(NSOutlineView*)outlineView viewForTableColumn:(NSTableColumn*)column
+    item:(id)item {
   (void)column;
-  if (row < 0 || row >= static_cast<NSInteger>(_labels.count)) return nil;
+  CoralSidebarNode* node = (CoralSidebarNode*)item;
+  if (node == nil) return nil;
   NSString* identifier = @"coral.sidebar.cell";
-  NSTableCellView* cell = [tableView makeViewWithIdentifier:identifier owner:self];
+  NSTableCellView* cell = [outlineView makeViewWithIdentifier:identifier owner:self];
   if (cell == nil) {
     cell = [[NSTableCellView alloc] initWithFrame:NSMakeRect(0.0, 0.0, 220.0, 28.0)];
     cell.identifier = identifier;
@@ -2172,35 +3239,99 @@ coral::ui::DragPayload payloadFromPasteboard(NSPasteboard* pasteboard) {
     [cell addSubview:label];
     cell.textField = label;
   }
-  cell.textField.stringValue = _labels[static_cast<NSUInteger>(row)];
-  const bool group = _groupRows != nil && [_groupRows containsIndex:static_cast<NSUInteger>(row)];
-  cell.textField.font = group ? [NSFont boldSystemFontOfSize:11.0]
-                              : [NSFont systemFontOfSize:13.0];
-  NSString* symbol = group ? @"" : _symbols[static_cast<NSUInteger>(row)];
-  if (symbol.length > 0 && @available(macOS 11.0, *)) {
-    cell.imageView.image = [NSImage imageWithSystemSymbolName:symbol accessibilityDescription:nil];
+  cell.textField.stringValue = node.label ?: @"";
+  cell.textField.editable = node.editable;
+  cell.textField.selectable = node.editable;
+  cell.textField.font = node.group ? [NSFont boldSystemFontOfSize:11.0]
+                                   : [NSFont systemFontOfSize:13.0];
+  if (!node.group && node.symbol.length > 0 && @available(macOS 11.0, *)) {
+    cell.imageView.image = [NSImage imageWithSystemSymbolName:node.symbol
+                                       accessibilityDescription:nil];
   } else {
     cell.imageView.image = nil;
   }
   return cell;
 }
 
+- (void)outlineView:(NSOutlineView*)outlineView setObjectValue:(id)object
+    forTableColumn:(NSTableColumn*)column item:(id)item {
+  (void)outlineView;
+  (void)column;
+  CoralSidebarNode* node = (CoralSidebarNode*)item;
+  if (node == nil || !node.editable || _platform == nullptr) return;
+  NSString* value = [object isKindOfClass:[NSString class]] ? (NSString*)object
+    : [object respondsToSelector:@selector(stringValue)] ? [object stringValue] : nil;
+  if (value == nil) return;
+  node.label = value;
+  const char* identifier = node.identifier.UTF8String;
+  const char* label = value.UTF8String;
+  if (identifier != nullptr && label != nullptr) {
+    static_cast<coral::ui::detail::CocoaPlatform*>(_platform)->sidebarLabelEdited(
+      identifier, label);
+  }
+}
+
+- (NSPasteboardItem*)outlineView:(NSOutlineView*)outlineView
+    pasteboardWriterForItem:(id)item {
+  (void)outlineView;
+  CoralSidebarNode* node = (CoralSidebarNode*)item;
+  if (node == nil || node.identifier.length == 0) return nil;
+  NSPasteboardItem* pasteboard = [[NSPasteboardItem alloc] init];
+  [pasteboard setString:node.identifier forType:@"com.coral.sidebar.item"];
+  return pasteboard;
+}
+
+- (NSDragOperation)outlineView:(NSOutlineView*)outlineView validateDrop:(id<NSDraggingInfo>)info
+    proposedItem:(id)item proposedChildIndex:(NSInteger)index {
+  (void)outlineView;
+  (void)item;
+  (void)index;
+  NSString* identifier = [[info draggingPasteboard] stringForType:@"com.coral.sidebar.item"];
+  return identifier.length > 0 ? NSDragOperationMove : NSDragOperationNone;
+}
+
+- (BOOL)outlineView:(NSOutlineView*)outlineView acceptDrop:(id<NSDraggingInfo>)info
+    item:(id)item childIndex:(NSInteger)index {
+  if (_platform == nullptr) return NO;
+  NSString* identifier = [[info draggingPasteboard] stringForType:@"com.coral.sidebar.item"];
+  CoralSidebarNode* parent = (CoralSidebarNode*)item;
+  NSString* parentId = parent != nil ? parent.identifier : @"";
+  NSInteger targetIndex = index;
+  if (targetIndex == NSOutlineViewDropOnItemIndex) {
+    targetIndex = [self outlineView:outlineView numberOfChildrenOfItem:item];
+  }
+  if (identifier.length == 0 || parentId == nil) return NO;
+  const char* id = identifier.UTF8String;
+  const char* parentUtf8 = parentId.UTF8String;
+  if (id == nullptr || parentUtf8 == nullptr) return NO;
+  return static_cast<coral::ui::detail::CocoaPlatform*>(_platform)->moveSidebarItem(
+    id, parentUtf8, static_cast<int>(targetIndex)) ? YES : NO;
+}
+
+- (BOOL)outlineView:(NSOutlineView*)outlineView isGroupItem:(id)item {
+  (void)outlineView;
+  return item != nil && ((CoralSidebarNode*)item).group;
+}
+
+- (BOOL)outlineView:(NSOutlineView*)outlineView shouldSelectItem:(id)item {
+  (void)outlineView;
+  return item != nil && !((CoralSidebarNode*)item).group;
+}
+
+// Keep the table-view alias too: a caller that only knows NSTableView can still ask about a row.
 - (BOOL)tableView:(NSTableView*)tableView isGroupRow:(NSInteger)row {
   (void)tableView;
-  return _groupRows != nil && [_groupRows containsIndex:static_cast<NSUInteger>(row)];
+  id item = [_outline itemAtRow:row];
+  return item != nil && ((CoralSidebarNode*)item).group;
 }
 
-- (BOOL)tableView:(NSTableView*)tableView shouldSelectRow:(NSInteger)row {
-  (void)tableView;
-  return _groupRows == nil || ![_groupRows containsIndex:static_cast<NSUInteger>(row)];
-}
-
-- (void)tableViewSelectionDidChange:(NSNotification*)notification {
+- (void)outlineViewSelectionDidChange:(NSNotification*)notification {
   (void)notification;
-  if (_platform == nullptr || _table == nil) return;
-  const NSInteger row = _table.selectedRow;
-  if (row < 0 || row >= static_cast<NSInteger>(_identifiers.count)) return;
-  const char* identifier = _identifiers[static_cast<NSUInteger>(row)].UTF8String;
+  if (_platform == nullptr || _outline == nil) return;
+  const NSInteger row = _outline.selectedRow;
+  CoralSidebarNode* node = row >= 0 ? [_outline itemAtRow:row] : nil;
+  if (node == nil || node.identifier == nil) return;
+  const char* identifier = node.identifier.UTF8String;
   if (identifier != nullptr) {
     static_cast<coral::ui::detail::CocoaPlatform*>(_platform)->sidebarSelectionChanged(identifier);
   }
@@ -2217,6 +3348,21 @@ coral::ui::DragPayload payloadFromPasteboard(NSPasteboard* pasteboard) {
   if (_platform != nullptr) {
     static_cast<coral::ui::detail::CocoaPlatform*>(_platform)->splitViewResized();
   }
+}
+
+@end
+
+@implementation CoralNativeMenuTarget
+
+@synthesize platform = _platform;
+
+- (void)select:(NSMenuItem*)item {
+  if (_platform == nullptr || item.representedObject == nil) return;
+  NSString* identifier = [item.representedObject isKindOfClass:[NSString class]]
+    ? (NSString*)item.representedObject : nil;
+  if (identifier.length == 0) return;
+  static_cast<coral::ui::detail::CocoaPlatform*>(_platform)->nativeContextMenuSelected(
+    identifier.UTF8String);
 }
 
 @end
@@ -2310,8 +3456,16 @@ NSString* accessibilityRoleFor(const coral::ui::AccessibilityRole role) {
     case coral::ui::AccessibilityRole::CheckBox: return NSAccessibilityCheckBoxRole;
     case coral::ui::AccessibilityRole::Radio: return NSAccessibilityRadioButtonRole;
     case coral::ui::AccessibilityRole::Slider: return NSAccessibilitySliderRole;
+    case coral::ui::AccessibilityRole::ComboBox: return NSAccessibilityComboBoxRole;
+    case coral::ui::AccessibilityRole::ColorPicker: return NSAccessibilityColorWellRole;
+    case coral::ui::AccessibilityRole::SpinButton: return NSAccessibilitySliderRole;
+    case coral::ui::AccessibilityRole::Calendar: return NSAccessibilityGroupRole;
+    case coral::ui::AccessibilityRole::ProgressIndicator:
+      return NSAccessibilityProgressIndicatorRole;
+    case coral::ui::AccessibilityRole::TabList: return NSAccessibilityTabGroupRole;
     case coral::ui::AccessibilityRole::TextField: return NSAccessibilityTextFieldRole;
     case coral::ui::AccessibilityRole::Label: return NSAccessibilityStaticTextRole;
+    case coral::ui::AccessibilityRole::Link: return NSAccessibilityLinkRole;
     case coral::ui::AccessibilityRole::List: return NSAccessibilityListRole;
     case coral::ui::AccessibilityRole::Tree: return NSAccessibilityOutlineRole;
     case coral::ui::AccessibilityRole::Menu: return NSAccessibilityMenuRole;
@@ -2530,6 +3684,12 @@ CoralAXElement* makeCoralAXElement(const coral::ui::AccessibilityNode& node, NSR
       coral::ui::hasAccessibilityAction(node.actions, coral::ui::AccessibilityAction::Select)) {
     [actions addObject:NSAccessibilityPressAction];
   }
+  if (coral::ui::hasAccessibilityAction(node.actions, coral::ui::AccessibilityAction::Confirm)) {
+    [actions addObject:NSAccessibilityConfirmAction];
+  }
+  if (coral::ui::hasAccessibilityAction(node.actions, coral::ui::AccessibilityAction::Cancel)) {
+    [actions addObject:NSAccessibilityCancelAction];
+  }
   if (node.range.has_value()) {
     [actions addObject:NSAccessibilityIncrementAction];
     [actions addObject:NSAccessibilityDecrementAction];
@@ -2557,6 +3717,10 @@ CoralAXElement* makeCoralAXElement(const coral::ui::AccessibilityNode& node, NSR
       kind = coral::ui::AccessibilityAction::Select;
     }
     (void)platform->performAccessibilityAction(path, kind, {});
+  } else if ([action isEqualToString:NSAccessibilityConfirmAction]) {
+    (void)platform->performAccessibilityAction(path, coral::ui::AccessibilityAction::Confirm, {});
+  } else if ([action isEqualToString:NSAccessibilityCancelAction]) {
+    (void)platform->performAccessibilityAction(path, coral::ui::AccessibilityAction::Cancel, {});
   } else if ([action isEqualToString:NSAccessibilityIncrementAction] ||
              [action isEqualToString:NSAccessibilityDecrementAction]) {
     if (payload->node.range.has_value()) {
@@ -2591,6 +3755,14 @@ CoralAXElement* makeCoralAXElement(const coral::ui::AccessibilityNode& node, NSR
 
 - (BOOL)acceptsFirstResponder {
   return YES;
+}
+
+- (void)drawFocusRingMask {
+  NSRectFill(self.bounds);
+}
+
+- (NSRect)focusRingMaskBounds {
+  return self.bounds;
 }
 
 - (BOOL)becomeFirstResponder {
@@ -2672,7 +3844,10 @@ CoralAXElement* makeCoralAXElement(const coral::ui::AccessibilityNode& node, NSR
 
 - (void)mouseMoved:(NSEvent*)event {
   auto* platform = static_cast<CocoaPlatform*>(self.platform);
-  if (platform != nullptr) platform->dispatchPointerEvent(event, coral::ui::PointerButton::None, 0, true);
+  if (platform != nullptr) {
+    platform->fullscreenMouseMoved(event.locationInWindow);
+    platform->dispatchPointerEvent(event, coral::ui::PointerButton::None, 0, true);
+  }
 }
 
 - (void)mouseDragged:(NSEvent*)event {
@@ -2703,7 +3878,10 @@ CoralAXElement* makeCoralAXElement(const coral::ui::AccessibilityNode& node, NSR
 
 - (void)mouseExited:(NSEvent*)event {
   auto* platform = static_cast<CocoaPlatform*>(self.platform);
-  if (platform != nullptr) platform->dispatchPointerEvent(event, coral::ui::PointerButton::None, 0, false);
+  if (platform != nullptr) {
+    platform->fullscreenMouseExited();
+    platform->dispatchPointerEvent(event, coral::ui::PointerButton::None, 0, false);
+  }
 }
 
 - (void)scrollWheel:(NSEvent*)event {
@@ -2720,7 +3898,14 @@ CoralAXElement* makeCoralAXElement(const coral::ui::AccessibilityNode& node, NSR
   const NSEventModifierFlags flags = event.modifierFlags;
   const bool shortcut = (flags & (NSEventModifierFlagCommand | NSEventModifierFlagControl)) != 0;
   if (!shortcut && platform->hasTextFocus()) {
-    [self interpretKeyEvents:@[ event ]];
+    if (platform->usesKeyboardLayout()) {
+      // No IME composition is needed for a keyboard layout. Dispatch the characters directly and
+      // avoid initialising InputMethodKit just for a plain ASCII key.
+      platform->dispatchKeyEvent(event, true);
+      platform->dispatchTextEvent(event);
+    } else {
+      [self interpretKeyEvents:@[ event ]];
+    }
     return;
   }
   platform->dispatchKeyEvent(event, true);
@@ -3015,6 +4200,7 @@ CoralAXElement* makeCoralAXElement(const coral::ui::AccessibilityNode& node, NSR
 }
 
 - (NSArray*)accessibilityChildren {
+  if (!coral::ui::detail::cocoaAccessibilityEnabled()) return @[];
   auto* platform = static_cast<CocoaPlatform*>(self.platform);
   if (platform == nullptr) return @[];
   const coral::ui::AccessibilityNode snapshot = platform->accessibilitySnapshot();
@@ -3024,6 +4210,7 @@ CoralAXElement* makeCoralAXElement(const coral::ui::AccessibilityNode& node, NSR
 }
 
 - (id)accessibilityHitTest:(NSPoint)point {
+  if (!coral::ui::detail::cocoaAccessibilityEnabled()) return nil;
   NSArray* roots = [self accessibilityChildren];
   id best = nil;
   NSMutableArray* pending = [NSMutableArray arrayWithArray:roots];
@@ -3039,6 +4226,7 @@ CoralAXElement* makeCoralAXElement(const coral::ui::AccessibilityNode& node, NSR
 }
 
 - (id)accessibilityFocusedUIElement {
+  if (!coral::ui::detail::cocoaAccessibilityEnabled()) return nil;
   NSArray* children = [self accessibilityChildren];
   NSMutableArray* pending = [NSMutableArray arrayWithArray:children];
   while (pending.count > 0) {
@@ -3081,6 +4269,24 @@ CoralAXElement* makeCoralAXElement(const coral::ui::AccessibilityNode& node, NSR
 // ==================================================================================================
 // The window delegate
 // ==================================================================================================
+
+@implementation CoralWindowRestoration
+
++ (void)restoreWindowWithIdentifier:(NSString*)identifier state:(NSCoder*)state
+    completionHandler:(void (^)(NSWindow*, NSError*))completionHandler {
+  (void)state;
+  std::shared_ptr<coral::ui::Window> window =
+    coral::ui::restoreWindowForIdentifier(identifier.UTF8String);
+  if (window == nullptr) {
+    completionHandler(nil, [NSError errorWithDomain:@"CoralUI" code:1 userInfo:@{
+      NSLocalizedDescriptionKey: @"no CoralUI restoration factory produced a window" }]);
+    return;
+  }
+  coral::ui::retainRestoredWindow(window);
+  completionHandler((__bridge NSWindow*)window->nativeWindowHandle(), nil);
+}
+
+@end
 
 @implementation CoralUIWindowDelegate
 
@@ -3153,7 +4359,11 @@ CoralAXElement* makeCoralAXElement(const coral::ui::AccessibilityNode& node, NSR
 - (void)windowDidBecomeKey:(NSNotification*)notification {
   (void)notification;
   auto* platform = static_cast<CocoaPlatform*>(self.platform);
-  if (platform != nullptr) platform->windowVisibilityChanged(true);
+  if (platform != nullptr) {
+    platform->ensureCommandMenu();
+    platform->rebuildCommandMenu();
+    platform->windowVisibilityChanged(true);
+  }
 }
 
 - (void)windowDidResignKey:(NSNotification*)notification {

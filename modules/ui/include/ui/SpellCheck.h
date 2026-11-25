@@ -43,6 +43,10 @@ struct SpellIssue {
 [[nodiscard]] std::vector<std::string> spellSuggestions(std::string_view word,
   std::string_view language = {});
 
+/** The platform's single autocorrect replacement for @p word, or empty when it has none. */
+[[nodiscard]] std::string spellCorrection(std::string_view word,
+  std::string_view language = {});
+
 [[nodiscard]] bool supportsSpellChecking() noexcept;
 
 } // namespace coral::ui

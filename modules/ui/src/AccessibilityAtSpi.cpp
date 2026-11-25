@@ -8,8 +8,15 @@ const char* atspiRoleName(const AccessibilityRole role) {
     case AccessibilityRole::CheckBox: return "check box";
     case AccessibilityRole::Radio: return "radio button";
     case AccessibilityRole::Slider: return "slider";
+    case AccessibilityRole::ComboBox: return "combo box";
+    case AccessibilityRole::ColorPicker: return "color chooser";
+    case AccessibilityRole::SpinButton: return "spin button";
+    case AccessibilityRole::Calendar: return "calendar";
+    case AccessibilityRole::ProgressIndicator: return "progress bar";
+    case AccessibilityRole::TabList: return "page tab list";
     case AccessibilityRole::TextField: return "text";
     case AccessibilityRole::Label: return "label";
+    case AccessibilityRole::Link: return "link";
     case AccessibilityRole::List: return "list";
     case AccessibilityRole::Tree: return "tree";
     case AccessibilityRole::Menu: return "menu";

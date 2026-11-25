@@ -12,9 +12,13 @@ examples/
 ├── fonts/                # the reference fonts the demos use (bundled, no external assets needed)
 └── ui/
     ├── CMakeLists.txt    # the executables and their headless CTest checks
-    ├── ui_demo.cpp       # window/layout/input/present smoke test, native or --headless
+    ├── gallery_sections.cpp # sectioned gallery pages
+    ├── ui_demo.cpp       # gallery + window/layout/input/AX/IME acceptance app
     └── ui_mvvm_demo.cpp  # DataContext + Element/Reconciler reference page, headless
 ```
+
+The cross-platform control inventory and accessibility/style contracts are in
+[`docs/cross-platform-controls.md`](../docs/cross-platform-controls.md).
 
 ## Configuring
 
@@ -66,20 +70,42 @@ out/examples/ui/ui_demo --headless --frames 2 --out out/ui_demo.png
 # The executable inside it takes the same arguments:
 out/examples/ui/ui_demo.app/Contents/MacOS/ui_demo --headless --frames 2 --out out/ui_demo.png
 open out/examples/ui/ui_demo.app
-out/examples/ui/ui_demo.app/Contents/MacOS/ui_demo --frames 0 --width 960 --height 540
+out/examples/ui/ui_demo.app/Contents/MacOS/ui_demo --frames 0 --width 960 --height 700
+# Pick a gallery section at launch (0 Inputs, 1 Selection, ... 6 Lists, 7 Native macOS, 8 More)
+out/examples/ui/ui_demo.app/Contents/MacOS/ui_demo --frames 0 --section 6
+# Open one control's standalone demo (section is inferred from the control row)
+out/examples/ui/ui_demo.app/Contents/MacOS/ui_demo --frames 0 --control SplitButton
+
+# Manual macOS acceptance modes
+open out/examples/ui/ui_demo.app --args --toolbar
+open out/examples/ui/ui_demo.app --args --toolbar --native-disabled
+open out/examples/ui/ui_demo.app --args --ime-demo
 
 # Linux native window (the macOS equivalent is the bundle executable above)
-out/examples/ui/ui_demo --frames 0 --width 960 --height 540
+out/examples/ui/ui_demo --frames 0 --width 960 --height 700
 
 # The declarative reference page (headless by default)
 out/examples/ui/ui_mvvm_demo --out out/ui_mvvm_demo.png --frames 1
 ```
 
-`ui_demo` also accepts `--platform auto|cocoa|x11|wayland`,
-`--render-host same-thread|render-thread`, `--theme dark|light`, `--scale S`, `--focus-input` and
-`--frames N`. `--frames 0` keeps a native window open until it is closed. On macOS the window opens
+`ui_demo` also accepts `--bookmark-panel` (NSOpenPanel + security-scoped bookmark),
+`--bookmark-smoke` (container-local bookmark smoke), `--platform auto|cocoa|x11|wayland`,
+`--render-host same-thread|render-thread`, `--theme dark|light`, `--scale S`, `--focus-input`,
+`--section N` and `--frames N` (section 8 is the additional-controls page). The left gallery list is a `RecyclingListView` with expandable
+sections and selectable control rows; a row opens that control's standalone demo with an MVVM event/value readout, while its section
+header opens the group page. `--control NAME` opens a control demo directly. Section 6 (`Lists`)
+contains an inner `ScrollView` to exercise nested wheel routing. `--frames 0` keeps a native window open until it is closed. On macOS the window opens
 at the requested point size (a 960x540 request is a 960x540-point window, 1920x1080 backing pixels on
 a Retina display) and presents through Metal.
+
+## macOS signing
+
+`scripts/check-macos-release.sh` verifies the Developer ID/runtime/universal/Gatekeeper prerequisites
+before notarization. `scripts/notarize-macos-app.sh` submits a Developer ID-signed bundle to notarytool.
+`scripts/check-macos-sandbox.sh` signs the demo with the sandbox entitlement template and verifies
+the embedded entitlements. The reference font is bundled under `Contents/Resources/fonts`, so a
+sandboxed headless launch works; `ui_demo --bookmark-smoke` exercises a container-local
+security-scoped bookmark, while user-selected file access still needs a real NSOpenPanel.
 
 ## Verification
 
@@ -88,11 +114,25 @@ registered:
 
 | Test | What it proves |
 |---|---|
-| `example_ui_demo_headless` | an offscreen window lays out, renders and snapshots the layer showcase |
+| `example_ui_demo_light_headless` | the gallery renders with the light theme |
+| `example_ui_demo_headless` | the sectioned gallery lays out and snapshots the Inputs page |
+| `example_ui_demo_lists_headless` | the Lists page renders the outer and nested ScrollViews |
+| `example_ui_demo_control_headless` | a standalone control demo renders with its accent frame |
+| `example_ui_demo_native_headless` | the Native macOS page renders its fallback text offscreen |
+| `example_ui_demo_more_headless` | the More page renders additional framework controls |
 | `example_ui_mvvm_headless` | the Element/Reconciler page mounts, patches from a Command and renders |
 
 The native window path is the manual check; `ui_demo --frames N --out frame.png` also snapshots the
 presented frame, so a macOS or Windows run can be verified without a screenshot.
+
+The two programs have different jobs and are intentionally kept separate:
+
+- `ui_demo` is the macOS bundle/acceptance app and the cross-platform control gallery. It owns the
+  `.app`, Info.plist, signing/entitlement options, `--platform`/`--render-host`/`--theme` flags,
+  the manual AX/IME/window checks and the visual control catalog.
+- `ui_mvvm_demo` is the DataContext/Element/Reconciler reference page.
+
+Deleting `ui_mvvm_demo` would remove the MVVM reference path; the gallery is part of `ui_demo`.
 
 ```sh
 ctest --test-dir out/examples -C Release -L examples --output-on-failure

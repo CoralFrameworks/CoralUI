@@ -159,6 +159,8 @@ enum class AccessibilityAction : uint8_t {
   Expand = 1 << 3,
   Scroll = 1 << 4,
   Select = 1 << 5,
+  Confirm = 1 << 6,
+  Cancel = 1 << 7,
 };
 
 [[nodiscard]] constexpr AccessibilityAction operator|(const AccessibilityAction left,

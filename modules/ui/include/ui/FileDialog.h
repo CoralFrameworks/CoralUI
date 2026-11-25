@@ -40,6 +40,12 @@ struct FileDialogOptions {
   std::string defaultPath;
   std::vector<FileDialogFilter> filters;
   bool allowMultiple = false;
+  /** Open panel may select directories. Defaults to files only. */
+  bool canChooseDirectories = false;
+  /** Open panel may select files. Set false with canChooseDirectories for a folder picker. */
+  bool canChooseFiles = true;
+  /** Optional native accessory view (`NSView*` on macOS); ignored by other backends. */
+  void* accessoryView = nullptr;
   /**
    * The portal's `parent_window` handle, for example `x11:0x1234`.
    *

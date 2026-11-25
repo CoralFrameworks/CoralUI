@@ -44,6 +44,8 @@ struct RichTextRun {
   std::shared_ptr<const FontFallback> fallback;
   Color color = Color::White();
   bool underline = false;
+  /** Optional OpenType feature settings for this run; tags are borrowed and must outlive layout. */
+  std::vector<graphics::FontFeature> features;
 };
 
 struct RichTextSegment {
@@ -55,6 +57,8 @@ struct RichTextSegment {
   /** Byte range in the concatenated runs. */
   size_t start = 0;
   size_t end = 0;
+  /** Optional OpenType feature settings copied from the run. */
+  std::vector<graphics::FontFeature> features;
 };
 
 /**

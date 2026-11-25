@@ -47,7 +47,7 @@ class Menu;
 class TextPainter;
 
 /**
- * A single-line editable text field.
+ * An editable text field; single-line by default, multiline via `setMultiline(true)`.
  *
  * It takes focus like any other layer, consumes characters through `onTextInput` and edits around a
  * UTF-8 byte cursor. This is the direct/ASCII input path the first editor milestone needs; a platform
@@ -62,8 +62,19 @@ class TextInput final : public Layer {
   [[nodiscard]] const std::string& text() const noexcept {
     return mText;
   }
+  /** Called when Enter is pressed in a single-line field; the text is left unchanged. */
+  void setOnSubmit(std::function<void(const std::string&)> callback) {
+    mOnSubmit = std::move(callback);
+  }
 
   void setFont(std::shared_ptr<const Font> font);
+  /** Installs a varied copy of the current font; false for a static face or an invalid axis. */
+  bool setFontVariations(std::vector<graphics::FontVariation> variations, std::string* error = nullptr);
+  /** Per-run OpenType feature settings; tags are borrowed and must outlive the input. */
+  void setFontFeatures(std::vector<graphics::FontFeature> features);
+  [[nodiscard]] const std::vector<graphics::FontFeature>& fontFeatures() const noexcept {
+    return mFontFeatures;
+  }
   void setFontFallback(std::shared_ptr<const FontFallback> fallback);
   [[nodiscard]] const std::shared_ptr<const FontFallback>& fontFallback() const noexcept {
     return mFallback;
@@ -92,6 +103,13 @@ class TextInput final : public Layer {
    * and set `spellIssues` through the app, which this convenience API does not model yet.
    */
   void setSpellCheckEnabled(bool enabled);
+  /** Enables the optional space-triggered autocorrect replacement. Defaults to off. */
+  void setAutocorrectEnabled(bool enabled) {
+    mAutocorrectEnabled = enabled;
+  }
+  [[nodiscard]] bool autocorrectEnabled() const noexcept {
+    return mAutocorrectEnabled;
+  }
   [[nodiscard]] bool spellCheckEnabled() const noexcept {
     return mSpellCheckEnabled;
   }
@@ -145,6 +163,9 @@ class TextInput final : public Layer {
   }
   [[nodiscard]] Rect imeCursorRect() const override;
   void onFocusChanged(bool focused) override;
+  [[nodiscard]] const char* defaultStyleName() const override {
+    return "textinput";
+  }
 
   /** The IME composition shown before it is committed. */
   [[nodiscard]] const std::string& composition() const noexcept {
@@ -165,6 +186,9 @@ class TextInput final : public Layer {
   /** Visible phase at @p now; composition (IME preedit) suppresses blinking. */
   [[nodiscard]] bool caretVisibleAt(std::chrono::steady_clock::time_point now) const;
   void onFrame(std::chrono::steady_clock::time_point now) override;
+  [[nodiscard]] bool hasRunningAnimation() const override {
+    return mFocused && mCaretBlinkInterval.count() > 0;
+  }
 
   [[nodiscard]] size_t cursor() const noexcept {
     return mCursor;
@@ -243,6 +267,8 @@ class TextInput final : public Layer {
   void moveCursor(size_t cursor, bool extend);
   [[nodiscard]] size_t indexAtX(float x) const;
   [[nodiscard]] size_t indexAtPoint(const Point& point) const;
+  [[nodiscard]] float measureText(std::string_view text,
+    graphics::Font::Direction direction = graphics::Font::Direction::Auto) const;
   [[nodiscard]] float xForIndex(size_t index) const;
   [[nodiscard]] float xForIndexInLine(size_t index, const TextLine& line) const;
   void drawLine(RenderContext& context, const TextLine& line, float left, float baseline,
@@ -262,13 +288,16 @@ class TextInput final : public Layer {
   void notifyChanged();
 
   std::string mText;
+  std::function<void(const std::string&)> mOnSubmit;
   std::string mPlaceholder;
   std::string mComposition;
   std::shared_ptr<const Font> mFont;
   std::shared_ptr<const FontFallback> mFallback;
+  std::vector<graphics::FontFeature> mFontFeatures;
   bool mSystemFallback = false;
   LineBreakPolicy mPolicy;
   bool mSpellCheckEnabled = false;
+  bool mAutocorrectEnabled = false;
   std::vector<SpellIssue> mSpellIssues;
   bool mPolicyExplicit = false;
   Color mBackground = Color::MakeRGBA8(24, 26, 32, 255);
