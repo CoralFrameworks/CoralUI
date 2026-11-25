@@ -26,6 +26,10 @@ std::vector<std::string> spellSuggestions(std::string_view, std::string_view) {
   return {};
 }
 
+std::string spellCorrection(std::string_view, std::string_view) {
+  return {};
+}
+
 bool supportsSpellChecking() noexcept {
   return false;
 }

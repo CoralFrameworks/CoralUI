@@ -16,16 +16,22 @@
 
 #include <ui/TabBar.h>
 
+#include "AccessibilityProxy.h"
+
 #include "WidgetDrawing.h"
 
 #include <ui/Theme.h>
 
 #include <algorithm>
+#include <cstdlib>
+#include <string>
 #include <utility>
 
 namespace coral::ui {
 
-TabBar::TabBar(std::shared_ptr<const graphics::Font> font) : mFont(std::move(font)) {}
+TabBar::TabBar(std::shared_ptr<const graphics::Font> font) : mFont(std::move(font)) {
+  setAccessibleRole(AccessibilityRole::TabList);
+}
 
 TabBar::~TabBar() = default;
 
@@ -36,11 +42,22 @@ int TabBar::addTab(std::string label, std::shared_ptr<Layer> content) {
   if (tab.content != nullptr) {
     addChild(tab.content);
   }
+  tab.accessibilityItem = std::make_shared<AccessibilityProxy>(tab.label);
+  const int addedIndex = static_cast<int>(mTabs.size());
+  if (auto proxy = std::dynamic_pointer_cast<AccessibilityProxy>(tab.accessibilityItem)) {
+    proxy->setOnSelect([this, addedIndex] { setActiveTab(addedIndex); });
+  }
+  addChild(tab.accessibilityItem);
   mTabs.push_back(std::move(tab));
   const int index = static_cast<int>(mTabs.size()) - 1;
   if (mActive < 0) {
     mActive = index;
   }
+  for (size_t current = 0; current < mTabs.size(); ++current) {
+    auto item = std::dynamic_pointer_cast<AccessibilityProxy>(mTabs[current].accessibilityItem);
+    if (item != nullptr) item->setSelected(static_cast<int>(current) == mActive);
+  }
+  if (mActive >= 0) setAccessibleValue(mTabs[static_cast<size_t>(mActive)].label);
   updateVisibility();
   setNeedsLayout();
   setNeedsPaint();
@@ -52,9 +69,13 @@ void TabBar::clear() {
     if (tab.content != nullptr) {
       removeChild(tab.content);
     }
+    if (tab.accessibilityItem != nullptr) {
+      removeChild(tab.accessibilityItem);
+    }
   }
   mTabs.clear();
   mActive = -1;
+  setAccessibleValue({});
   setNeedsLayout();
   setNeedsPaint();
 }
@@ -69,6 +90,11 @@ void TabBar::setActiveTab(const int index) {
     return;
   }
   mActive = next;
+  setAccessibleValue(mTabs[static_cast<size_t>(mActive)].label);
+  for (size_t current = 0; current < mTabs.size(); ++current) {
+    auto item = std::dynamic_pointer_cast<AccessibilityProxy>(mTabs[current].accessibilityItem);
+    if (item != nullptr) item->setSelected(static_cast<int>(current) == mActive);
+  }
   updateVisibility();
   setNeedsLayout();
   setNeedsPaint();
@@ -125,6 +151,10 @@ void TabBar::layout() {
     bounds().getTop() + mHeaderHeight, bounds().getWidth(),
     std::max(0.0f, bounds().getHeight() - mHeaderHeight));
   for (size_t index = 0; index < mTabs.size(); ++index) {
+    if (mTabs[index].accessibilityItem != nullptr) {
+      mTabs[index].accessibilityItem->setBounds(mTabs[index].bounds);
+      mTabs[index].accessibilityItem->layout();
+    }
     if (mTabs[index].content != nullptr) {
       mTabs[index].content->setBounds(contentBounds);
       if (static_cast<int>(index) == mActive) {
@@ -201,6 +231,14 @@ bool TabBar::onKeyDown(const KeyEvent& event) {
     setActiveTab((mActive + 1) % static_cast<int>(mTabs.size()));
     return true;
   }
+  if (event.key == Key::Home) {
+    setActiveTab(0);
+    return true;
+  }
+  if (event.key == Key::End) {
+    setActiveTab(static_cast<int>(mTabs.size()) - 1);
+    return true;
+  }
   return false;
 }
 
@@ -223,6 +261,25 @@ void TabBar::applyTheme(const Theme& theme) {
     : 36.0f;
   setNeedsLayout();
   setNeedsPaint();
+}
+
+bool TabBar::performAccessibilityAction(const AccessibilityAction action,
+    const std::string_view value) {
+  if (action != AccessibilityAction::Select) return false;
+  const std::string text(value);
+  char* end = nullptr;
+  const long index = std::strtol(text.c_str(), &end, 10);
+  if (end != text.c_str() && *end == '\0') {
+    setActiveTab(static_cast<int>(index));
+    return true;
+  }
+  for (size_t tab = 0; tab < mTabs.size(); ++tab) {
+    if (mTabs[tab].label == text) {
+      setActiveTab(static_cast<int>(tab));
+      return true;
+    }
+  }
+  return false;
 }
 
 void TabBar::updateVisibility() {

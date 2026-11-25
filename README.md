@@ -59,11 +59,12 @@ third_party/        the shared libz / libyuv / libgtest submodules
 |---|---|---|---|---|
 | Native window and GPU surface | Yes | Yes | Yes | Yes, titled `NSWindow` + `CAMetalLayer` content view |
 | High-DPI scaling | Per-monitor v2 | Global DPI | Per-output scale, including fractional | Backing scale, per screen |
-| IME | IMM32 | IBus/XIM | `text-input` v1/v3 | Not yet (key events and text dispatch only) |
+| IME | IMM32 | IBus/XIM | `text-input` v1/v3 | `NSTextInputClient` (marked text, commit, candidates) |
 | Clipboard | Multi-MIME, files, PNG | Multi-MIME, PRIMARY, INCR | Per-MIME, PRIMARY | Multi-MIME, HTML, PNG, file URLs |
-| Drag and drop | OLE | XDND | Not yet | Not yet |
+| Drag and drop | OLE | XDND | Not yet | `NSDraggingSource` / destination |
 | File dialogs | Native | Portal, `zenity`/`kdialog` | Portal | `NSOpenPanel`/`NSSavePanel` |
-| Accessibility | UI Automation | AT-SPI | AT-SPI | Not yet |
+| Native chrome | Custom | Custom | Custom / server-side | Toolbar, sidebar/outline, titlebar accessory, native menus |
+| Accessibility | UI Automation | AT-SPI | AT-SPI | `NSAccessibility` tree, actions, text, grid, hit test |
 
 Headless and software-raster targets work on every platform and are what the tests and examples
 use. The macOS window backend presents through Metal using the same `graphics::gpu::WindowSurface`

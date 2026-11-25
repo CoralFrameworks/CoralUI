@@ -15,6 +15,8 @@
  */
 
 #include <ui/DateFormat.h>
+#include <ui/SystemSettings.h>
+#include <ui/Translation.h>
 
 #include <cstdio>
 
@@ -48,6 +50,10 @@ DateFormatOptions dateFormatForLocale(const Locale& locale) {
     return DateFormatOptions{ DateOrder::DayMonthYear, "/" };
   }
   return dateFormatIso();
+}
+
+DateFormatOptions systemDateFormat() {
+  return dateFormatForLocale(Locale::parse(currentSystemLocale().identifier));
 }
 
 std::string formatDate(const std::chrono::year_month_day& date,

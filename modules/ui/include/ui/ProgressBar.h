@@ -22,6 +22,7 @@
 #include <ui/Layer.h>
 
 
+#include <chrono>
 #include <memory>
 
 namespace coral::ui {
@@ -44,9 +45,22 @@ class ProgressBar final : public Layer {
     mShowPercentage = show;
     setNeedsPaint();
   }
+  /** An indeterminate bar ignores the value and animates a moving band. */
+  void setIndeterminate(bool indeterminate);
+  [[nodiscard]] bool indeterminate() const noexcept {
+    return mIndeterminate;
+  }
 
   Size measure(const Size& available) override;
   void drawSelf(RenderContext& context) override;
+  [[nodiscard]] std::optional<AccessibleRange> accessibleRange() const override;
+  void onFrame(std::chrono::steady_clock::time_point now) override;
+  [[nodiscard]] bool hasRunningAnimation() const override {
+    return mIndeterminate;
+  }
+  [[nodiscard]] const char* defaultStyleName() const override {
+    return "progress";
+  }
 
  protected:
   void applyTheme(const Theme& theme) override;
@@ -60,6 +74,9 @@ class ProgressBar final : public Layer {
   float mRadius = 4.0f;
   double mValue = 0.0;
   bool mShowPercentage = false;
+  bool mIndeterminate = false;
+  double mPhase = 0.0;
+  std::chrono::steady_clock::time_point mLastFrame{};
 };
 
 } // namespace coral::ui

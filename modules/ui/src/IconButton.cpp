@@ -200,7 +200,7 @@ void IconButton::activate() {
 
 bool IconButton::performAccessibilityAction(const AccessibilityAction action, const std::string_view value) {
   (void)value;
-  if (action != AccessibilityAction::Invoke) return false;
+  if (action != AccessibilityAction::Invoke && action != AccessibilityAction::Confirm) return false;
   if (mOnClick) { mOnClick(); return true; }
   return false;
 }

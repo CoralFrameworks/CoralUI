@@ -476,3 +476,21 @@ TEST(UiRichTextVisual, SelectionAcrossReorderedRunsIsStoredAndSafe) {
   EXPECT_TRUE(layer.hasSelection());
   EXPECT_EQ(layer.layout().lines.front().visualRuns.size(), 2u);
 }
+
+TEST(UiRichTextVisual, RunFontFeaturesReachTheSegmentAndLayout) {
+  const auto font = testFont(16.0f);
+  if (font == nullptr) GTEST_SKIP() << "the UI test font is not available";
+  coral::ui::RichTextRun run;
+  run.text = "fi kern";
+  run.font = font;
+  run.features = { graphics::FontFeature{ .tag = "kern", .value = 0 } };
+  coral::ui::RichTextLayer layer({ run });
+  layer.setBounds(coral::ui::Rect::MakeWH(220.0f, 40.0f));
+  layer.measure({ 220.0f, 40.0f });
+  ASSERT_FALSE(layer.layout().lines.empty());
+  const auto& segments = layer.layout().lines.front().segments;
+  ASSERT_FALSE(segments.empty());
+  ASSERT_EQ(segments.front().features.size(), 1u);
+  EXPECT_EQ(segments.front().features.front().tag, "kern");
+  EXPECT_EQ(segments.front().features.front().value, 0u);
+}

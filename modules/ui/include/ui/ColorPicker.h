@@ -67,6 +67,11 @@ class ColorPicker final : public Layer {
   bool onPointerDown(const PointerEvent& event) override;
   bool onPointerMove(const PointerEvent& event) override;
   bool onPointerUp(const PointerEvent& event) override;
+  bool performAccessibilityAction(AccessibilityAction action,
+    std::string_view value) override;
+  [[nodiscard]] const char* defaultStyleName() const override {
+    return "colorpicker";
+  }
 
  protected:
   void applyTheme(const Theme& theme) override;
@@ -81,6 +86,7 @@ class ColorPicker final : public Layer {
   void select(int index);
   void updateHsvFromPoint(Point point);
   void notify();
+  void syncAccessibleValue();
 
   std::vector<Color> mPalette;
   std::function<void(Color)> mOnChanged;

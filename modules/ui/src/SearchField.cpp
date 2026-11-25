@@ -111,6 +111,10 @@ void SearchField::layout() {
 
 void SearchField::drawSelf(RenderContext& context) {
   auto& canvas = context.canvas();
+  // The magnifier, text viewport and clear glyph are painted manually. Clip them to the field so a
+  // stale glyph after deleting text cannot bleed into the neighbouring panel or the list scrollbar.
+  canvas.save();
+  canvas.clipRect(bounds());
   graphics::Paint background;
   background.color = mBackground;
   background.style = graphics::Paint::Style::kFill;
@@ -144,6 +148,7 @@ void SearchField::drawSelf(RenderContext& context) {
       clearPaint);
   }
   detail::drawFocusRing(canvas, bounds(), mFocused, mFocus, mRadius, focusRingWidth());
+  canvas.restore();
 }
 
 bool SearchField::onPointerDown(const PointerEvent& event) {

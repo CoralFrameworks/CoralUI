@@ -52,6 +52,10 @@ class CheckBox final : public Layer {
   [[nodiscard]] bool checked() const noexcept {
     return mChecked;
   }
+  void setIndeterminate(bool indeterminate);
+  [[nodiscard]] bool indeterminate() const noexcept {
+    return mIndeterminate;
+  }
 
   void setOnChanged(std::function<void(bool)> callback) {
     mOnChanged = std::move(callback);
@@ -100,6 +104,7 @@ class CheckBox final : public Layer {
   float mGap = 8.0f;
   float mRadius = 2.0f;
   bool mChecked = false;
+  bool mIndeterminate = false;
   bool mPressed = false;
   bool mFocused = false;
   int mActivations = 0;

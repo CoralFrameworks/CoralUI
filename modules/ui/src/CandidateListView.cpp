@@ -99,7 +99,7 @@ void CandidateListView::drawSelf(RenderContext& context) {
   for (size_t index = 0; index < mCandidates.size(); ++index) {
     const float baseline = box.getTop() + kPaddingY + static_cast<float>(index) * height +
       metrics.ascent;
-    canvas.drawText(mCandidates[index], box.getLeft() + kPaddingX, baseline, *mFont, text);
+    context.drawText(mCandidates[index], box.getLeft() + kPaddingX, baseline, *mFont, text);
   }
 }
 

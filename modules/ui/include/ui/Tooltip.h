@@ -69,6 +69,13 @@ class Tooltip final : public Layer {
   Size measure(const Size& available) override;
   void drawSelf(RenderContext& context) override;
   void onFrame(std::chrono::steady_clock::time_point now) override;
+  [[nodiscard]] bool hasRunningAnimation() const override {
+    return mPending;
+  }
+
+  [[nodiscard]] const char* defaultStyleName() const override {
+    return "tooltip";
+  }
 
  protected:
   void applyTheme(const Theme& theme) override;

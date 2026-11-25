@@ -33,7 +33,8 @@ namespace {
 } // namespace
 
 ShapedAdvances ShapedAdvances::fromFont(const graphics::Font& font, const std::string_view text,
-    const graphics::Font::Direction direction) {
+    const graphics::Font::Direction direction,
+    const std::span<const graphics::FontFeature> features) {
   ShapedAdvances result;
   if (text.empty()) {
     result.mPrefix.assign(1, 0.0f);
@@ -42,7 +43,7 @@ ShapedAdvances ShapedAdvances::fromFont(const graphics::Font& font, const std::s
   }
   const float scale = emToPixels(font);
   if (scale <= 0.0f) return result;
-  const graphics::TextBlob blob = font.shape(text, direction);
+  const graphics::TextBlob blob = font.shape(text, direction, features);
   if (blob.count() == 0) return result;
   result.mPrefix.assign(text.size() + 1, 0.0f);
   result.appendRun(text, 0, blob, scale);

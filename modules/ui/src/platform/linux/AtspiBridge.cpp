@@ -60,6 +60,12 @@ unsigned roleNumber(const AccessibilityRole role) {
     case AccessibilityRole::CheckBox: return 7;      // ATSPI_ROLE_CHECK_BOX
     case AccessibilityRole::Radio: return 44;        // ATSPI_ROLE_RADIO_BUTTON
     case AccessibilityRole::Slider: return 51;       // ATSPI_ROLE_SLIDER
+    case AccessibilityRole::ComboBox: return 11;     // ATSPI_ROLE_COMBO_BOX
+    case AccessibilityRole::ColorPicker: return 6;   // ATSPI_ROLE_COLOR_CHOOSER
+    case AccessibilityRole::SpinButton: return 52;   // ATSPI_ROLE_SPIN_BUTTON
+    case AccessibilityRole::Calendar: return 8;      // ATSPI_ROLE_CALENDAR
+    case AccessibilityRole::ProgressIndicator: return 36; // ATSPI_ROLE_PROGRESS_BAR
+    case AccessibilityRole::TabList: return 39;          // ATSPI_ROLE_PANEL
     case AccessibilityRole::TextField: return 79;    // ATSPI_ROLE_ENTRY
     case AccessibilityRole::Label: return 29;        // ATSPI_ROLE_LABEL
     case AccessibilityRole::List: return 31;          // ATSPI_ROLE_LIST

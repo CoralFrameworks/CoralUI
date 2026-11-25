@@ -60,6 +60,10 @@ class TitleBar final : public Layer {
   Size measure(const Size& available) override;
   void layout() override;
 
+  [[nodiscard]] const char* defaultStyleName() const override {
+    return "titlebar";
+  }
+
  private:
   std::shared_ptr<Flex> mBar;
   std::shared_ptr<TextLayer> mTitle;

@@ -20,6 +20,7 @@
 #include <ui/ContentView.h>
 #include <ui/Flex.h>
 #include <ui/RenderContext.h>
+#include <ui/TextLayer.h>
 #include <ui/Window.h>
 #include <ui/WindowBackend.h>
 #include <ui/CanvasBackend.h>
@@ -27,6 +28,7 @@
 #include <graphics/Bitmap.h>
 #include <graphics/Canvas.h>
 #include <graphics/Paint.h>
+#include <graphics/Typeface.h>
 
 #include <gpu/Surface.h>
 
@@ -410,6 +412,37 @@ TEST(UiContent, InFlightSlotsCapAProducer) {
 }
 
 } // namespace
+
+TEST(UiContent, TextLayersRemainVisibleOverATransparentClear) {
+  Window::Options options;
+  options.headless = true;
+  options.width = 240;
+  options.height = 80;
+  options.clearColor = graphics::Color::MakeRGBA8(0, 0, 0, 1);
+  options.frameLimit = 1;
+  auto window = Window::create(options);
+  ASSERT_NE(window, nullptr);
+  const auto typeface = graphics::Typeface::fromFile(
+    std::string(CORAL_ASSETS_DIR) + "/fonts/NotoSansSC-Regular.otf");
+  ASSERT_NE(typeface, nullptr);
+  auto text = std::make_shared<TextLayer>("Transparent text",
+    graphics::Font::create(typeface, 24.0f), graphics::Color::White());
+  text->setFontFeatures({ graphics::FontFeature{ .tag = "kern", .value = 1 } });
+  text->setBounds(Rect::MakeWH(240.0f, 80.0f));
+  window->setRoot(text);
+  ASSERT_TRUE(window->renderFrame()) << window->diagnostics();
+  graphics::Bitmap snapshot;
+  ASSERT_TRUE(window->snapshot(&snapshot));
+  const graphics::Pixmap pixmap = snapshot.makePixmap();
+  size_t visible = 0;
+  for (int y = 0; y < pixmap.height(); ++y) {
+    for (int x = 0; x < pixmap.width(); ++x) {
+      const uint32_t argb = pixmap.getPixelARGB32(x, y);
+      if ((argb & 0xFF000000u) != 0 && (argb & 0x00FFFFFFu) != 0) ++visible;
+    }
+  }
+  EXPECT_GT(visible, 0u) << "text disappeared over a fully transparent clear";
+}
 
 TEST(UiContent, ContentViewsInFlexReceiveRowBounds) {
   Window::Options options;

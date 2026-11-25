@@ -15,6 +15,7 @@
  */
 
 #include <ui/ColorLayer.h>
+#include <filesystem>
 #include <ui/CrashReporter.h>
 #include <ui/Flex.h>
 #include <ui/FrameStatsOverlay.h>
@@ -2379,6 +2380,17 @@ TEST(UiApplication, CapturesAndAppliesWindowLayout) {
   std::vector<WindowLayout> mismatched = restored;
   mismatched.pop_back();
   EXPECT_FALSE(application->applyWindowLayout(mismatched));
+
+  const std::filesystem::path layoutPath =
+    std::filesystem::temp_directory_path() / "coral-ui-window-layout.txt";
+  ASSERT_TRUE(application->saveWindowLayout(layoutPath.string()));
+  first->restoreGeometry(Rect::MakeLTRB(0.0f, 0.0f, 100.0f, 80.0f));
+  first->setFullscreen(false);
+  ASSERT_TRUE(application->loadWindowLayout(layoutPath.string()));
+  EXPECT_EQ(first->bounds().getWidth(), 320.0f);
+  EXPECT_TRUE(first->isFullscreen());
+  std::error_code removeError;
+  std::filesystem::remove(layoutPath, removeError);
 
   first->requestClose();
   second->requestClose();

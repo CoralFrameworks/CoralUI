@@ -91,6 +91,14 @@ struct FrameTimings {
 };
 
 /** Cumulative frame counters for a diagnostics overlay or a product status line. */
+/** The presentation color space requested by a Window. */
+enum class OutputColorSpace : uint8_t {
+  Srgb,
+  DisplayP3,
+  ExtendedLinearP3,
+  Hdr10Pq,
+};
+
 struct FrameStatistics {
   uint64_t frames = 0;
   uint32_t recoveries = 0;
@@ -201,8 +209,10 @@ struct FrameStatistics {
    * R3 would remove.
    */
   uint64_t frameListBytes = 0;
-  /** True when the window presented PQ numbers (HDR10); false when it fell back to sRGB. */
+  /** True when the window presented HDR/EDR content rather than SDR. */
   bool hdrOutput = false;
+  /** The actual color space granted by the backend. */
+  OutputColorSpace outputColorSpace = OutputColorSpace::Srgb;
 };
 
 /**
@@ -235,6 +245,22 @@ class Window final : public Renderer {
     std::string label;
     std::string symbol;
     std::string tooltip;
+    /** Optional native view (`NSView*` on macOS) used instead of the standard toolbar button. */
+    void* nativeView = nullptr;
+    /** Insert an NSToolbar flexible-space item. */
+    bool flexibleSpace = false;
+    /** Insert an NSToolbar separator item. */
+    bool separator = false;
+  };
+
+  /** One item in a native NSMenu. */
+  struct NativeMenuItem {
+    std::string id;
+    std::string title;
+    bool separator = false;
+    bool enabled = true;
+    bool checked = false;
+    std::vector<NativeMenuItem> children;
   };
 
   /** One native titlebar accessory segment. */
@@ -250,6 +276,35 @@ class Window final : public Renderer {
     std::string symbol;
     /** A non-selectable section header in the native source list. */
     bool group = false;
+    /** Nested rows; the native sidebar uses an NSOutlineView. */
+    std::vector<SidebarItem> children;
+    /** Allows the native outline row label to be edited in place. */
+    bool editable = false;
+  };
+
+  /** macOS native toolbar visuals. Automatic follows the current platform default. */
+  enum class ToolbarStyle : uint8_t {
+    Automatic,
+    Expanded,
+    Preference,
+    Unified,
+    UnifiedCompact,
+  };
+
+  /** Native window background material (macOS NSVisualEffectView). */
+  enum class BackgroundMaterial : uint8_t {
+    None,
+    Sidebar,
+    HeaderView,
+    UnderWindowBackground,
+    ContentBackground,
+    HUDWindow,
+  };
+
+  /** One item in the native sidebar context menu. */
+  struct SidebarContextAction {
+    std::string id;
+    std::string title;
   };
 
   /** macOS native window tabbing preference; ignored by the other backends. */
@@ -325,6 +380,12 @@ class Window final : public Renderer {
     bool hdrOutput = false;
 
     /**
+     * Requested presentation color space. `hdrOutput` is the compatibility shorthand for
+     * Hdr10Pq; an explicit non-Srgb value wins.
+     */
+    OutputColorSpace outputColorSpace = OutputColorSpace::Srgb;
+
+    /**
      * An existing renderer device to share with this window, or null to create one.
      *
      * Native Win32/X11/Wayland windows can share a device; the handle must outlive every window
@@ -357,6 +418,27 @@ class Window final : public Renderer {
 
     /** macOS only: native window tabbing preference. */
     TabbingMode tabbingMode = TabbingMode::Automatic;
+
+    /**
+     * macOS only: extend the content view under a transparent titlebar
+     * (NSWindowStyleMaskFullSizeContentView). Use `safeAreaInsets().top` to keep content clear of
+     * the traffic lights. In native fullscreen the inset is also reported without this option,
+     * because the titlebar/toolbar overlays the content.
+     */
+    bool fullSizeContentView = false;
+    /** macOS only: default newly attached Menu/ContextMenu layers to native NSMenu presentation. */
+    bool nativeMenus = false;
+    /** macOS only: toolbar visual style. */
+    ToolbarStyle toolbarStyle = ToolbarStyle::Automatic;
+    /** macOS only: hide the native toolbar in full screen until the pointer reaches the top edge. */
+    bool fullscreenToolbarAutoHide = true;
+    /** macOS only: show the title in the titlebar. */
+    bool titlebarVisible = true;
+    /** macOS only: show the close/minimize/zoom buttons. */
+    bool windowButtonsVisible = true;
+
+    /** macOS only: AppKit state-restoration identifier; empty disables restoration. */
+    std::string restorationIdentifier;
   };
 
   ~Window();
@@ -452,6 +534,30 @@ class Window final : public Renderer {
    * maps to `System`, because the window server owns drag, edge resize and zoom there.
    */
   enum class Decorations : uint8_t { System, Client };
+  /** macOS only: use native NSMenu for attached Menu/ContextMenu layers by default. */
+  void setNativeMenusEnabled(bool enabled);
+  [[nodiscard]] bool nativeMenusEnabled() const noexcept;
+
+  /** macOS only: native window toolbar appearance. */
+  void setToolbarStyle(ToolbarStyle style);
+  [[nodiscard]] ToolbarStyle toolbarStyle() const noexcept;
+  /** macOS only: titlebar title and standard window buttons. */
+  void setTitlebarVisible(bool visible);
+  void setWindowButtonsVisible(bool visible);
+
+  /**
+   * Shows an AppKit `NSView` in a native NSPopover anchored to a logical window rectangle.
+   * The view is borrowed and must outlive the popover.
+   */
+  void showNativePopover(void* nativeView, Rect anchor);
+  void hideNativePopover();
+  [[nodiscard]] bool isNativePopoverVisible() const noexcept;
+  [[nodiscard]] bool supportsNativePopover() const noexcept;
+
+  /** Hosts a native view above the Metal content at an absolute logical rectangle. */
+  void setNativeViewBounds(void* nativeView, Rect bounds, bool visible);
+  void removeNativeView(void* nativeView);
+
   void setDecorations(Decorations decorations);
   [[nodiscard]] Decorations decorations() const noexcept;
 
@@ -463,22 +569,91 @@ class Window final : public Renderer {
   /** Shows or hides the native toolbar without discarding its items. */
   void setToolbarVisible(bool visible);
   /**
+   * macOS only: auto-hide the native toolbar in full screen. The toolbar is revealed when the pointer
+   * reaches the top edge and hidden again after leaving it.
+   */
+  void setToolbarAutoHideInFullScreen(bool enabled);
+  [[nodiscard]] bool toolbarAutoHideInFullScreen() const noexcept;
+  /**
    * Enables macOS secure event input for password fields. Process-wide and reference-counted by the
    * OS; the backend balances its own enable. Other platforms ignore it.
    */
   void setSecureInputEnabled(bool enabled);
   [[nodiscard]] bool isSecureInputEnabled() const noexcept;
+  /**
+   * Sets the window's native background material. The Metal layer becomes non-opaque and the window
+   * clear colour gets zero alpha so the effect is visible; None restores the previous clear colour.
+   */
+  void setBackgroundMaterial(BackgroundMaterial material);
+  [[nodiscard]] BackgroundMaterial backgroundMaterial() const noexcept;
+
+  /** Enables AppKit's exterior focus ring around the content view. */
+  void setContentFocusRingEnabled(bool enabled);
+  [[nodiscard]] bool contentFocusRingEnabled() const noexcept;
+
+  /** Opens the native print panel for the current frame; false when unsupported/no surface. */
+  bool printWindow();
+  /** Prints to @p path without showing a panel (PDF by default). */
+  bool printToFile(std::string_view path);
+  [[nodiscard]] bool supportsPrinting() const noexcept;
+
+  /**
+   * Captures the window through ScreenCaptureKit (including native chrome) into @p out.
+   * Requires macOS 14+ and screen-recording permission; returns false when the permission or capture fails.
+   */
+  bool captureWindow(graphics::Bitmap* out);
+  [[nodiscard]] bool supportsWindowCapture() const noexcept;
+
+  /** Shows the native share sheet for @p text, anchored at a logical window rectangle. */
+  void showShareSheet(std::string_view text, Rect anchor = {});
+  [[nodiscard]] bool supportsShareSheet() const noexcept;
+
+  /** Sets the Dock tile badge (macOS only); empty clears it. */
+  void setDockBadge(std::string_view text);
+  /** Requests Dock user attention (macOS only). */
+  void requestUserAttention(bool critical = false);
   /** Called with the item id when a toolbar item is clicked. */
   void setToolbarActionHandler(std::function<void(std::string_view)> handler);
 
   /** Replaces the native titlebar accessory segments (macOS `NSTitlebarAccessoryViewController`). */
   void setTitlebarAccessoryItems(std::vector<TitlebarAccessoryItem> items);
   void setTitlebarAccessorySelectionHandler(std::function<void(int)> handler);
+  /**
+   * Installs an arbitrary AppKit `NSView*` as the trailing titlebar accessory (macOS only).
+   * The view is borrowed and must outlive the window; pass null to restore the segmented items.
+   */
+  void setTitlebarAccessoryView(void* nativeView);
+  /** Safe-area insets caused by native chrome (top is the titlebar under full-size content). */
+  [[nodiscard]] Insets safeAreaInsets() const noexcept;
+  /**
+   * Called when the macOS titlebar/toolbar safe area changes (fullscreen toolbar reveal/hide,
+   * titlebar visibility). Use it to offset a fixed content root.
+   */
+  void setSafeAreaChangedHandler(std::function<void(Insets)> handler);
 
+  /**
+   * Shows a native NSMenu at a logical window position. The handler receives the selected item id.
+   * Empty items, or a platform without native menus, is a no-op.
+   */
+  void showNativeContextMenu(std::vector<NativeMenuItem> items, Point position,
+    std::function<void(std::string_view)> handler);
   /** Replaces the native sidebar rows (macOS `NSSplitViewController`); empty removes the sidebar. */
   void setSidebarItems(std::vector<SidebarItem> items);
   void setSidebarVisible(bool visible);
   void setSidebarSelectionHandler(std::function<void(std::string_view)> handler);
+  /** Called with (id, new label) after an editable sidebar row is committed. */
+  void setSidebarEditHandler(
+    std::function<void(std::string_view, std::string_view)> handler);
+  /** Called after a drag/programmatic sidebar move with the new parent id and index. */
+  void setSidebarMoveHandler(
+    std::function<void(std::string_view, std::string_view, int)> handler);
+  /** Moves an item under parentId (empty for the root) at index; returns false on an invalid target. */
+  bool moveSidebarItem(std::string_view id, std::string_view parentId, int index);
+  /** Replaces the native sidebar right-click menu; empty removes the menu. */
+  void setSidebarContextActions(std::vector<SidebarContextAction> actions);
+  /** Called with (sidebar item id, action id). */
+  void setSidebarContextActionHandler(
+    std::function<void(std::string_view, std::string_view)> handler);
   [[nodiscard]] std::string selectedSidebarItem() const;
 
   /** Chrome geometry used by client-side decorations; ignored in system-decoration mode. */
@@ -501,6 +676,8 @@ class Window final : public Renderer {
   [[nodiscard]] float displayHeadroom() const noexcept;
   /** True when the window's display advertises a wide-gamut (Display P3) colour space. */
   [[nodiscard]] bool supportsWideColor() const noexcept;
+  /** The actual presentation color space granted by the backend. */
+  [[nodiscard]] OutputColorSpace outputColorSpace() const noexcept;
 
   /** Native maximize/restore/minimize. Fullscreen owns the state while it is active. */
   void maximize();
@@ -581,6 +758,13 @@ class Window final : public Renderer {
   void releasePointerCapture();
   /** The layer currently capturing the pointer, or null. */
   [[nodiscard]] Layer* pointerCapture() const noexcept;
+  /**
+   * Internal teardown hook: clears hover/capture references inside a removed subtree.
+   *
+   * A recycled list can remove the row under the pointer while a mouse-drag is in flight; keeping the
+   * bare layer pointer would call into freed storage on the next move event.
+   */
+  void notifyLayerRemoved(const Layer* layer);
   /** The pointer id a capture is held for. */
   [[nodiscard]] std::uint32_t pointerCaptureId() const noexcept;
   bool keyDown(const KeyEvent& event);
@@ -691,6 +875,10 @@ class Window final : public Renderer {
 
   /** The native window handle (HWND/X11 Window/wl_surface), or null for headless. */
   [[nodiscard]] void* nativeHandle() const noexcept;
+  /** The platform window object (NSWindow on macOS), or `nativeHandle()` elsewhere. */
+  [[nodiscard]] void* nativeWindowHandle() const noexcept;
+  /** The AppKit restoration identifier configured at creation, or empty. */
+  [[nodiscard]] std::string restorationIdentifier() const;
 
   /**
    * The value to pass to `FileDialogOptions::parentWindow`.

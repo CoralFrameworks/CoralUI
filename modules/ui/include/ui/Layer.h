@@ -58,8 +58,15 @@ enum class AccessibilityRole : uint8_t {
   CheckBox,
   Radio,
   Slider,
+  ComboBox,
+  ColorPicker,
+  SpinButton,
+  Calendar,
+  ProgressIndicator,
+  TabList,
   TextField,
   Label,
+  Link,
   List,
   Tree,
   Menu,
@@ -198,6 +205,13 @@ public:
   [[nodiscard]] const Rect& bounds() const noexcept {
     return mBounds;
   }
+  /**
+   * Bounds in window coordinates after this layer's and every ancestor's translation.
+   *
+   * Composite controls attach popups to the root overlay, which expects window coordinates; their
+   * own bounds are in the page's untranslated coordinate space.
+   */
+  [[nodiscard]] Rect boundsInWindow() const;
 
   void setVisible(const bool visible);
 
@@ -602,6 +616,11 @@ public:
   }
   /** Sets the window back-pointer for this layer and its subtree; called by the window itself. */
   void attachToWindow(Window* window);
+  /** Called when the window back-pointer changes, including detach to null. */
+  virtual void onWindowChanged(Window* previous, Window* current) {
+    (void)previous;
+    (void)current;
+  }
 
   void addChild(std::shared_ptr<Layer> child);
   /**

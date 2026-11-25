@@ -16,6 +16,7 @@
 
 #include <ui/Window.h>
 #include <ui/CandidateListView.h>
+#include <ui/Popup.h>
 #include <backend/Device.h>
 
 #include <ui/Accessibility.h>
@@ -51,6 +52,22 @@
 namespace coral::ui {
 
 namespace {
+
+Color colorFromArgb(const uint32_t argb) {
+  return Color::MakeRGBA8(static_cast<uint8_t>((argb >> 16) & 0xFF),
+    static_cast<uint8_t>((argb >> 8) & 0xFF), static_cast<uint8_t>(argb & 0xFF),
+    static_cast<uint8_t>((argb >> 24) & 0xFF));
+}
+
+Theme themeWithAccent(const Theme& base, const Color accent) {
+  Theme next = base;
+  next.accent = accent;
+  next.controls.accent = accent;
+  next.controls.borderFocused = accent;
+  return next;
+}
+
+
 
 /** Logical pixels the pointer must travel before a press becomes a platform drag-out. */
 constexpr float kDragOutThreshold = 4.0f;
@@ -109,8 +126,14 @@ struct WindowImpl final : detail::WindowHost {
   bool highContrast = false;
   /** True while the platform reports the window hidden; automatic frames pause. */
   bool occluded = false;
+  bool contentFocusRingEnabled = false;
+  Window::BackgroundMaterial backgroundMaterial = Window::BackgroundMaterial::None;
+  Color preMaterialClearColor{};
+  bool hasPreMaterialClearColor = false;
   /** The theme the application installed, kept while high contrast overrides it. */
   std::shared_ptr<const Theme> baseTheme;
+  std::shared_ptr<const Theme> accentBaseTheme;
+  bool accentApplied = false;
   std::shared_ptr<const StyleSheet> styleSheet;
   /**
    * The window command table.
@@ -725,6 +748,16 @@ struct WindowImpl final : detail::WindowHost {
                       : (pointerCapture != nullptr
                            ? pointerCapture
                            : (event.inside && root != nullptr ? root->hitTest(logical.position) : nullptr));
+    // A floating Popup is dismissible by a press outside its own panel. Menus already own a
+    // full-parent hit catcher, so this mainly covers Popup-based pickers such as DateField.
+    if (phase == 1 && event.inside && target != nullptr) {
+      Layer* popupLayer = topmostPopup(root.get());
+      auto* popup = dynamic_cast<Popup*>(popupLayer);
+      if (popup != nullptr && !popup->bounds().contains(logical.position)) {
+        popup->hide();
+        return;
+      }
+    }
     // A disabled control and everything inside it are inert: not hovered, not clicked, not captured.
     if (target != nullptr && !target->inputEnabled()) {
       if (hovered != nullptr) {
@@ -741,50 +774,9 @@ struct WindowImpl final : detail::WindowHost {
     }
     // The overlay host is the top of the transient stack: the page below it must not see the event.
     Layer* boundary = overlays != nullptr && overlays->visible() ? overlays.get() : nullptr;
-    Layer* handledBy = nullptr;
-    for (Layer* layer = target; layer != nullptr; layer = layer->parent()) {
-      bool handled = false;
-      if (phase == 0) handled = layer->onPointerMove(logical);
-      else if (phase == 1) handled = layer->onPointerDown(logical);
-      else handled = layer->onPointerUp(logical);
-      if (handled) {
-        handledBy = layer;
-        break;
-      }
-      if (layer == boundary) break;
-    }
-    if (phase == 1 && handledBy != nullptr && handledBy->capturesPointerOnPress()) {
-      pointerCapture = handledBy;
-      if (platform != nullptr) platform->setPointerCapture(true);
-    }
-    // A press on a layer that offers a drag-out payload arms the gesture; a later move starts the
-    // platform drag. Only the nearest provider is asked: it defines the gesture for its subtree.
-    if (phase == 1) {
-      dragOutPending = false;
-      dragOutPayload = DragPayload{};
-      for (Layer* layer = target; layer != nullptr; layer = layer->parent()) {
-        if (!layer->dragOutProvider()) {
-          continue;
-        }
-        if (std::optional<DragPayload> payload = layer->dragOutProvider()();
-            payload.has_value() && !payload->empty()) {
-          dragOutPayload = std::move(*payload);
-          dragOutOrigin = logical.position;
-          dragOutPending = true;
-        }
-        break;
-      }
-    }
-    if (phase == 2) {
-      dragOutPending = false;
-      dragOutPayload = DragPayload{};
-      if (pointerCapture != nullptr && platform != nullptr) platform->setPointerCapture(false);
-      pointerCapture = nullptr;
-      if (capturedEvent) {
-        publicPointerCapture.reset();
-        publicPointerCaptureId = 0;
-      }
-    }
+    // Resolve focus and drag-out from the press target before dispatching the press. A row builder can
+    // recycle/replace the target inside onPointerDown; using the raw target afterwards would be a
+    // dangling read. Removing the focused layer clears focus through removeChild.
     if (phase == 1) {
       Layer* scope = topmostFocusScope(root.get());
       Layer* focusTarget = nullptr;
@@ -802,12 +794,50 @@ struct WindowImpl final : detail::WindowHost {
         if (focusTarget != nullptr) {
           setFocus(focusTarget);
         } else if (focused == nullptr || !isWithin(focused, scope)) {
-          // A click on the modal backdrop does not take focus out of the modal: it moves it to the
-          // first focusable control of the scope.
           focusNext(false);
         }
       } else {
         setFocus(focusTarget);
+      }
+      dragOutPending = false;
+      dragOutPayload = DragPayload{};
+      for (Layer* layer = target; layer != nullptr; layer = layer->parent()) {
+        if (!layer->dragOutProvider()) {
+          continue;
+        }
+        if (std::optional<DragPayload> payload = layer->dragOutProvider()();
+            payload.has_value() && !payload->empty()) {
+          dragOutPayload = std::move(*payload);
+          dragOutOrigin = logical.position;
+          dragOutPending = true;
+        }
+        break;
+      }
+    }
+    Layer* handledBy = nullptr;
+    for (Layer* layer = target; layer != nullptr; layer = layer->parent()) {
+      bool handled = false;
+      if (phase == 0) handled = layer->onPointerMove(logical);
+      else if (phase == 1) handled = layer->onPointerDown(logical);
+      else handled = layer->onPointerUp(logical);
+      if (handled) {
+        handledBy = layer;
+        break;
+      }
+      if (layer == boundary) break;
+    }
+    if (phase == 1 && handledBy != nullptr && handledBy->capturesPointerOnPress()) {
+      pointerCapture = handledBy;
+      if (platform != nullptr) platform->setPointerCapture(true);
+    }
+    if (phase == 2) {
+      dragOutPending = false;
+      dragOutPayload = DragPayload{};
+      if (pointerCapture != nullptr && platform != nullptr) platform->setPointerCapture(false);
+      pointerCapture = nullptr;
+      if (capturedEvent) {
+        publicPointerCapture.reset();
+        publicPointerCaptureId = 0;
       }
     }
   }
@@ -1057,6 +1087,11 @@ struct WindowImpl final : detail::WindowHost {
     }
   }
 
+  void platformSafeAreaChanged(const Insets& insets) override {
+    if (safeAreaHandler) safeAreaHandler(insets);
+    layoutRoot();
+  }
+
   void platformResized(const int newWidth, const int newHeight) override {
     if (newWidth <= 0 || newHeight <= 0) return;
     markFrameNeeded();
@@ -1072,6 +1107,12 @@ struct WindowImpl final : detail::WindowHost {
         static_cast<uint32_t>(newHeight));
     }
     layoutRoot();
+  }
+
+  std::function<void(Insets)> safeAreaHandler;
+
+  [[nodiscard]] CommandRegistry* commandRegistry() override {
+    return &commands;
   }
 
   [[nodiscard]] bool canClose() const override {
@@ -1171,6 +1212,18 @@ struct WindowImpl final : detail::WindowHost {
     hostOptions.height = static_cast<uint32_t>(height);
     hostOptions.rendererApi = options.rendererApi;
     hostOptions.nativeWindow = platform != nullptr ? platform->nativeWindow() : nullptr;
+    switch (options.outputColorSpace) {
+      case OutputColorSpace::DisplayP3:
+        hostOptions.outputColorSpace = backend::SwapchainColorSpace::DisplayP3; break;
+      case OutputColorSpace::ExtendedLinearP3:
+        hostOptions.outputColorSpace = backend::SwapchainColorSpace::ExtendedLinearP3; break;
+      case OutputColorSpace::Hdr10Pq:
+        hostOptions.outputColorSpace = backend::SwapchainColorSpace::Hdr10Pq; break;
+      case OutputColorSpace::Srgb:
+      default:
+        if (options.hdrOutput) hostOptions.outputColorSpace = backend::SwapchainColorSpace::Hdr10Pq;
+        break;
+    }
     if (platform != nullptr) {
       const graphics::gpu::NativeDisplay native = platform->nativeDisplay();
       hostOptions.nativeDisplay = native.display;
@@ -1395,6 +1448,7 @@ struct WindowImpl final : detail::WindowHost {
       Canvas uiCanvas = detail::makeCanvas(recorderCanvas);
       RenderContext context(uiCanvas, uiScale, textCache,
         Size{ static_cast<float>(width), static_cast<float>(height) }, capabilities);
+      context.setOpaque(options.clearColor.alpha >= 1.0f);
       context.setContentSink(&contentFrames, &contentFences);
       // ## The render thread can take the lists instead of a flattened recording
       //
@@ -1634,6 +1688,7 @@ struct WindowImpl final : detail::WindowHost {
       Canvas uiCanvas = detail::makeCanvas(*canvas);
       RenderContext context(uiCanvas, uiScale, textCache,
         Size{ static_cast<float>(width), static_cast<float>(height) }, capabilities);
+      context.setOpaque(options.clearColor.alpha >= 1.0f);
       if (planMode) context.setPlanSink(&plannedItems);
       Layer::beginAnimationFrame();
       root->draw(context);
@@ -2107,6 +2162,77 @@ void Window::setTitlebarAccessorySelectionHandler(std::function<void(int)> handl
   }
 }
 
+void Window::setNativeMenusEnabled(const bool enabled) {
+  if (mImpl != nullptr) mImpl->options.nativeMenus = enabled;
+}
+
+bool Window::nativeMenusEnabled() const noexcept {
+  return mImpl != nullptr && mImpl->options.nativeMenus;
+}
+
+void Window::setToolbarStyle(const ToolbarStyle style) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) mImpl->platform->setToolbarStyle(style);
+}
+
+Window::ToolbarStyle Window::toolbarStyle() const noexcept {
+  return mImpl != nullptr ? mImpl->options.toolbarStyle : ToolbarStyle::Automatic;
+}
+
+void Window::setTitlebarVisible(const bool visible) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) mImpl->platform->setTitlebarVisible(visible);
+}
+
+void Window::setWindowButtonsVisible(const bool visible) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) {
+    mImpl->platform->setWindowButtonsVisible(visible);
+  }
+}
+
+void Window::showNativePopover(void* nativeView, const Rect anchor) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) {
+    mImpl->platform->showNativePopover(nativeView, anchor);
+  }
+}
+
+void Window::hideNativePopover() {
+  if (mImpl != nullptr && mImpl->platform != nullptr) mImpl->platform->hideNativePopover();
+}
+
+bool Window::isNativePopoverVisible() const noexcept {
+  return mImpl != nullptr && mImpl->platform != nullptr &&
+    mImpl->platform->isNativePopoverVisible();
+}
+
+void Window::setNativeViewBounds(void* nativeView, const Rect bounds, const bool visible) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) {
+    mImpl->platform->setNativeViewBounds(nativeView, bounds, visible);
+  }
+}
+
+void Window::removeNativeView(void* nativeView) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) {
+    mImpl->platform->removeNativeView(nativeView);
+  }
+}
+
+bool Window::supportsNativePopover() const noexcept {
+  return mImpl != nullptr && mImpl->platform != nullptr &&
+    mImpl->platform->supportsNativePopover();
+}
+
+void Window::setTitlebarAccessoryView(void* nativeView) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) {
+    mImpl->platform->setTitlebarAccessoryView(nativeView);
+  }
+}
+
+void Window::showNativeContextMenu(std::vector<NativeMenuItem> items, const Point position,
+    std::function<void(std::string_view)> handler) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) {
+    mImpl->platform->showNativeContextMenu(std::move(items), position, std::move(handler));
+  }
+}
+
 void Window::setSidebarItems(std::vector<SidebarItem> items) {
   if (mImpl != nullptr && mImpl->platform != nullptr) {
     mImpl->platform->setSidebarItems(std::move(items));
@@ -2123,9 +2249,132 @@ void Window::setSidebarSelectionHandler(std::function<void(std::string_view)> ha
   }
 }
 
+void Window::setSidebarEditHandler(
+    std::function<void(std::string_view, std::string_view)> handler) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) {
+    mImpl->platform->setSidebarEditHandler(std::move(handler));
+  }
+}
+
+void Window::setSidebarMoveHandler(
+    std::function<void(std::string_view, std::string_view, int)> handler) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) {
+    mImpl->platform->setSidebarMoveHandler(std::move(handler));
+  }
+}
+
+bool Window::moveSidebarItem(const std::string_view id, const std::string_view parentId,
+    const int index) {
+  return mImpl != nullptr && mImpl->platform != nullptr &&
+    mImpl->platform->moveSidebarItem(id, parentId, index);
+}
+
+void Window::setSidebarContextActions(std::vector<SidebarContextAction> actions) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) {
+    mImpl->platform->setSidebarContextActions(std::move(actions));
+  }
+}
+
+void Window::setSidebarContextActionHandler(
+    std::function<void(std::string_view, std::string_view)> handler) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) {
+    mImpl->platform->setSidebarContextActionHandler(std::move(handler));
+  }
+}
+
+void Window::setSafeAreaChangedHandler(std::function<void(Insets)> handler) {
+  if (mImpl != nullptr) mImpl->safeAreaHandler = std::move(handler);
+}
+
+Insets Window::safeAreaInsets() const noexcept {
+  return mImpl != nullptr && mImpl->platform != nullptr
+    ? mImpl->platform->safeAreaInsets() : Insets{};
+}
+
 std::string Window::selectedSidebarItem() const {
   return mImpl != nullptr && mImpl->platform != nullptr
     ? mImpl->platform->selectedSidebarItem() : std::string();
+}
+
+void Window::setBackgroundMaterial(const BackgroundMaterial material) {
+  if (mImpl == nullptr) return;
+  if (mImpl->backgroundMaterial == material) return;
+  if (material != BackgroundMaterial::None && !mImpl->hasPreMaterialClearColor) {
+    mImpl->preMaterialClearColor = mImpl->options.clearColor;
+    mImpl->hasPreMaterialClearColor = true;
+    Color transparent = mImpl->options.clearColor;
+    transparent.alpha = 0.0f;
+    setClearColor(transparent);
+  } else if (material == BackgroundMaterial::None && mImpl->hasPreMaterialClearColor) {
+    mImpl->hasPreMaterialClearColor = false;
+    setClearColor(mImpl->preMaterialClearColor);
+  }
+  mImpl->backgroundMaterial = material;
+  if (mImpl->platform != nullptr) mImpl->platform->setBackgroundMaterial(material);
+}
+
+OutputColorSpace Window::outputColorSpace() const noexcept {
+  return mImpl != nullptr && mImpl->platform != nullptr
+    ? mImpl->platform->outputColorSpace() : OutputColorSpace::Srgb;
+}
+
+Window::BackgroundMaterial Window::backgroundMaterial() const noexcept {
+  return mImpl != nullptr ? mImpl->backgroundMaterial : BackgroundMaterial::None;
+}
+
+bool Window::printWindow() {
+  return mImpl != nullptr && mImpl->platform != nullptr && mImpl->platform->printWindow();
+}
+
+bool Window::captureWindow(graphics::Bitmap* out) {
+  return mImpl != nullptr && mImpl->platform != nullptr &&
+    mImpl->platform->captureWindow(out);
+}
+
+bool Window::supportsWindowCapture() const noexcept {
+  return mImpl != nullptr && mImpl->platform != nullptr &&
+    mImpl->platform->supportsWindowCapture();
+}
+
+bool Window::printToFile(const std::string_view path) {
+  return mImpl != nullptr && mImpl->platform != nullptr &&
+    mImpl->platform->printToFile(path);
+}
+
+bool Window::supportsPrinting() const noexcept {
+  return mImpl != nullptr && mImpl->platform != nullptr &&
+    mImpl->platform->supportsPrinting();
+}
+
+void Window::showShareSheet(const std::string_view text, const Rect anchor) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) {
+    mImpl->platform->showShareSheet(text, anchor);
+  }
+}
+
+bool Window::supportsShareSheet() const noexcept {
+  return mImpl != nullptr && mImpl->platform != nullptr &&
+    mImpl->platform->supportsShareSheet();
+}
+
+void Window::setContentFocusRingEnabled(const bool enabled) {
+  if (mImpl == nullptr) return;
+  mImpl->contentFocusRingEnabled = enabled;
+  if (mImpl->platform != nullptr) mImpl->platform->setContentFocusRingEnabled(enabled);
+}
+
+bool Window::contentFocusRingEnabled() const noexcept {
+  return mImpl != nullptr && mImpl->contentFocusRingEnabled;
+}
+
+void Window::setDockBadge(const std::string_view text) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) mImpl->platform->setDockBadge(text);
+}
+
+void Window::requestUserAttention(const bool critical) {
+  if (mImpl != nullptr && mImpl->platform != nullptr) {
+    mImpl->platform->requestUserAttention(critical);
+  }
 }
 
 void Window::setSecureInputEnabled(const bool enabled) {
@@ -2151,6 +2400,18 @@ bool Window::isSecureInputEnabled() const noexcept {
 
 void Window::setToolbarVisible(const bool visible) {
   if (mImpl != nullptr && mImpl->platform != nullptr) mImpl->platform->setToolbarVisible(visible);
+}
+
+void Window::setToolbarAutoHideInFullScreen(const bool enabled) {
+  if (mImpl == nullptr) return;
+  mImpl->options.fullscreenToolbarAutoHide = enabled;
+  if (mImpl->platform != nullptr) {
+    mImpl->platform->setToolbarAutoHideInFullScreen(enabled);
+  }
+}
+
+bool Window::toolbarAutoHideInFullScreen() const noexcept {
+  return mImpl != nullptr && mImpl->options.fullscreenToolbarAutoHide;
 }
 
 void Window::setToolbarActionHandler(std::function<void(std::string_view)> handler) {
@@ -2497,6 +2758,7 @@ FrameStatistics Window::frameStatistics() const noexcept {
     stats.lastGpuMilliseconds = render.gpu;
     stats.residentBytes = render.residentBytes;
     stats.hdrOutput = mImpl->platform->outputIsHdr();
+    stats.outputColorSpace = mImpl->platform->outputColorSpace();
   }
   stats.hostKind = mImpl->threadedHost != nullptr ? RenderHostKind::RenderThread
                                                  : RenderHostKind::SameThread;
@@ -2561,6 +2823,15 @@ float Window::dpiScale() const noexcept {
 std::string Window::portalParentHandle() const {
   if (mImpl == nullptr || mImpl->platform == nullptr) return {};
   return mImpl->platform->portalParentHandle();
+}
+
+std::string Window::restorationIdentifier() const {
+  return mImpl != nullptr ? mImpl->options.restorationIdentifier : std::string();
+}
+
+void* Window::nativeWindowHandle() const noexcept {
+  return mImpl != nullptr && mImpl->platform != nullptr
+    ? mImpl->platform->nativeWindowHandle() : nullptr;
 }
 
 void* Window::nativeHandle() const noexcept {
@@ -2723,6 +2994,21 @@ void Window::releasePointerCapture() {
   mImpl->publicPointerCapture.reset();
   mImpl->publicPointerCaptureId = 0;
   if (mImpl->platform != nullptr) mImpl->platform->setPointerCapture(false);
+}
+
+void Window::notifyLayerRemoved(const Layer* layer) {
+  if (mImpl == nullptr || layer == nullptr) return;
+  const auto within = [layer](const Layer* target) {
+    for (const Layer* current = target; current != nullptr; current = current->parent()) {
+      if (current == layer) return true;
+    }
+    return false;
+  };
+  if (within(mImpl->hovered)) mImpl->hovered = nullptr;
+  if (within(mImpl->pointerCapture)) {
+    if (mImpl->platform != nullptr) mImpl->platform->setPointerCapture(false);
+    mImpl->pointerCapture = nullptr;
+  }
 }
 
 Layer* Window::pointerCapture() const noexcept {
@@ -2949,13 +3235,28 @@ void Window::applySystemAppearance(const SystemAppearance& appearance) {
     applyResolvedTheme(std::make_shared<const Theme>(highContrastTheme(appearance.colors)));
     return;
   }
-  if (!mImpl->highContrast) return;
-  mImpl->highContrast = false;
-  if (mImpl->baseTheme != nullptr) {
-    applyResolvedTheme(std::move(mImpl->baseTheme));
-    mImpl->baseTheme.reset();
-  } else {
-    refreshThemeMode();
+  if (mImpl->highContrast) {
+    mImpl->highContrast = false;
+    if (mImpl->baseTheme != nullptr) {
+      applyResolvedTheme(std::move(mImpl->baseTheme));
+      mImpl->baseTheme.reset();
+    } else {
+      refreshThemeMode();
+    }
+  }
+  // Normal appearance: tint the built-in/current theme with the system accent. The untouched base
+  // theme is retained so a later accent change replaces rather than compounds the override.
+  if (appearance.accentColor != 0 && mImpl->theme != nullptr) {
+    if (!mImpl->accentApplied) {
+      mImpl->accentBaseTheme = mImpl->theme;
+      mImpl->accentApplied = true;
+    }
+    const Theme next = themeWithAccent(*mImpl->accentBaseTheme, colorFromArgb(appearance.accentColor));
+    applyResolvedTheme(std::make_shared<const Theme>(next));
+  } else if (mImpl->accentApplied) {
+    mImpl->accentApplied = false;
+    if (mImpl->accentBaseTheme != nullptr) applyResolvedTheme(std::move(mImpl->accentBaseTheme));
+    mImpl->accentBaseTheme.reset();
   }
 }
 

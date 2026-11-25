@@ -21,6 +21,7 @@
 
 #include <cstddef>
 #include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -130,6 +131,30 @@ class CommandRegistry {
   /** Command names in binding order, for a menu bar or a settings page. */
   [[nodiscard]] std::vector<std::string> names() const;
 
+  /** Optional presentation metadata for a bound command. An empty title means "no menu item". */
+  struct Info {
+    std::string title;
+    /** Top-level menu/group title; empty commands go into a generic Commands menu. */
+    std::string group;
+    /** Ordering inside the group; lower first, ties keep binding order. */
+    int order = 0;
+    /** Standard-menu insertion index; -1 appends. Ignored by a Commands submenu. */
+    int menuIndex = -1;
+    /** Insert a separator immediately before this command in a standard menu. */
+    bool separatorBefore = false;
+    /** Optional SF Symbol shown next to the command in native menus. */
+    std::string icon;
+  };
+
+  /**
+   * Attaches presentation metadata used by a native menu bar.
+   *
+   * The registry stays presentation-free unless a caller opts in; commands without an `Info.title`
+   * are not published to a native menu.
+   */
+  void setInfo(const std::string& name, Info info);
+  [[nodiscard]] std::optional<Info> info(const std::string& name) const;
+
   /**
    * Called after the table or a command's state changes.
    *
@@ -164,6 +189,8 @@ class CommandRegistry {
     Predicate enabled;
     bool explicitlyEnabled = true;
     bool checked = false;
+    bool hasInfo = false;
+    Info info;
   };
 
   [[nodiscard]] Entry* find(const std::string& name);

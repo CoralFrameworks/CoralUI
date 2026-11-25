@@ -26,7 +26,10 @@ constexpr float kTurnMilliseconds = 900.0f;
 constexpr float kTwoPi = 6.28318530718f;
 } // namespace
 
-Spinner::Spinner() = default;
+Spinner::Spinner() {
+  setAccessibleRole(AccessibilityRole::ProgressIndicator);
+  setAccessibleValue("Loading");
+}
 
 void Spinner::setColor(const Color color) {
   mColor = color;

@@ -71,6 +71,10 @@ class TreeView final : public ScrollView {
   void setOnSelection(std::function<void(int, const std::string&)> callback);
   void setOnActivated(std::function<void(int, const std::string&)> callback);
 
+  [[nodiscard]] const char* defaultStyleName() const override {
+    return "treeview";
+  }
+
  protected:
   void applyTheme(const Theme& theme) override;
 

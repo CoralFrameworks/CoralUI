@@ -22,6 +22,8 @@
 
 #include <ui/Renderer.h>
 
+#include <backend/Device.h>
+
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -68,6 +70,8 @@ class ThreadedRenderHost final : public RenderHost {
     /** X11 `Display*` / Wayland `wl_display*`; ignored on Windows and for offscreen targets. */
     void* nativeDisplay = nullptr;
     NativeWindowKind nativeWindowKind = NativeWindowKind::Unknown;
+    /** Swapchain colour space requested by the owning window. */
+    backend::SwapchainColorSpace outputColorSpace = backend::SwapchainColorSpace::Srgb;
     const char* label = "ui-threaded-host";
   };
 

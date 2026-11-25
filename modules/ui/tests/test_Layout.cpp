@@ -1360,6 +1360,39 @@ TEST(UiLayout, BaseDirectionDoesNotChangeMeasuredAdvance) {
   EXPECT_FLOAT_EQ(rtl.intrinsicSize().width, ltr.intrinsicSize().width);
   EXPECT_EQ(rtl.direction(), TextDirectionMode::Rtl);
 }
+TEST(UiLayout, BoundsInWindowIncludesAncestorTranslations) {
+  Layer root;
+  root.setBounds(Rect::MakeWH(200.0f, 200.0f));
+  root.setTranslation({ 20.0f, 30.0f });
+  auto nested = std::make_shared<Layer>();
+  nested->setBounds(Rect::MakeXYWH(5.0f, 6.0f, 40.0f, 20.0f));
+  root.addChild(nested);
+  const Rect inWindow = nested->boundsInWindow();
+  EXPECT_FLOAT_EQ(inWindow.getLeft(), 25.0f);
+  EXPECT_FLOAT_EQ(inWindow.getTop(), 36.0f);
+  EXPECT_FLOAT_EQ(inWindow.getWidth(), 40.0f);
+}
+
+TEST(UiLayout, AScrollbarTrackHasAWideEnoughHitTarget) {
+  auto scroll = std::make_shared<ScrollView>();
+  auto content = std::make_shared<ColorLayer>(Color::MakeRGBA8(0, 200, 0, 255));
+  content->setBounds(Rect::MakeWH(100.0f, 400.0f));
+  scroll->setContent(content);
+  scroll->setBounds(Rect::MakeWH(100.0f, 100.0f));
+  scroll->layout();
+  ASSERT_FALSE(scroll->scrollbarThumbBounds().isEmpty());
+
+  PointerEvent down;
+  down.position = { 96.0f, 90.0f };
+  EXPECT_TRUE(scroll->onPointerDown(down)) << "the 12px gutter accepts a track click";
+  EXPECT_GT(scroll->scrollY(), 0.0f);
+  PointerEvent move;
+  move.position = { 96.0f, 50.0f };
+  EXPECT_TRUE(scroll->onPointerMove(move));
+  EXPECT_GE(scroll->scrollY(), 0.0f);
+  EXPECT_TRUE(scroll->onPointerUp(move));
+}
+
 TEST(UiLayout, ARightToLeftScrollViewPutsTheBarsOnTheReadingStartSide) {
   auto scroll = std::make_shared<ScrollView>();
   auto content = std::make_shared<ColorLayer>(Color::MakeRGBA8(0, 200, 0, 255));

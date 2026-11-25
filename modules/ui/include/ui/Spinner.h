@@ -34,7 +34,10 @@ namespace coral::ui {
 class Spinner final : public Layer {
  public:
   Spinner();
-  Spinner(bool spinning, Color color) : mColor(color), mSpinning(spinning) {}
+  Spinner(bool spinning, Color color) : mColor(color), mSpinning(spinning) {
+    setAccessibleRole(AccessibilityRole::ProgressIndicator);
+    setAccessibleValue("Loading");
+  }
 
   void setColor(Color color);
   [[nodiscard]] Color color() const noexcept {
@@ -63,6 +66,9 @@ class Spinner final : public Layer {
   void onFrame(std::chrono::steady_clock::time_point now) override;
   /** Theme switches repaint the dots with the theme's accent colour. */
   void applyTheme(const Theme& theme) override;
+  [[nodiscard]] const char* defaultStyleName() const override {
+    return "spinner";
+  }
   [[nodiscard]] bool hasRunningAnimation() const override {
     return mSpinning;
   }

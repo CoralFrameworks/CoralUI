@@ -38,11 +38,24 @@ struct Glyph {
   std::string_view text;
   float width = 0.0f;
   std::shared_ptr<const graphics::Font> font;
+  std::vector<graphics::FontFeature> features;
   graphics::Color color{};
   bool underline = false;
   bool space = false;
   size_t offset = 0;
 };
+
+bool sameFeatures(const std::vector<graphics::FontFeature>& left,
+    const std::vector<graphics::FontFeature>& right) {
+  if (left.size() != right.size()) return false;
+  for (size_t index = 0; index < left.size(); ++index) {
+    if (left[index].tag != right[index].tag || left[index].value != right[index].value ||
+        left[index].start != right[index].start || left[index].end != right[index].end) {
+      return false;
+    }
+  }
+  return true;
+}
 
 size_t sequenceLength(const std::string& text, const size_t offset) {
   const auto lead = static_cast<unsigned char>(text[offset]);
@@ -123,6 +136,7 @@ RichTextLine makeLine(const std::vector<Glyph>& glyphs, const size_t begin, cons
       break; // trailing spaces do not affect a line's measured width
     }
     if (!line.segments.empty() && line.segments.back().font == glyph.font &&
+            sameFeatures(line.segments.back().features, glyph.features) &&
             line.segments.back().color.red == glyph.color.red &&
             line.segments.back().color.green == glyph.color.green &&
             line.segments.back().color.blue == glyph.color.blue &&
@@ -140,6 +154,7 @@ RichTextLine makeLine(const std::vector<Glyph>& glyphs, const size_t begin, cons
       flushPending();
       RichTextSegment segment;
       segment.font = glyph.font;
+      segment.features = glyph.features;
       segment.color = glyph.color;
       segment.underline = glyph.underline;
       segment.start = glyph.offset;
@@ -304,13 +319,15 @@ RichTextLayout layoutRichTextUncached(const std::vector<RichTextRun>& runs,
     // fallback below (TextShapeCache) stays for tabs and for a run whose shaping has no metrics.
     const detail::ShapedAdvances advances = run.fallback != nullptr
       ? detail::ShapedAdvances::fromFallback(*run.fallback, run.text)
-      : detail::ShapedAdvances::fromFont(*run.font, run.text);
+      : detail::ShapedAdvances::fromFont(*run.font, run.text,
+          graphics::Font::Direction::Auto, run.features);
     size_t offset = 0;
     while (offset < run.text.size()) {
       if (run.text[offset] == '\n') {
         Glyph newline;
         newline.text = "\n";
         newline.font = run.font;
+        newline.features = run.features;
         newline.color = run.color;
         newline.offset = textOffset;
         glyphs.push_back(std::move(newline));
@@ -334,6 +351,7 @@ RichTextLayout layoutRichTextUncached(const std::vector<RichTextRun>& runs,
                       static_cast<float>(tabSize);
       }
       glyph.font = face;
+      glyph.features = run.features;
       glyph.color = run.color;
       glyph.underline = run.underline;
       glyph.space = glyph.text == " ";

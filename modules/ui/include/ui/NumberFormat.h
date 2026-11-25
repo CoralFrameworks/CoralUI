@@ -56,6 +56,9 @@ struct NumberFormatOptions {
  */
 [[nodiscard]] NumberFormatOptions numberFormatForLocale(const Locale& locale);
 
+/** The separators the current OS locale reports (falling back to en-US). */
+[[nodiscard]] NumberFormatOptions systemNumberFormat();
+
 /**
  * Formats @p value with @p options.
  *

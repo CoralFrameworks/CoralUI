@@ -871,6 +871,16 @@ void Layer::invalidateClipMask() {
   mClipMaskRadius = -1.0f;
 }
 
+Rect Layer::boundsInWindow() const {
+  Rect result = mBounds;
+  for (const Layer* layer = this; layer != nullptr; layer = layer->parent()) {
+    const Point offset = layer->translation();
+    result = Rect::MakeXYWH(result.getLeft() + offset.x, result.getTop() + offset.y,
+      result.getWidth(), result.getHeight());
+  }
+  return result;
+}
+
 void Layer::setBounds(const Rect& bounds) {
   if (mBounds == bounds) {
     return;
@@ -902,7 +912,9 @@ void Layer::attachToWindow(Window* window) {
     for (const std::shared_ptr<Layer>& child: mChildren) child->attachToWindow(window);
     return;
   }
+  Window* previous = mWindow;
   mWindow = window;
+  onWindowChanged(previous, window);
   for (const std::shared_ptr<Layer>& child: mChildren) child->attachToWindow(window);
 }
 
@@ -938,6 +950,10 @@ void Layer::setTheme(std::shared_ptr<const Theme> theme) {
 }
 
 bool Layer::performAccessibilityAction(const AccessibilityAction action, const std::string_view value) {
+  if (action == AccessibilityAction::Confirm) {
+    return performAccessibilityAction(AccessibilityAction::Invoke, value);
+  }
+  if (action == AccessibilityAction::Cancel) return false;
   (void)value;
   if (action == AccessibilityAction::Select && mAccessibleOnSelect) {
     mAccessibleOnSelect();
@@ -1022,6 +1038,8 @@ void Layer::removeChild(const std::shared_ptr<Layer>& child) {
   if (mWindow != nullptr) {
     Layer* focused = mWindow->focusedLayer();
     if (focused != nullptr && subtreeContains(found->get(), focused)) mWindow->focusLayer(nullptr);
+    // A hovered/pressed row can be recycled during a mouse drag; those are also bare pointers.
+    mWindow->notifyLayerRemoved(found->get());
   }
   (*found)->mParent = nullptr;
   ++(*found)->mReparents;

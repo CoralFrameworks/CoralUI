@@ -8,11 +8,29 @@ set(PUBLIC_HDRS
     include/ui/Animation.h
     include/ui/Curve.h
     include/ui/DateFormat.h
+    include/ui/DateField.h
+    include/ui/DateTimeField.h
+    include/ui/DateRangeField.h
+    include/ui/DatePickerPanel.h
+    include/ui/NativeViewLayer.h
+    include/ui/macos/NativeButton.h
+    include/ui/macos/NativeSearchField.h
+    include/ui/macos/NativePopUpButton.h
+    include/ui/macos/NativeColorWell.h
+    include/ui/macos/NativeSwitch.h
+    include/ui/macos/NativeSlider.h
+    include/ui/macos/NativeProgressIndicator.h
+    include/ui/macos/NativeControlSize.h
+    include/ui/macos/NativeStepper.h
+    include/ui/macos/NativeDatePicker.h
+    include/ui/macos/NativeSegmentedControl.h
     include/ui/Binding.h
     include/ui/Button.h
+    include/ui/Divider.h
     include/ui/Canvas.h
     include/ui/CanvasBackend.h
     include/ui/CheckBox.h
+    include/ui/CheckBoxGroup.h
     include/ui/Clipboard.h
     include/ui/ClipboardMime.h
     include/ui/Command.h
@@ -44,6 +62,7 @@ set(PUBLIC_HDRS
     include/ui/Event.h
     include/ui/FileDialog.h
     include/ui/Flex.h
+    include/ui/FormField.h
     include/ui/Geometry.h
     include/ui/Grid.h
     include/ui/HotReload.h
@@ -61,16 +80,28 @@ set(PUBLIC_HDRS
     include/ui/Layer.h
     include/ui/NativeAlert.h
     include/ui/LineBreakPolicy.h
+    include/ui/Icon.h
+    include/ui/Kbd.h
+    include/ui/Link.h
     include/ui/ListView.h
     include/ui/Menu.h
+    include/ui/Meter.h
+    include/ui/MultiSelect.h
     include/ui/MenuBar.h
     include/ui/NumberField.h
     include/ui/Overlay.h
+    include/ui/Pagination.h
+    include/ui/PasswordField.h
     include/ui/Popup.h
     include/ui/ProcessStats.h
     include/ui/Ref.h
     include/ui/Positioner.h
     include/ui/ProgressBar.h
+    include/ui/PropertyRow.h
+    include/ui/ProgressRing.h
+    include/ui/RadioGroup.h
+    include/ui/RangeSlider.h
+    include/ui/Rating.h
     include/ui/RadioButton.h
     include/ui/RenderContext.h
     include/ui/RasterRenderer.h
@@ -84,11 +115,38 @@ set(PUBLIC_HDRS
     include/ui/ScrollView.h
     include/ui/SearchField.h
     include/ui/SegmentedControl.h
+    include/ui/SectionHeader.h
+    include/ui/Select.h
+    include/ui/Calendar.h
+    include/ui/ComboBox.h
+    include/ui/Breadcrumb.h
+    include/ui/Badge.h
+    include/ui/Banner.h
+    include/ui/Avatar.h
+    include/ui/AvatarGroup.h
+    include/ui/Skeleton.h
+    include/ui/Chip.h
+    include/ui/Card.h
+    include/ui/TimeField.h
+    include/ui/TimeRangeField.h
+    include/ui/SplitButton.h
+    include/ui/TimePicker.h
+    include/ui/Toolbar.h
+    include/ui/Stat.h
+    include/ui/StepIndicator.h
+    include/ui/StatusBar.h
+    include/ui/StatusIndicator.h
+    include/ui/DropZone.h
+    include/ui/EmptyState.h
+    include/ui/Expander.h
+    include/ui/Stepper.h
     include/ui/Slider.h
     include/ui/SplitView.h
     include/ui/State.h
     include/ui/Style.h
     include/ui/TabBar.h
+    include/ui/TagInput.h
+    include/ui/TagList.h
     include/ui/TextInput.h
     include/ui/TitleBar.h
     include/ui/TextLayer.h
@@ -100,6 +158,12 @@ set(PUBLIC_HDRS
     include/ui/SpellCheck.h
     include/ui/SecurityScopedBookmark.h
     include/ui/InputSource.h
+    include/ui/SystemSettings.h
+    include/ui/FontPanel.h
+    include/ui/ScreenCapture.h
+    include/ui/Notification.h
+    include/ui/ColorPanel.h
+    include/ui/WindowRestoration.h
     include/ui/Motion.h
     include/ui/NumberFormat.h
     include/ui/Spinner.h
@@ -111,8 +175,12 @@ set(PUBLIC_HDRS
     include/ui/ThemeHotReload.h
     include/ui/Translation.h
     include/ui/Undo.h
+    include/ui/Timeline.h
     include/ui/Toast.h
+    include/ui/ToastStack.h
     include/ui/Toggle.h
+    include/ui/ToggleButton.h
+    include/ui/ToggleGroup.h
     include/ui/UI.h
     include/ui/Tooltip.h
     include/ui/TreeView.h
@@ -129,12 +197,17 @@ set(SRCS
     src/Animation.cpp
     src/Curve.cpp
     src/DateFormat.cpp
+    src/DateField.cpp
+    src/DateTimeField.cpp
+    src/DateRangeField.cpp
     src/Application.cpp
     src/ApplicationLifecycle.cpp
     src/Binding.cpp
     src/Button.cpp
+    src/Divider.cpp
     src/CandidateListView.cpp
     src/CheckBox.cpp
+    src/CheckBoxGroup.cpp
     src/Clipboard.cpp
     src/ClipboardImage.cpp
     src/ClipboardMime.cpp
@@ -157,6 +230,7 @@ set(SRCS
     src/DragDrop.cpp
     src/FileDialog.cpp
     src/Flex.cpp
+    src/FormField.cpp
     src/FrameStatsOverlay.cpp
     src/Grid.cpp
     src/HotReload.cpp
@@ -166,15 +240,28 @@ set(SRCS
     src/Layer.cpp
     src/LineBreakPolicy.cpp
     src/DictionaryBackends.cpp
+    src/Icon.cpp
+    src/Kbd.cpp
+    src/Link.cpp
     src/ListView.cpp
     src/Menu.cpp
+    src/Meter.cpp
+    src/MultiSelect.cpp
     src/MenuBar.cpp
+    src/NativeViewLayer.cpp
     src/NumberField.cpp
     src/Overlay.cpp
+    src/Pagination.cpp
+    src/PasswordField.cpp
     src/Popup.cpp
     src/ProcessStats.cpp
     src/Positioner.cpp
     src/ProgressBar.cpp
+    src/PropertyRow.cpp
+    src/ProgressRing.cpp
+    src/RadioGroup.cpp
+    src/RangeSlider.cpp
+    src/Rating.cpp
     src/RadioButton.cpp
     src/Reconciler.cpp
     src/PlatformClock.cpp
@@ -189,6 +276,31 @@ set(SRCS
     src/ScrollView.cpp
     src/SearchField.cpp
     src/SegmentedControl.cpp
+    src/SectionHeader.cpp
+    src/Select.cpp
+    src/Calendar.cpp
+    src/ComboBox.cpp
+    src/Breadcrumb.cpp
+    src/Badge.cpp
+    src/Banner.cpp
+    src/Avatar.cpp
+    src/AvatarGroup.cpp
+    src/Skeleton.cpp
+    src/Chip.cpp
+    src/Card.cpp
+    src/TimeField.cpp
+    src/TimeRangeField.cpp
+    src/SplitButton.cpp
+    src/TimePicker.cpp
+    src/Toolbar.cpp
+    src/Stat.cpp
+    src/StepIndicator.cpp
+    src/StatusBar.cpp
+    src/StatusIndicator.cpp
+    src/DropZone.cpp
+    src/EmptyState.cpp
+    src/Expander.cpp
+    src/Stepper.cpp
     src/Slider.cpp
     src/SplitView.cpp
     src/Style.cpp
@@ -200,6 +312,8 @@ set(SRCS
     src/Spinner.cpp
     src/Table.cpp
     src/TableView.cpp
+    src/TagInput.cpp
+    src/TagList.cpp
     src/TextInput.cpp
     src/TitleBar.cpp
     src/ThemeFile.cpp
@@ -225,14 +339,19 @@ set(SRCS
     src/unicode/WordBreakProperties.generated.cpp
     src/unicode/WordTrie.cpp
     src/unicode/WordTries.generated.cpp
+    src/Timeline.cpp
     src/Toast.cpp
+    src/ToastStack.cpp
     src/Toggle.cpp
+    src/ToggleButton.cpp
+    src/ToggleGroup.cpp
     src/Tooltip.cpp
     src/Undo.cpp
     src/TreeView.cpp
     src/Window.cpp
     src/WindowChrome.cpp
     src/WindowManager.cpp
+    src/WindowRestoration.cpp
     src/host/ThreadedRenderHost.cpp
     src/platform/WindowPlatform.cpp
     src/platform/WindowHeadless.cpp
@@ -274,6 +393,13 @@ if (NOT APPLE OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
   target_sources(${TARGET} PRIVATE src/platform/SpellCheckFallback.cpp)
   target_sources(${TARGET} PRIVATE src/platform/SecurityScopedBookmarkFallback.cpp)
   target_sources(${TARGET} PRIVATE src/platform/InputSourceFallback.cpp)
+  target_sources(${TARGET} PRIVATE src/platform/SystemSettingsFallback.cpp)
+  target_sources(${TARGET} PRIVATE src/platform/SystemFontsFallback.cpp)
+  target_sources(${TARGET} PRIVATE src/platform/FontPanelFallback.cpp)
+  target_sources(${TARGET} PRIVATE src/platform/ScreenCaptureFallback.cpp)
+  target_sources(${TARGET} PRIVATE src/platform/NotificationFallback.cpp)
+  target_sources(${TARGET} PRIVATE src/platform/ColorPanelFallback.cpp)
+  target_sources(${TARGET} PRIVATE src/platform/DatePickerPanelFallback.cpp)
 endif ()
 
 if (APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
@@ -285,23 +411,78 @@ if (APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   find_library(QUARTZCORE_FRAMEWORK QuartzCore REQUIRED)
   find_library(UNIFORMTYPEIDENTIFIERS_FRAMEWORK UniformTypeIdentifiers REQUIRED)
   find_library(CARBON_FRAMEWORK Carbon REQUIRED)
+  find_library(CORETEXT_FRAMEWORK CoreText REQUIRED)
+  find_library(COREGRAPHICS_FRAMEWORK CoreGraphics REQUIRED)
+  find_library(USERNOTIFICATIONS_FRAMEWORK UserNotifications REQUIRED)
+  find_library(SCREENCAPTUREKIT_FRAMEWORK ScreenCaptureKit REQUIRED)
   target_sources(${TARGET} PRIVATE src/platform/darwin/WindowCocoa.mm
       src/platform/darwin/ClipboardCocoa.mm src/platform/darwin/FileDialogCocoa.mm
       src/platform/darwin/SystemImageCocoa.mm src/platform/darwin/NativeAlertCocoa.mm
       src/platform/darwin/SpellCheckCocoa.mm
       src/platform/darwin/SecurityScopedBookmarkCocoa.mm
-      src/platform/darwin/InputSourceCocoa.mm)
+      src/platform/darwin/InputSourceCocoa.mm
+      src/platform/darwin/SystemSettingsCocoa.mm
+      src/platform/darwin/SystemFontsCocoa.mm
+      src/platform/darwin/FontPanelCocoa.mm
+      src/platform/darwin/ScreenCaptureCocoa.mm
+      src/platform/darwin/NotificationCocoa.mm
+      src/platform/darwin/ColorPanelCocoa.mm
+      src/platform/darwin/DatePickerPanelCocoa.mm
+      src/NativeButton.cpp
+      src/NativeSearchField.cpp
+      src/platform/darwin/NativeButtonCocoa.mm
+      src/platform/darwin/NativeSearchFieldCocoa.mm
+      src/NativePopUpButton.cpp
+      src/NativeColorWell.cpp
+      src/platform/darwin/NativePopUpButtonCocoa.mm
+      src/platform/darwin/NativeColorWellCocoa.mm
+      src/NativeSwitch.cpp
+      src/NativeSlider.cpp
+      src/NativeProgressIndicator.cpp
+      src/NativeStepper.cpp
+      src/platform/darwin/NativeControlSizeCocoa.mm
+      src/platform/darwin/NativeProgressIndicatorCocoa.mm
+      src/platform/darwin/NativeStepperCocoa.mm
+      src/platform/darwin/NativeControlSizeCocoa.mm
+      src/platform/darwin/NativeSwitchCocoa.mm
+      src/platform/darwin/NativeSliderCocoa.mm
+      src/NativeDatePicker.cpp
+      src/NativeSegmentedControl.cpp
+      src/platform/darwin/NativeDatePickerCocoa.mm
+      src/platform/darwin/NativeSegmentedControlCocoa.mm)
   set_source_files_properties(src/platform/darwin/WindowCocoa.mm
       src/platform/darwin/ClipboardCocoa.mm src/platform/darwin/FileDialogCocoa.mm
       src/platform/darwin/SystemImageCocoa.mm src/platform/darwin/NativeAlertCocoa.mm
       src/platform/darwin/SpellCheckCocoa.mm
       src/platform/darwin/SecurityScopedBookmarkCocoa.mm
       src/platform/darwin/InputSourceCocoa.mm
+      src/platform/darwin/SystemSettingsCocoa.mm
+      src/platform/darwin/SystemFontsCocoa.mm
+      src/platform/darwin/FontPanelCocoa.mm
+      src/platform/darwin/ScreenCaptureCocoa.mm
+      src/platform/darwin/NotificationCocoa.mm
+      src/platform/darwin/ColorPanelCocoa.mm
+      src/platform/darwin/DatePickerPanelCocoa.mm
+      src/platform/darwin/NativeButtonCocoa.mm
+      src/platform/darwin/NativeSearchFieldCocoa.mm
+      src/platform/darwin/NativePopUpButtonCocoa.mm
+      src/platform/darwin/NativeColorWellCocoa.mm
+      src/platform/darwin/NativeSwitchCocoa.mm
+      src/platform/darwin/NativeSliderCocoa.mm
+      src/platform/darwin/NativeProgressIndicatorCocoa.mm
+      src/platform/darwin/NativeStepperCocoa.mm
+      src/platform/darwin/NativeControlSizeCocoa.mm
+      src/platform/darwin/NativeDatePickerCocoa.mm
+      src/platform/darwin/NativeSegmentedControlCocoa.mm
       PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
   target_link_libraries(${TARGET} PRIVATE $<BUILD_INTERFACE:${COCOA_FRAMEWORK}>
       $<BUILD_INTERFACE:${METAL_FRAMEWORK}> $<BUILD_INTERFACE:${QUARTZCORE_FRAMEWORK}>
       $<BUILD_INTERFACE:${UNIFORMTYPEIDENTIFIERS_FRAMEWORK}>
-      $<BUILD_INTERFACE:${CARBON_FRAMEWORK}>)
+      $<BUILD_INTERFACE:${CARBON_FRAMEWORK}>
+      $<BUILD_INTERFACE:${CORETEXT_FRAMEWORK}>
+      $<BUILD_INTERFACE:${COREGRAPHICS_FRAMEWORK}>
+      $<BUILD_INTERFACE:${USERNOTIFICATIONS_FRAMEWORK}>
+      $<BUILD_INTERFACE:${SCREENCAPTUREKIT_FRAMEWORK}>)
   target_compile_definitions(${TARGET} PRIVATE CORAL_UI_COCOA=1)
   set(CLIPBOARD_PLATFORM_SOURCE src/platform/darwin/ClipboardCocoa.mm)
   set(FILEDIALOG_PLATFORM_SOURCE src/platform/darwin/FileDialogCocoa.mm)
@@ -613,7 +794,13 @@ foreach (_target shaderc_util glslang SPIRV SPIRV-Tools SPIRV-Tools-opt)
   endif ()
 endforeach ()
 
-install(DIRECTORY ${PUBLIC_HDR_DIR}/${TARGET} DESTINATION include)
+# Platform-native control extensions are installed only on their platform. The cross-platform
+# headers stay under include/ui; macOS interop lives under include/ui/macos.
+install(DIRECTORY ${PUBLIC_HDR_DIR}/${TARGET} DESTINATION include
+    PATTERN "macos" EXCLUDE)
+if (APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  install(DIRECTORY ${PUBLIC_HDR_DIR}/${TARGET}/macos DESTINATION include/ui)
+endif ()
 
 # Translation catalogues belong to the SDK, not to the demo: `loadCatalogDirectory()` takes a
 # directory, so the installed `share/coral/i18n` is the packaging contract (`CoralUI_I18N_DIR` in the

@@ -17,8 +17,10 @@
 #ifndef CORAL_UI_SYSTEMIMAGE_H
 #define CORAL_UI_SYSTEMIMAGE_H
 
+#include <geometry/Color.h>
 #include <graphics/Image.h>
 
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -32,6 +34,8 @@ struct SystemImageOptions {
   float scale = 0.0f;
   /** Optional description passed to the platform's accessibility metadata. */
   std::string description;
+  /** Optional tint for the template artwork (SF Symbols); unset keeps the symbol's own colour. */
+  std::optional<graphics::Color> tint;
 };
 
 /**

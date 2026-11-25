@@ -16,11 +16,15 @@
 
 #include <ui/SegmentedControl.h>
 
+#include "AccessibilityProxy.h"
+
 #include "WidgetDrawing.h"
 
 #include <ui/Theme.h>
 
 #include <algorithm>
+#include <cstdlib>
+#include <string>
 #include <utility>
 
 namespace coral::ui {
@@ -32,12 +36,18 @@ float SegmentedControl::segmentWidth(const std::string& label) const {
 
 SegmentedControl::SegmentedControl(std::vector<std::string> segments,
     std::shared_ptr<const graphics::Font> font)
-    : mSegments(std::move(segments)), mFont(std::move(font)) {}
+    : mSegments(std::move(segments)), mFont(std::move(font)) {
+  setAccessibleRole(AccessibilityRole::TabList);
+  rebuildAccessibilityItems();
+  if (!mSegments.empty()) setAccessibleValue(mSegments.front());
+}
 
 void SegmentedControl::setSegments(std::vector<std::string> segments) {
   mSegments = std::move(segments);
   mSelected = std::clamp(mSelected, 0,
     mSegments.empty() ? 0 : static_cast<int>(mSegments.size()) - 1);
+  rebuildAccessibilityItems();
+  setAccessibleValue(mSegments.empty() ? std::string() : mSegments[static_cast<size_t>(mSelected)]);
   setNeedsLayout();
   setNeedsPaint();
 }
@@ -62,6 +72,11 @@ void SegmentedControl::setSelectedIndex(const int index) {
     return;
   }
   mSelected = std::clamp(index, 0, static_cast<int>(mSegments.size()) - 1);
+  if (!mSegments.empty()) setAccessibleValue(mSegments[static_cast<size_t>(mSelected)]);
+  for (size_t index = 0; index < mAccessibilityItems.size(); ++index) {
+    auto item = std::dynamic_pointer_cast<AccessibilityProxy>(mAccessibilityItems[index]);
+    if (item != nullptr) item->setSelected(static_cast<int>(index) == mSelected);
+  }
   setNeedsPaint();
 }
 
@@ -76,6 +91,20 @@ Size SegmentedControl::measure(const Size& available) {
     : 28.0f;
   setMeasuredSize({ width, std::max(26.0f, height) });
   return measuredSize();
+}
+
+void SegmentedControl::layout() {
+  float left = bounds().getLeft();
+  for (size_t index = 0; index < mAccessibilityItems.size() && index < mSegments.size(); ++index) {
+    const float width = segmentWidth(mSegments[index]);
+    if (mAccessibilityItems[index] != nullptr) {
+      mAccessibilityItems[index]->setBounds(Rect::MakeXYWH(left, bounds().getTop(),
+        width, bounds().getHeight()));
+      mAccessibilityItems[index]->layout();
+    }
+    left += width;
+  }
+  clearNeedsLayout();
 }
 
 void SegmentedControl::drawSelf(RenderContext& context) {
@@ -168,12 +197,57 @@ bool SegmentedControl::onKeyDown(const KeyEvent& event) {
     select((mSelected + 1) % static_cast<int>(mSegments.size()));
     return true;
   }
+  if (event.key == Key::Home) {
+    select(0);
+    return true;
+  }
+  if (event.key == Key::End) {
+    select(static_cast<int>(mSegments.size()) - 1);
+    return true;
+  }
   return false;
 }
 
 void SegmentedControl::onFocusChanged(const bool focused) {
   mFocused = focused;
   setNeedsPaint();
+}
+
+bool SegmentedControl::performAccessibilityAction(const AccessibilityAction action,
+    const std::string_view value) {
+  if (action != AccessibilityAction::Select) return false;
+  const std::string text(value);
+  char* end = nullptr;
+  const long index = std::strtol(text.c_str(), &end, 10);
+  if (end != text.c_str() && *end == '\0') {
+    select(static_cast<int>(index));
+    return true;
+  }
+  for (size_t segment = 0; segment < mSegments.size(); ++segment) {
+    if (mSegments[segment] == text) {
+      select(static_cast<int>(segment));
+      return true;
+    }
+  }
+  return false;
+}
+
+void SegmentedControl::rebuildAccessibilityItems() {
+  for (const auto& item: mAccessibilityItems) {
+    if (item != nullptr) removeChild(item);
+  }
+  mAccessibilityItems.clear();
+  for (size_t index = 0; index < mSegments.size(); ++index) {
+    auto item = std::make_shared<AccessibilityProxy>(mSegments[index]);
+    item->setSelected(false);
+    item->setOnSelect([this, index] { select(static_cast<int>(index)); });
+    addChild(item);
+    mAccessibilityItems.push_back(item);
+  }
+  if (!mAccessibilityItems.empty()) {
+    auto first = std::dynamic_pointer_cast<AccessibilityProxy>(mAccessibilityItems.front());
+    if (first != nullptr) first->setSelected(mSelected == 0);
+  }
 }
 
 void SegmentedControl::applyTheme(const Theme& theme) {
@@ -194,6 +268,11 @@ void SegmentedControl::select(const int index) {
     return;
   }
   mSelected = index;
+  setAccessibleValue(mSegments[static_cast<size_t>(mSelected)]);
+  for (size_t item = 0; item < mAccessibilityItems.size(); ++item) {
+    auto proxy = std::dynamic_pointer_cast<AccessibilityProxy>(mAccessibilityItems[item]);
+    if (proxy != nullptr) proxy->setSelected(static_cast<int>(item) == mSelected);
+  }
   setNeedsPaint();
   if (mOnChanged) {
     mOnChanged(mSelected);

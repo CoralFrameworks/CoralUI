@@ -28,13 +28,23 @@ namespace {
 AccessibilityAction actionsForRole(const AccessibilityRole role) {
   switch (role) {
     case AccessibilityRole::Button:
-      return AccessibilityAction::Invoke;
+      return AccessibilityAction::Invoke | AccessibilityAction::Confirm |
+        AccessibilityAction::Cancel;
     case AccessibilityRole::CheckBox:
     case AccessibilityRole::Radio:
       return AccessibilityAction::Toggle;
     case AccessibilityRole::Slider:
     case AccessibilityRole::TextField:
+    case AccessibilityRole::SpinButton:
       return AccessibilityAction::SetValue;
+    case AccessibilityRole::ComboBox:
+      return AccessibilityAction::Invoke | AccessibilityAction::Select;
+    case AccessibilityRole::ColorPicker:
+      return AccessibilityAction::SetValue;
+    case AccessibilityRole::Calendar:
+      return AccessibilityAction::Select | AccessibilityAction::SetValue;
+    case AccessibilityRole::TabList:
+      return AccessibilityAction::Select;
     case AccessibilityRole::List:
     case AccessibilityRole::Tree:
     case AccessibilityRole::Table:

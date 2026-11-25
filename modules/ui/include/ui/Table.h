@@ -106,6 +106,10 @@ class Table final : public Layer {
     return mFocused;
   }
 
+  [[nodiscard]] const char* defaultStyleName() const override {
+    return "table";
+  }
+
  private:
   std::vector<TableColumn> mColumns;
   std::vector<std::vector<std::shared_ptr<Layer>>> mRows;

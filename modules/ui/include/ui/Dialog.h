@@ -80,6 +80,10 @@ public:
   /** The panel rectangle inside the layer's bounds, exposed for tests and anchoring. */
   [[nodiscard]] Rect panelBounds() const;
 
+  [[nodiscard]] const char* defaultStyleName() const override {
+    return "dialog";
+  }
+
 protected:
   void applyTheme(const Theme& theme) override;
 

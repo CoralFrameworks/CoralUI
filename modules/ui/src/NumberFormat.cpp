@@ -15,6 +15,8 @@
  */
 
 #include <ui/NumberFormat.h>
+#include <ui/SystemSettings.h>
+#include <ui/Translation.h>
 
 #include <algorithm>
 #include <cmath>
@@ -89,6 +91,14 @@ NumberFormatOptions numberFormatForLocale(const Locale& locale) {
   }
   // en and every language without a preset above.
   return numberFormatEnUs();
+}
+
+NumberFormatOptions systemNumberFormat() {
+  const SystemLocale locale = currentSystemLocale();
+  NumberFormatOptions options = numberFormatForLocale(Locale::parse(locale.identifier));
+  if (!locale.decimalSeparator.empty()) options.decimalSeparator = locale.decimalSeparator;
+  if (!locale.groupingSeparator.empty()) options.groupSeparator = locale.groupingSeparator;
+  return options;
 }
 
 std::string formatNumber(const double value, const NumberFormatOptions& options) {

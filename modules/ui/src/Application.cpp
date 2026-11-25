@@ -27,6 +27,9 @@
 #include <core/event/Timer.h>
 
 #include <algorithm>
+#include <fstream>
+#include <iomanip>
+#include <sstream>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -166,6 +169,47 @@ std::vector<WindowLayout> Application::captureWindowLayout() const {
     layout.push_back(WindowLayout{ window->title(), window->bounds(), window->isFullscreen() });
   }
   return layout;
+}
+
+bool Application::saveWindowLayout(const std::string_view path) const {
+  if (path.empty()) return false;
+  std::ofstream file{ std::string(path), std::ios::binary | std::ios::trunc };
+  if (!file) return false;
+  file << "CORAL_WINDOW_LAYOUT 1\n";
+  for (const WindowLayout& entry: captureWindowLayout()) {
+    file << (entry.fullscreen ? 1 : 0) << ' ' << entry.bounds.getLeft() << ' '
+         << entry.bounds.getTop() << ' ' << entry.bounds.getRight() << ' '
+         << entry.bounds.getBottom() << ' ' << std::quoted(entry.title) << '\n';
+  }
+  return file.good();
+}
+
+bool Application::loadWindowLayout(const std::string_view path) {
+  if (path.empty()) return false;
+  std::ifstream file{ std::string(path), std::ios::binary };
+  if (!file) return false;
+  std::string header;
+  std::getline(file, header);
+  if (header != "CORAL_WINDOW_LAYOUT 1") return false;
+  std::vector<WindowLayout> layout;
+  std::string line;
+  while (std::getline(file, line)) {
+    if (line.empty()) continue;
+    std::istringstream input(line);
+    int fullscreen = 0;
+    float left = 0.0f;
+    float top = 0.0f;
+    float right = 0.0f;
+    float bottom = 0.0f;
+    WindowLayout entry;
+    if (!(input >> fullscreen >> left >> top >> right >> bottom >> std::quoted(entry.title))) {
+      return false;
+    }
+    entry.bounds = Rect::MakeLTRB(left, top, right, bottom);
+    entry.fullscreen = fullscreen != 0;
+    layout.push_back(std::move(entry));
+  }
+  return applyWindowLayout(layout);
 }
 
 bool Application::applyWindowLayout(const std::vector<WindowLayout>& layout) {

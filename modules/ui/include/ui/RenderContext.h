@@ -123,6 +123,18 @@ public:
   }
 
   /**
+   * True when the target has opaque alpha. Subpixel text masks deliberately write colour channels only,
+   * so they are only valid on an opaque target; a transparent window uses grayscale text so the glyph
+   * alpha participates in the destination alpha.
+   */
+  [[nodiscard]] bool isOpaque() const noexcept {
+    return mOpaque;
+  }
+  void setOpaque(const bool opaque) noexcept {
+    mOpaque = opaque;
+  }
+
+  /**
    * True when this frame can sample a texture another producer owns.
    *
    * A GPU recording canvas can; a software raster canvas cannot, because it has no device to sample
@@ -167,6 +179,7 @@ public:
 
 private:
   std::vector<PlannedItem>* mPlanItems = nullptr;
+  bool mOpaque = true;
   mutable Canvas mCanvas;
   float mUiScale = 1.0f;
   Size mDeviceSize{};

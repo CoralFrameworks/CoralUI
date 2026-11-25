@@ -101,8 +101,8 @@ FileDialogResult showPlatformFileDialog(const FileDialogKind kind,
     NSOpenPanel* openPanel = nil;
     if (kind == FileDialogKind::OpenFile) {
       openPanel = [NSOpenPanel openPanel];
-      openPanel.canChooseFiles = YES;
-      openPanel.canChooseDirectories = NO;
+      openPanel.canChooseFiles = options.canChooseFiles;
+      openPanel.canChooseDirectories = options.canChooseDirectories;
       openPanel.allowsMultipleSelection = options.allowMultiple;
       panel = openPanel;
     } else {
@@ -113,6 +113,10 @@ FileDialogResult showPlatformFileDialog(const FileDialogKind kind,
 
     if (!options.title.empty()) {
       panel.title = [NSString stringWithUTF8String:options.title.c_str()];
+    }
+    if (options.accessoryView != nullptr) {
+      NSView* accessory = (__bridge NSView*)options.accessoryView;
+      if ([accessory isKindOfClass:[NSView class]]) panel.accessoryView = accessory;
     }
     if (!options.defaultPath.empty()) applyDefaultPath(panel, options.defaultPath);
     applyFilters(panel, options);

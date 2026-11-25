@@ -15,6 +15,7 @@
  */
 
 #include <ui/Menu.h>
+#include <ui/Window.h>
 
 #include <ui/Positioner.h>
 #include "TextPainter.h"
@@ -241,10 +242,63 @@ void Menu::showAt(const Point& position) {
   showAt(Rect::MakeXYWH(position.x, position.y - 2.0f, 0.0f, 0.0f));
 }
 
+void Menu::setNativePresentation(const bool native) {
+  mNativePresentation = native;
+}
+
+void Menu::activateNativePath(const std::string_view path) {
+  Menu* menu = this;
+  size_t begin = 0;
+  while (begin < path.size() && menu != nullptr) {
+    const size_t end = path.find('.', begin);
+    const std::string_view part = path.substr(begin,
+      end == std::string_view::npos ? std::string_view::npos : end - begin);
+    int index = 0;
+    for (const char c: part) {
+      if (c < '0' || c > '9') return;
+      index = index * 10 + (c - '0');
+    }
+    if (end == std::string_view::npos) {
+      menu->activate(index);
+      return;
+    }
+    if (index < 0 || index >= static_cast<int>(menu->mItems.size())) return;
+    const auto& submenu = menu->mItems[static_cast<size_t>(index)].submenu;
+    menu = submenu.get();
+    begin = end + 1;
+  }
+}
+
 void Menu::showAt(const Rect& anchor) {
   // A menu is rebuilt from the command table each time it opens: enabled/checked state may have
   // changed since it last closed.
   refreshCommands();
+  const bool useNative = mNativePresentation || (window() != nullptr && window()->nativeMenusEnabled());
+  if (useNative && window() != nullptr) {
+    const auto build = [&](const auto& self, const Menu& source,
+        const std::string& prefix) -> std::vector<Window::NativeMenuItem> {
+      std::vector<Window::NativeMenuItem> entries;
+      entries.reserve(source.mItems.size());
+      for (size_t index = 0; index < source.mItems.size(); ++index) {
+        const Item& item = source.mItems[index];
+        Window::NativeMenuItem entry;
+        entry.id = prefix.empty() ? std::to_string(index) : prefix + "." + std::to_string(index);
+        entry.title = item.label;
+        entry.separator = item.separator;
+        entry.enabled = item.enabled;
+        entry.checked = item.checked;
+        if (item.submenu != nullptr) {
+          entry.children = self(self, *item.submenu, entry.id);
+        }
+        entries.push_back(std::move(entry));
+      }
+      return entries;
+    };
+    window()->showNativeContextMenu(build(build, *this, {}),
+      Point{ anchor.getLeft(), anchor.getBottom() },
+      [this](const std::string_view path) { activateNativePath(path); });
+    return;
+  }
   const Size size = measure({});
   Rect parentBounds = anchor;
   if (parent() != nullptr) parentBounds = parent()->bounds();

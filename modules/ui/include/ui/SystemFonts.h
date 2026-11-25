@@ -39,6 +39,12 @@ namespace coral::ui {
 [[nodiscard]] std::vector<std::string> systemFontFiles();
 
 /**
+ * @return the platform UI font at @p pointSize (NSFont + CoreText on macOS), or null when the
+ * platform cannot resolve one. Useful for native-looking default text and for font-panel results.
+ */
+[[nodiscard]] std::shared_ptr<const Font> systemUIFont(float pointSize);
+
+/**
  * @return a cached fallback face set for @p primary: the primary plus up to 12
  * discovered system faces at the primary's pixel size. `nullptr` when discovery
  * found nothing (the caller should keep using the primary alone).

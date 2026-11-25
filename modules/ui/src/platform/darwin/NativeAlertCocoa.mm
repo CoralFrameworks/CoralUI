@@ -53,6 +53,10 @@ int runAlert(NativeAlertOptions options, Window* parent) {
     if (!options.message.empty()) {
       alert.informativeText = [NSString stringWithUTF8String:options.message.c_str()];
     }
+    if (options.accessoryView != nullptr) {
+      NSView* accessory = (__bridge NSView*)options.accessoryView;
+      if ([accessory isKindOfClass:[NSView class]]) alert.accessoryView = accessory;
+    }
     for (const std::string& title: options.buttons) {
       [alert addButtonWithTitle:title.empty()
         ? @"OK" : [NSString stringWithUTF8String:title.c_str()]];

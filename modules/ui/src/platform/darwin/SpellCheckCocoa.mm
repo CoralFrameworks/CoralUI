@@ -86,6 +86,22 @@ std::vector<std::string> spellSuggestions(const std::string_view word,
   return suggestions;
 }
 
+std::string spellCorrection(const std::string_view word, const std::string_view language) {
+  if (word.empty()) return {};
+  @autoreleasepool {
+    NSString* text = [[NSString alloc] initWithBytes:word.data() length:word.size()
+                                            encoding:NSUTF8StringEncoding];
+    if (text == nil || text.length == 0) return {};
+    NSString* preferred = language.empty() ? nil
+      : [NSString stringWithUTF8String:std::string(language).c_str()];
+    NSString* correction = [[NSSpellChecker sharedSpellChecker]
+      correctionForWordRange:NSMakeRange(0, text.length) inString:text language:preferred
+      inSpellDocumentWithTag:0];
+    const char* utf8 = correction.UTF8String;
+    return utf8 != nullptr ? std::string(utf8) : std::string();
+  }
+}
+
 bool supportsSpellChecking() noexcept {
   return true;
 }
