@@ -31,12 +31,21 @@ git submodule update --init --recursive
 Then configure either the examples project or the framework root; both build the examples:
 
 ```sh
-# Windows: the standalone examples project (what an IDE opens when working on a demo)
-cmake -S examples -B out/examples -G "Visual Studio 17 2022" -A x64
+# Windows: one command for configure + build + the headless checks. It finds CMake and the newest
+# Visual Studio generator and resolves the shared libz/libyuv/libgtest tree; -Tests also builds the
+# framework unit suites.
+scripts\build-windows.cmd
+
+# Or the examples project by hand (run from a Visual Studio Developer PowerShell). Name the shared
+# third-party tree when this checkout does not carry third_party/ itself.
+cmake -S examples -B out/examples -G "Visual Studio 18 2026" -A x64 `
+    -DCORAL_SHARED_THIRD_PARTY_DIR=<third_party>
+cmake --build out/examples --config Release
 
 # Or the framework root: libraries, tests and examples in one tree
-cmake -S . -B out/ui -G "Visual Studio 17 2022" -A x64
-cmake --build out/ui
+cmake -S . -B out/ui -G "Visual Studio 18 2026" -A x64 `
+    -DCORAL_SHARED_THIRD_PARTY_DIR=<third_party>
+cmake --build out/ui --config Release
 
 # macOS: the stand-alone examples project
 cmake -S examples -B out/examples -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
@@ -61,6 +70,8 @@ checkouts in the frameworks/workgroup layout.
 # Windows
 cmake --build out/examples --config Release
 out/examples/ui/Release/ui_demo --headless --frames 2 --out out/ui_demo.png
+# Native Win32 window; --width/--height are logical units, scaled by the monitor DPI
+out/examples/ui/Release/ui_demo --frames 3 --width 960 --height 700 --out out/native.png
 
 # Linux single-config generators put the executables under out/examples/ui/
 cmake --build out/examples -j8
@@ -89,14 +100,17 @@ out/examples/ui/ui_mvvm_demo --out out/ui_mvvm_demo.png --frames 1
 ```
 
 `ui_demo` also accepts `--bookmark-panel` (NSOpenPanel + security-scoped bookmark),
-`--bookmark-smoke` (container-local bookmark smoke), `--platform auto|cocoa|x11|wayland`,
+`--bookmark-smoke` (container-local bookmark smoke; both are macOS-only and report an error on other
+platforms), `--platform auto|cocoa|x11|wayland`,
 `--render-host same-thread|render-thread`, `--theme dark|light`, `--scale S`, `--focus-input`,
 `--section N` and `--frames N` (section 8 is the additional-controls page). The left gallery list is a `RecyclingListView` with expandable
 sections and selectable control rows; a row opens that control's standalone demo with an MVVM event/value readout, while its section
 header opens the group page. `--control NAME` opens a control demo directly. Section 6 (`Lists`)
 contains an inner `ScrollView` to exercise nested wheel routing. `--frames 0` keeps a native window open until it is closed. On macOS the window opens
 at the requested point size (a 960x540 request is a 960x540-point window, 1920x1080 backing pixels on
-a Retina display) and presents through Metal.
+a Retina display) and presents through Metal. Windows and Linux size native windows in device
+pixels, so `ui_demo` scales `--width`/`--height` by the monitor DPI after creating the window: a
+960x700 request is a 960x700-logical window, backed by 1440x1050 pixels on a 150% display.
 
 ## macOS signing
 

@@ -81,15 +81,27 @@ targets instead of initializing another copy. GoogleTest is needed only when the
 ```sh
 git submodule update --init --recursive
 
-# Windows
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64
-cmake --build build --config Release
-ctest --test-dir build -C Release --output-on-failure
+# Windows: one command. The script finds CMake in the Visual Studio installation, picks the newest
+# installed Visual Studio generator, resolves the shared libz/libyuv/libgtest tree and runs the
+# suites. Use scripts\build-windows.cmd (the .ps1 needs an execution policy that allows local
+# scripts).
+scripts\build-windows.cmd -Tests
 
 # macOS (Command Line Tools; Ninja is optional)
 cmake -S . -B build -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j8
 ctest --test-dir build --output-on-failure
+```
+
+For a manual Windows configure, run this from a Visual Studio Developer PowerShell. Use the
+generator that matches the installed toolset (`Visual Studio 18 2026` or `Visual Studio 17 2022`),
+and name the shared third-party tree when this checkout does not carry `third_party/` itself:
+
+```powershell
+cmake -S . -B build -G "Visual Studio 18 2026" -A x64 `
+    -DCORAL_SHARED_THIRD_PARTY_DIR=<third_party>
+cmake --build build --config Release
+ctest --test-dir build -C Release --output-on-failure
 ```
 
 Useful switches:

@@ -30,7 +30,7 @@
 #include <vector>
 
 namespace graphics::gpu {
-class DrawList;
+struct DrawList;
 } // namespace graphics::gpu
 
 namespace coral::ui {

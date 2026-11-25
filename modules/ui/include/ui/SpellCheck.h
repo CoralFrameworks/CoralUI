@@ -18,6 +18,7 @@
 #define CORAL_UI_SPELLCHECK_H
 
 #include <cstddef>
+#include <string>
 #include <string_view>
 #include <vector>
 

@@ -31,7 +31,7 @@ namespace coral::ui {
 
 class ElementHost;
 class Layer;
-class Theme;
+struct Theme;
 class Window;
 
 /**

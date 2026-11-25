@@ -1184,6 +1184,9 @@ private:
       default:
         return DefWindowProcW(hwnd, message, wParam, lParam);
     }
+    // A case that only breaks (WM_GETOBJECT without a provider, WM_GETMINMAXINFO without minimums)
+    // still has to answer the message; falling off the end of a window procedure is undefined.
+    return DefWindowProcW(hwnd, message, wParam, lParam);
   }
 
   Window::Options mOptions;

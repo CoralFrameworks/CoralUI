@@ -104,6 +104,7 @@
 #include <graphics/Typeface.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -367,6 +368,20 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  // Keep --width/--height in logical units on every platform. Win32 and X11 interpret
+  // Options::width as device pixels, so on a 150% display a 960x700 request would give the
+  // fixed-size gallery a 640x467 logical viewport and clip its right-hand column; macOS points
+  // already are logical units. The effective scale is only known after creation, so resize once
+  // here and size the page from the window's logical geometry below.
+  const float windowScale = window->uiScale() > 0.0f ? window->uiScale() : 1.0f;
+  if (!headless && windowScale != 1.0f) {
+    const int scaledWidth = static_cast<int>(std::lround(static_cast<float>(width) * windowScale));
+    const int scaledHeight = static_cast<int>(std::lround(static_cast<float>(height) * windowScale));
+    if (scaledWidth != window->width() || scaledHeight != window->height()) {
+      (void)window->resize(scaledWidth, scaledHeight);
+    }
+  }
+
   if (showToolbar) {
     window->setToolbarStyle(Window::ToolbarStyle::Unified);
     std::vector<Window::ToolbarItem> items{
@@ -484,7 +499,9 @@ int main(int argc, char** argv) {
   auto root = std::make_shared<ColorLayer>(acceptance
     ? Color::MakeRGBA8(0, 0, 0, 0) : theme.background);
   auto page = std::make_shared<GalleryPage>(window.get(), fullSizeContentView);
-  page->setBounds(Rect::MakeWH(static_cast<float>(width), static_cast<float>(height)));
+  // The layer tree lays out at width()/uiScale() logical units on every platform.
+  page->setBounds(Rect::MakeWH(static_cast<float>(window->width()) / windowScale,
+    static_cast<float>(window->height()) / windowScale));
   window->setSafeAreaChangedHandler([page](const Insets insets) {
     page->setTranslation({ 0.0f, insets.top });
   });
