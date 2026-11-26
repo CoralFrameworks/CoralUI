@@ -46,12 +46,14 @@ lists.
 ### Default-styled controls
 
 - `dsl::Button`
+- `dsl::Panel`
 - `dsl::Card`
 - `dsl::Section`
 - `dsl::Page`
 - `dsl::FormField`
 
-These own their default font, colour, padding and gap. A caller should not need `ElementProps` for
+`Panel` is the untitled surface container; `Card`, `Section`, `Page` and `FormField` add a title or
+control semantics. These own their default font, colour, padding and gap. A caller should not need `ElementProps` for
 the common case.
 
 ### Dynamic content

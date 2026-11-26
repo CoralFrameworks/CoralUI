@@ -103,3 +103,21 @@ TEST(DslApi, DesignTokensFollowTheActiveTheme) {
   EXPECT_EQ(tokens.text, theme.text);
   EXPECT_EQ(tokens.body, theme.body);
 }
+
+TEST(DslApi, PanelUsesDesignTokensWithoutElementProps) {
+  Theme theme = Theme::dark();
+  theme.spacing.md = 15.0f;
+  theme.spacing.sm = 5.0f;
+  theme.radius.md = 7.0f;
+  dsl::ThemeScope scope(theme);
+  const ElementPtr panel = dsl::Panel(dsl::Text("inside"));
+  auto props = std::dynamic_pointer_cast<const PropsElement>(panel);
+  ASSERT_NE(props, nullptr);
+  EXPECT_EQ(props->props().backgroundRole, ThemeColorRole::Surface);
+  EXPECT_FLOAT_EQ(props->props().cornerRadius.value_or(-1.0f), 7.0f);
+  ASSERT_NE(props->children().front(), nullptr);
+  const auto stack = std::dynamic_pointer_cast<const StackElement>(props->children().front());
+  ASSERT_NE(stack, nullptr);
+  EXPECT_FLOAT_EQ(stack->gap(), 5.0f);
+  EXPECT_FLOAT_EQ(stack->padding().left, 15.0f);
+}

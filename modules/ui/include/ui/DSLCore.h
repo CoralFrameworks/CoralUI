@@ -202,6 +202,44 @@ template <class... Children>
     {}, std::move(key));
 }
 
+struct PanelOptions {
+  /** -1 means "use theme.spacing.md". */
+  float padding = -1.0f;
+  /** -1 means "use theme.spacing.sm". */
+  float gap = -1.0f;
+  /** Use the raised surface role instead of the normal surface role. */
+  bool raised = false;
+  /** -1 means "use theme.radius.md". */
+  float radius = -1.0f;
+  std::string key;
+};
+
+/**
+ * A default-styled surface container without a title.
+ *
+ * This is the design-system answer to "wrap children in a surface": callers do not need to construct
+ * `ElementProps` or know which colour role a panel uses.
+ */
+template <class... Children>
+[[nodiscard]] ElementPtr Panel(PanelOptions options, Children&&... children) {
+  const Tokens t = tokens();
+  const float padding = options.padding >= 0.0f ? options.padding : t.spacing.md;
+  const float gap = options.gap >= 0.0f ? options.gap : t.spacing.sm;
+  auto content = Column(StackOptions{ .gap = gap, .padding = Insets{}.all(padding) },
+    std::forward<Children>(children)...);
+  ElementProps props;
+  props.backgroundRole = options.raised ? ThemeColorRole::SurfaceRaised : ThemeColorRole::Surface;
+  props.cornerRadius = options.radius >= 0.0f ? options.radius : t.radius.md;
+  // Panels are rectangular until composed masks at fractional DPI are reliable.
+  props.clip = false;
+  return components::WithProps(std::move(content), props,
+    options.key.empty() ? "dsl.panel" : std::move(options.key));
+}
+
+template <class... Children>
+[[nodiscard]] ElementPtr Panel(Children&&... children) {
+  return Panel(PanelOptions{}, std::forward<Children>(children)...);
+}
 template <class... Children>
 [[nodiscard]] ElementPtr Card(std::string title, Children&&... children) {
   const Tokens t = tokens();
