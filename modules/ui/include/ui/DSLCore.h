@@ -110,6 +110,8 @@ struct TextOptions {
 struct ButtonOptions {
   std::shared_ptr<const graphics::Font> font;
   bool enabled = true;
+  /** Optional named style installed through Window::setStyleSheet (e.g. "button.primary"). */
+  std::string styleName;
   std::string key;
 };
 
@@ -212,9 +214,14 @@ template <class... Children>
 
 [[nodiscard]] inline ElementPtr Button(std::string label, std::function<void()> onClick = {},
     ButtonOptions options = {}) {
-  return components::Button(std::move(label),
-    options.font != nullptr ? options.font : theme().body, std::move(onClick),
-    std::move(options.key), options.enabled);
+  auto button = components::Button(std::move(label),
+    options.font != nullptr ? options.font : theme().body, std::move(onClick), options.key,
+    options.enabled);
+  if (options.styleName.empty()) return button;
+  ElementProps props;
+  props.styleName = std::move(options.styleName);
+  return components::WithProps(std::move(button), props,
+    options.key.empty() ? "dsl.button.style" : options.key + ".style");
 }
 
 [[nodiscard]] inline ElementPtr Spacer(std::string key = "dsl.spacer") {

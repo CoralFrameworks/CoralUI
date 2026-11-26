@@ -15,6 +15,7 @@
  */
 
 #include <ui/DSLCore.h>
+#include <ui/DSLStyle.h>
 #include <ui/Element.h>
 #include <ui/Theme.h>
 
@@ -153,4 +154,36 @@ TEST(DslApi, CompactDensityScalesSpacingButNotTypography) {
     EXPECT_EQ(after.text, before.text);
   }
   EXPECT_FLOAT_EQ(dsl::tokens().spacing.md, 20.0f);
+}
+
+TEST(DslApi, DefaultStyleSheetProvidesButtonVariantsAndStates) {
+  const Theme theme = Theme::dark();
+  const auto sheet = dsl::defaultStyleSheet(theme);
+  ASSERT_NE(sheet, nullptr);
+  EXPECT_TRUE(sheet->contains("button.primary"));
+  EXPECT_TRUE(sheet->contains("button.secondary"));
+  EXPECT_TRUE(sheet->contains("button.ghost"));
+  EXPECT_TRUE(sheet->contains("button.danger"));
+
+  const auto normal = sheet->resolve("button.primary", 0, theme);
+  const auto hovered = sheet->resolve("button.primary", stateFlag(ControlState::Hovered), theme);
+  const auto disabled = sheet->resolve("button.primary", stateFlag(ControlState::Disabled), theme);
+  ASSERT_TRUE(normal.has_value());
+  ASSERT_TRUE(hovered.has_value());
+  ASSERT_TRUE(disabled.has_value());
+  EXPECT_TRUE(normal->background != hovered->background);
+  EXPECT_EQ(disabled->background, theme.controls.disabled);
+}
+
+TEST(DslApi, ButtonStyleNameIsAppliedThroughProps) {
+  dsl::ThemeScope scope(Theme::dark());
+  const ElementPtr element = dsl::Button("Run", [] {},
+    dsl::ButtonOptions{ .enabled = true, .styleName = "button.primary", .key = "run" });
+  const auto props = std::dynamic_pointer_cast<const PropsElement>(element);
+  ASSERT_NE(props, nullptr);
+  ASSERT_TRUE(props->props().styleName.has_value());
+  EXPECT_EQ(*props->props().styleName, "button.primary");
+  ASSERT_FALSE(props->children().empty());
+  EXPECT_EQ(props->children().front()->kind(), ElementKind::Button);
+  EXPECT_EQ(props->children().front()->key(), "run");
 }

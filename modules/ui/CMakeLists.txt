@@ -9,6 +9,7 @@ set(PUBLIC_HDRS
     include/ui/Curve.h
     include/ui/DateFormat.h
     include/ui/DSL.h
+    include/ui/DSLStyle.h
     include/ui/DSLCore.h
     include/ui/DSLOverlay.h
     include/ui/DateField.h
@@ -212,6 +213,7 @@ set(SRCS
     src/Curve.cpp
     src/DateFormat.cpp
     src/DSL.cpp
+    src/DSLStyle.cpp
     src/DSLOverlay.cpp
     src/DateField.cpp
     src/DateTimeField.cpp

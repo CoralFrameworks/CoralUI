@@ -66,6 +66,19 @@ The theme's font-size scale is exposed through Tokens, pending dedicated faces o
 control semantics. These own their default font, colour, padding and gap. A caller should not need `ElementProps` for
 the common case.
 
+### Styles
+
+`DSLStyle.h` is the stable style companion. `defaultStyleSheet(theme)` provides:
+
+- `button.primary`
+- `button.secondary`
+- `button.ghost`
+- `button.danger`
+
+Install the sheet with `Window::setStyleSheet`, then select a style through
+`ButtonOptions::styleName`. The sheet is theme-derived; rebuild it when the window theme changes.
+Hover, pressed, focused and disabled variants are resolved by the existing `StyleSheet` machinery.
+
 ### Dynamic content
 
 - `dsl::ForEach(items, builder, StackOptions)`

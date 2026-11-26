@@ -25,6 +25,7 @@
  */
 #include <ui/DSLCore.h>
 #include <ui/DSLOverlay.h>
+#include <ui/DSLStyle.h>
 
 #include <functional>
 #include <memory>

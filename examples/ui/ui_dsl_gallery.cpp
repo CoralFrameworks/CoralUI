@@ -459,6 +459,7 @@ private:
 
   void applyTheme() {
     mWindow.setTheme(mModel.get().dark ? mDark : mLight);
+    mWindow.setStyleSheet(dsl::defaultStyleSheet(mWindow.theme()));
   }
 
   void registerElements() {
@@ -887,12 +888,12 @@ private:
     std::vector<ElementPtr> cards;
 
     std::vector<ElementPtr> buttons;
-    buttons.push_back(dsl::Button("Primary", mFonts.body, [this] {
+    buttons.push_back(dsl::Button("Primary", [this] {
       change([](GalleryState& next) {
         ++next.clicks;
         next.lastEvent = "Button clicked";
       });
-    }, "in.btn.primary"));
+    }, dsl::ButtonOptions{ .styleName = "button.primary", .key = "in.btn.primary" }));
     buttons.push_back(dsl::Button("Disabled", mFonts.body, [] {}, "in.btn.disabled", false));
     buttons.push_back(dsl::IconButton(mIcon, "Star", [this] {
       change([](GalleryState& next) { next.lastEvent = "IconButton clicked"; });
