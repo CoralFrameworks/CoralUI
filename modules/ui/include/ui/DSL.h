@@ -96,6 +96,8 @@ using components::ToggleGroup;
 using components::Toolbar;
 using components::WithProps;
 
+/** Raw layer host, kept as `dsl::Layer` for escape-hatch code. */
+using components::Layer;
 
 /** Component-signature Button for callers that still need an explicit font. */
 [[nodiscard]] inline ElementPtr Button(std::string label,
@@ -122,8 +124,6 @@ using components::WithProps;
     std::move(action), std::move(key));
 }
 
-/** Raw layer host, kept as `dsl::Layer` for escape-hatch code. */
-using components::Layer;
 } // namespace coral::ui::dsl
 
 #endif // CORAL_UI_DSL_H

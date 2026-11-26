@@ -1,7 +1,7 @@
 # DSL API contract (P2 -> P3)
 
 This document is the first API-freeze pass. The stable contract is `ui/DSLCore.h`; `ui/DSL.h` is the umbrella that adds the experimental forwarders. It records which names are intended to
-survive the prototype, which are convenience forwarders, and what a caller may rely on.
+survive the API-freeze pass, which are convenience forwarders, and what a caller may rely on.
 
 ## Stable core
 
@@ -91,7 +91,8 @@ keys are still required when the order can change.
 
 - `dsl::Canvas(layer, CanvasOptions)` for a retained `Layer`
 - `dsl::Component(build, key)` for a reusable DSL build function
-- `dsl::Layer` for a widget that has no semantic wrapper yet
+- `dsl::RawLayer(layer, key)` for a widget that has no semantic wrapper yet
+- `dsl::Layer` is the umbrella alias retained for existing gallery code
 
 `Canvas` preserves the layer instance across rebuilds and accepts min width/height plus grow/shrink
 options. A custom control made of DSL nodes uses `Component`; a control that needs

@@ -346,6 +346,10 @@ struct CanvasOptions {
     CanvasOptions{ .minHeight = minHeight, .key = std::move(key) });
 }
 
+/** Hosts a raw Layer under a stable DSL-only name. */
+[[nodiscard]] inline ElementPtr RawLayer(std::shared_ptr<Layer> layer, std::string key = {}) {
+  return components::Layer(std::move(layer), std::move(key));
+}
 /**
  * A pure component: a build function that returns a DSL subtree.
  *

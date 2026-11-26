@@ -215,3 +215,11 @@ TEST(DslApi, CanvasOptionsDescribeTheHostedLayerLayout) {
   EXPECT_FLOAT_EQ(props->props().layout.shrink, 0.0f);
   EXPECT_EQ(props->key(), "custom");
 }
+
+TEST(DslApi, LayerEscapeHatchIsPartOfTheStableCore) {
+  auto layer = std::make_shared<ColorLayer>(Color::MakeRGBA8(1, 2, 3, 255));
+  const ElementPtr element = dsl::RawLayer(std::move(layer), "raw");
+  ASSERT_NE(element, nullptr);
+  EXPECT_EQ(element->kind(), ElementKind::Layer);
+  EXPECT_EQ(element->key(), "raw");
+}
