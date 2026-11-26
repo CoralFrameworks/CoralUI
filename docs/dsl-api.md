@@ -1,7 +1,11 @@
-# DSL API contract (P2 -> P3)
+# DSL API contract (Production Candidate)
 
-This document is the first API-freeze pass. The stable contract is `ui/DSLCore.h`; `ui/DSL.h` is the umbrella that adds the experimental forwarders. It records which names are intended to
-survive the API-freeze pass, which are convenience forwarders, and what a caller may rely on.
+Status: **Production Candidate (P3)**. `dsl::kStage` is `Stage::ProductionCandidate`; external
+platform verification is the remaining gate.
+
+The stable contract is `ui/DSLCore.h`. `DSLOverlay.h` and `DSLStyle.h` are its stable companions.
+`ui/DSL.h` is an umbrella that also includes `dsl::experimental`; those names are convenience
+forwarders and are not API-stable.
 
 ## Stable core
 
@@ -92,7 +96,7 @@ keys are still required when the order can change.
 - `dsl::Canvas(layer, CanvasOptions)` for a retained `Layer`
 - `dsl::Component(build, key)` for a reusable DSL build function
 - `dsl::RawLayer(layer, key)` for a widget that has no semantic wrapper yet
-- `dsl::Layer` is the umbrella alias retained for existing gallery code
+- `dsl::Layer` is the umbrella alias under `dsl::experimental` retained for existing gallery code
 
 `Canvas` preserves the layer instance across rebuilds and accepts min width/height plus grow/shrink
 options. A custom control made of DSL nodes uses `Component`; a control that needs
@@ -114,7 +118,7 @@ overlay service is used outside the umbrella header.
 
 ## Experimental forwarders
 
-`ui/DSL.h` includes `DSLCore.h` and also exposes `using components::...` names for the long tail of controls. These are
+`ui/DSLExperimental.h` exposes `using components::...` names under `dsl::experimental` for the long tail of controls. These are
 **convenience forwarders, not stable API**. Their signatures are the component signatures, they do
 not necessarily pick up theme defaults, and they may move once each control gets a proper typed
 wrapper.
@@ -141,7 +145,7 @@ theme-scoped forms.
 - `using components::...` forwarders are explicitly outside this promise and may move or change
   signature as controls get typed wrappers.
 
-The self-contained header checks (`dsl_header_core/style/overlay/element_content.cpp`) compile each
+The self-contained header checks (`dsl_header_core/style/overlay/element_content/experimental.cpp`) compile each
 stable companion header without the umbrella, so a missing include or accidental experimental
 dependency fails the suite.
 
@@ -196,3 +200,4 @@ scales.
 
 - macOS CI (`macos.yml`) builds and runs `ui_dsl_gallery`, `ui_dsl_bench`, the DSL page/DPI tests and the golden suite.
 - Windows CI (`windows.yml`) runs `scripts/build-windows.cmd -Tests`, which now includes the DSL gallery and benchmark plus the native Win32 smoke targets.
+- Local WSLg validation (Debian 13, WSL2, WSLg Wayland/X11) builds with Ninja and runs the headless suite, DSL self-check, 1.5x DPI Layout and `ui_dsl_bench`. The native OnDemand wake test is timing-sensitive under the full parallel suite and passes standalone; macOS remains the CI reference for native wake tests.

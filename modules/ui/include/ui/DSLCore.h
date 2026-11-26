@@ -33,6 +33,16 @@ namespace coral::ui::dsl {
 /** The stable-core API revision. Additive changes keep the major value; removals require a bump. */
 inline constexpr int kApiVersion = 1;
 
+/** The intended support level of this DSL surface. */
+enum class Stage {
+  Prototype,
+  ProductionCandidate,
+  Stable,
+};
+
+/** The DSL is a production candidate; external platform verification is the remaining gate. */
+inline constexpr Stage kStage = Stage::ProductionCandidate;
+
 /** A spacing density for a DSL build. Typography and colours are unchanged. */
 enum class Density {
   Comfortable,

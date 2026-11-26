@@ -1,5 +1,7 @@
 # Declarative DSL
 
+Status: **Production Candidate (P3)**. `DSLCore.h` is the stable API; `dsl::experimental` is not.
+
 This document describes the concise C++ façade over the existing `Element` / `Reconciler` / Layer
 architecture. It is not a second renderer and does not change the reconciliation semantics. The stable
 contract is `DSLCore.h`; `DSL.h` adds the experimental component forwarders.

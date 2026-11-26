@@ -31,6 +31,11 @@ namespace {
 
 using namespace coral::ui;
 
+TEST(DslApi, TheStableCoreIsAProductionCandidate) {
+  static_assert(dsl::kApiVersion >= 1);
+  EXPECT_EQ(dsl::kStage, dsl::Stage::ProductionCandidate);
+}
+
 TEST(DslApi, ThemeScopeNestsAndRestores) {
   const Theme first = Theme::dark();
   const Theme second = Theme::light();

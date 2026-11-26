@@ -22,7 +22,7 @@
  * `Reconciler` patches the mounted `Layer` tree in place.
  *
  * Every page is a plain function from a state snapshot to elements; no page implements a `Layer`
- * subclass. The last page deliberately hosts a few prebuilt widgets through `dsl::Layer`, and
+ * subclass. The last page deliberately hosts a few prebuilt widgets through `dsx::Layer`, and
  * is labelled as the escape hatch, so the boundary of the current declarative slice stays visible.
  *
  * The demo opens a native window by default and renders offscreen with `--headless`, which is how the
@@ -72,6 +72,7 @@
 namespace {
 
 using namespace coral::ui;
+namespace dsx = coral::ui::dsl::experimental;
 
 using FontPtr = std::shared_ptr<const graphics::Font>;
 
@@ -248,7 +249,7 @@ class GalleryApp {
       theme->title = fonts.title;
     }
     mCardWidget = std::make_shared<Card>(fonts.section, "Card widget");
-    mCardWidget->setContent(std::make_shared<TextLayer>("Hosted through dsl::Layer",
+    mCardWidget->setContent(std::make_shared<TextLayer>("Hosted through dsx::Layer",
       fonts.small, Color::MakeRGBA8(148, 163, 184, 255)));
     mChipWidget = std::make_shared<Chip>("Chip", fonts.small);
     mChipWidget->setRemovable(false);
@@ -471,7 +472,7 @@ private:
       props.clip = false;
       auto stack = dsl::Row(dsl::StackOptions{ .gap = 6.0f, .padding = Insets{}.all(8.0f),
         .align = Align::Center, .key = "pill.stack" }, std::move(children));
-      return dsl::WithProps(std::move(stack), props, "pill.body");
+      return dsx::WithProps(std::move(stack), props, "pill.body");
     });
   }
 
@@ -516,7 +517,7 @@ private:
     props.backgroundRole = ThemeColorRole::Surface;
     // A card is a masked container; keep it rectangular until composed container masks composite.
     props.clip = false;
-    return dsl::WithProps(std::move(stack), props, std::move(key));
+    return dsx::WithProps(std::move(stack), props, std::move(key));
   }
 
   [[nodiscard]] ElementPtr statCard(std::string key, std::string value, std::string caption) const {
@@ -530,7 +531,7 @@ private:
     props.backgroundRole = ThemeColorRole::Surface;
     // A card is a masked container; keep it rectangular until composed container masks composite.
     props.clip = false;
-    return dsl::WithProps(std::move(stack), props, std::move(key));
+    return dsx::WithProps(std::move(stack), props, std::move(key));
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -548,7 +549,7 @@ private:
     ElementProps props;
     props.backgroundRole = ThemeColorRole::Background;
     props.clip = true;
-    return dsl::WithProps(std::move(shell), props, "shell-wrap");
+    return dsx::WithProps(std::move(shell), props, "shell-wrap");
   }
 
   [[nodiscard]] ElementPtr buildSidebar(const GalleryState& state, const Theme& theme) {
@@ -563,8 +564,8 @@ private:
       ElementProps props;
       props.layout.basis = 34.0f;
       props.layout.shrink = 0.0f;
-      children.push_back(dsl::WithProps(
-        dsl::Button(text, mFonts.body,
+      children.push_back(dsx::WithProps(
+        dsx::Button(text, mFonts.body,
           [this, index] { setPage(index); }, "side.nav." + std::to_string(index)),
         props, "side.nav." + std::to_string(index) + ".wrap"));
     }
@@ -582,7 +583,7 @@ private:
     props.layout.basis = 238.0f;
     props.layout.shrink = 0.0f;
     props.clip = true;
-    return dsl::WithProps(std::move(column), props, "side.shell");
+    return dsx::WithProps(std::move(column), props, "side.shell");
   }
 
   [[nodiscard]] ElementPtr buildContent(const GalleryState& state, const Theme& theme) {
@@ -590,15 +591,15 @@ private:
     ElementProps titleProps;
     titleProps.layout.grow = 1.0f;
     titleProps.layout.shrink = 1.0f;
-    headerChildren.push_back(dsl::WithProps(
+    headerChildren.push_back(dsx::WithProps(
       label(kPages[state.page].title, mFonts.title, theme.text, "content.page-title"),
       titleProps, "content.page-title-wrap"));
-    headerChildren.push_back(dsl::Button(state.dark ? "Light mode" : "Dark mode",
+    headerChildren.push_back(dsx::Button(state.dark ? "Light mode" : "Dark mode",
       mFonts.body, [this] { toggleTheme(); }, "content.theme"));
     auto header = row("content.header", std::move(headerChildren), 12.0f, Align::Center);
 
     auto body = buildPage(state, theme);
-    auto scroll = dsl::Scroll(std::move(body), 0.0f, "content.scroll");
+    auto scroll = dsx::Scroll(std::move(body), 0.0f, "content.scroll");
     ElementProps scrollProps;
     scrollProps.layout.grow = 1.0f;
     scrollProps.layout.shrink = 1.0f;
@@ -607,7 +608,7 @@ private:
 
     std::vector<ElementPtr> columnChildren;
     columnChildren.push_back(std::move(header));
-    columnChildren.push_back(dsl::WithProps(std::move(scroll), scrollProps,
+    columnChildren.push_back(dsx::WithProps(std::move(scroll), scrollProps,
       "content.scroll-wrap"));
     columnChildren.push_back(footerWithRef("page: " + std::string(kPages[state.page].title) +
       "  -  clicks: " + std::to_string(state.clicks) + "  -  last event: " + state.lastEvent, theme));
@@ -619,14 +620,14 @@ private:
     props.layout.shrink = 1.0f;
     props.layout.minWidth = 0.0f;
     props.backgroundRole = ThemeColorRole::Background;
-    return dsl::WithProps(std::move(column), props, "content.shell");
+    return dsx::WithProps(std::move(column), props, "content.shell");
   }
 
   /** The footer is the one element with a `LayerRef`, so the self-check can prove layer identity. */
   [[nodiscard]] ElementPtr footerWithRef(const std::string& text, const Theme& theme) {
     ElementProps props;
     props.ref = mFooterRef;
-    return dsl::WithProps(
+    return dsx::WithProps(
       label(text, mFonts.small, theme.textMuted, "content.footer"), props, "content.footer-wrap");
   }
 
@@ -658,15 +659,15 @@ private:
       mFonts.body, theme.textMuted, "ov.hero.body"));
 
     std::vector<ElementPtr> actions;
-    actions.push_back(dsl::Button("Open Inputs", mFonts.body, [this] { setPage(2); },
+    actions.push_back(dsx::Button("Open Inputs", mFonts.body, [this] { setPage(2); },
       "ov.hero.inputs"));
-    actions.push_back(dsl::Button("Toggle theme", mFonts.body, [this] { toggleTheme(); },
+    actions.push_back(dsx::Button("Toggle theme", mFonts.body, [this] { toggleTheme(); },
       "ov.hero.theme"));
-    actions.push_back(dsl::Button("Show toast", mFonts.body, [this] {
+    actions.push_back(dsx::Button("Show toast", mFonts.body, [this] {
       if (mOverlays != nullptr) mOverlays->Toast("Saved to the library");
       change([](GalleryState& next) { next.lastEvent = "Toast shown"; });
     }, "ov.hero.toast"));
-    actions.push_back(dsl::CheckBox("Show detail", mFonts.body, state.detail,
+    actions.push_back(dsx::CheckBox("Show detail", mFonts.body, state.detail,
       [this](const bool value) {
         change([value](GalleryState& next) {
           next.detail = value;
@@ -710,11 +711,11 @@ private:
     std::vector<ElementPtr> coverageBody;
     coverageBody.push_back(label(
       "Only the element kinds in `ui/Element.h` are first-class; the remaining layer types are "
-      "reachable through dsl::Layer or an ElementRegistry type. The last page shows the "
+      "reachable through dsx::Layer or an ElementRegistry type. The last page shows the "
       "boundary on purpose.",
       mFonts.body, theme.textMuted, "ov.coverage.text"));
     coverageBody.push_back(row("ov.coverage.actions", {
-      dsl::Button("See the escape hatch", mFonts.body, [this] { setPage(6); },
+      dsx::Button("See the escape hatch", mFonts.body, [this] { setPage(6); },
         "ov.coverage.open"),
     }, 8.0f));
     page.push_back(card("ov.coverage", "Coverage", "80 of 89 public Layer types", std::move(coverageBody)));
@@ -763,9 +764,9 @@ private:
       ElementProps props;
       props.background = background;
       props.clip = false;
-      return dsl::WithProps(std::move(stack), props, std::move(key));
+      return dsx::WithProps(std::move(stack), props, std::move(key));
     };
-    auto dock = dsl::Dock(
+    auto dock = dsx::Dock(
       dockPanel("lay.dock.center", "center", theme.controls.track),
       dockPanel("lay.dock.left", "left", theme.controls.background),
       dockPanel("lay.dock.right", "right", theme.controls.background),
@@ -777,7 +778,7 @@ private:
     std::vector<ElementPtr> dockBody;
     dockBody.push_back(label("DockElement: left / centre / right regions", mFonts.small,
       theme.textMuted, "lay.dock.caption"));
-    dockBody.push_back(dsl::WithProps(std::move(dock), dockProps, "lay.dock.wrap"));
+    dockBody.push_back(dsx::WithProps(std::move(dock), dockProps, "lay.dock.wrap"));
     cards.push_back(card("lay.dock", "Dock", "A four-region layout", std::move(dockBody)));
     page.push_back(dsl::Grid(dsl::GridOptions{ .columns = 2, .gap = 12.0f, .key = "lay.cards" },
       std::move(cards)));
@@ -797,7 +798,7 @@ private:
       if (looks[index].shadow) props.shadow = theme.shadow.sm;
       Color fill = index == 0 ? theme.controls.track : theme.accent;
       const std::string key = "lay.props." + std::to_string(index);
-      styled.push_back(dsl::WithProps(
+      styled.push_back(dsx::WithProps(
         dsl::Swatch(fill, 72.0f, 44.0f, looks[index].radius, key + ".color"), props, key));
     }
     propsBody.push_back(row("lay.props.row", std::move(styled), 14.0f));
@@ -814,34 +815,34 @@ private:
     std::vector<ElementPtr> scrollBody;
     scrollBody.push_back(label("ScrollElement(20 rows, preferred height 150)", mFonts.small,
       theme.textMuted, "lay.scroll.caption"));
-    scrollBody.push_back(dsl::Scroll(std::move(scrollContent), 150.0f, "lay.scroll.view"));
+    scrollBody.push_back(dsx::Scroll(std::move(scrollContent), 150.0f, "lay.scroll.view"));
     std::vector<ElementPtr> containerBody;
     containerBody.push_back(dsl::Card("CardElement",
       label("A title, a content slot and a header action.", mFonts.small, theme.textMuted,
         "lay.cont.card.body"),
-      dsl::Link("Edit", mFonts.small, [this] {
+      dsx::Link("Edit", mFonts.small, [this] {
         change([](GalleryState& next) { next.lastEvent = "Card action"; });
       }, "lay.cont.card.action")));
-    containerBody.push_back(dsl::SectionHeader("SectionHeader", mFonts.body, "subtitle",
-      dsl::Link("More", mFonts.small, {}, "lay.cont.section.action"), "lay.cont.section"));
-    containerBody.push_back(dsl::FormField("Display name", mFonts.small,
-      dsl::TextInput("Coral", mFonts.body, {}, "lay.cont.field.input"),
+    containerBody.push_back(dsx::SectionHeader("SectionHeader", mFonts.body, "subtitle",
+      dsx::Link("More", mFonts.small, {}, "lay.cont.section.action"), "lay.cont.section"));
+    containerBody.push_back(dsx::FormField("Display name", mFonts.small,
+      dsx::TextInput("Coral", mFonts.body, {}, "lay.cont.field.input"),
       "Shown on your profile", {}, "lay.cont.field"));
-    containerBody.push_back(dsl::Expander("Expander", mFonts.body,
+    containerBody.push_back(dsx::Expander("Expander", mFonts.body,
       label("The content slot is mounted only while expanded.", mFonts.small, theme.textMuted,
         "lay.cont.expander.body"), true, [this](const bool expanded) {
         change([expanded](GalleryState& next) {
           next.lastEvent = expanded ? "Expander opened" : "Expander closed";
         });
       }, "lay.cont.expander"));
-    containerBody.push_back(dsl::EmptyState("EmptyState", mFonts.section, "No builds yet",
-      {}, dsl::Button("Create build", mFonts.small, [this] {
+    containerBody.push_back(dsx::EmptyState("EmptyState", mFonts.section, "No builds yet",
+      {}, dsx::Button("Create build", mFonts.small, [this] {
         change([](GalleryState& next) { next.lastEvent = "Empty state action"; });
       }, "lay.cont.empty.action"), {}, "lay.cont.empty"));
     page.insert(page.begin(), card("lay.containers", "Content containers",
       "Card - SectionHeader - FormField - Expander - EmptyState", std::move(containerBody)));
     std::vector<ElementPtr> structuredBody;
-    structuredBody.push_back(dsl::TabBar(mFonts.body, {
+    structuredBody.push_back(dsx::TabBar(mFonts.body, {
       TabItem{ "Tab one", label("The TabBar owns one content slot per tab.", mFonts.small,
         theme.textMuted, "lay.struct.tab1"), "one" },
       TabItem{ "Tab two", label("Switching tabs reuses the content layers.", mFonts.small,
@@ -860,22 +861,22 @@ private:
       props.background = background;
       props.layout.widthPercent = 1.0f;
       props.layout.heightPercent = 1.0f;
-      return dsl::WithProps(std::move(pane), props, key);
+      return dsx::WithProps(std::move(pane), props, key);
     };
-    structuredBody.push_back(dsl::WithProps(dsl::SplitView(Axis::Row, 0.4f,
+    structuredBody.push_back(dsx::WithProps(dsx::SplitView(Axis::Row, 0.4f,
       splitPane("lay.struct.left", "left pane", theme.accent),
       splitPane("lay.struct.right", "right pane", theme.surfaceRaised),
       {}, "lay.struct.split"), splitProps, "lay.struct.split.wrap"));
-    structuredBody.push_back(dsl::Toolbar(mFonts.body, {
-      ToolbarItem{ dsl::Link("Open", mFonts.small, {}, "lay.struct.open"), false, false, {},
+    structuredBody.push_back(dsx::Toolbar(mFonts.body, {
+      ToolbarItem{ dsx::Link("Open", mFonts.small, {}, "lay.struct.open"), false, false, {},
         {}, "open" },
       ToolbarItem{ {}, false, true, {}, {}, "sep" },
-      ToolbarItem{ dsl::Link("Share", mFonts.small, {}, "lay.struct.share"), false, false,
+      ToolbarItem{ dsx::Link("Share", mFonts.small, {}, "lay.struct.share"), false, false,
         {}, {}, "share" },
     }, 40.0f, "lay.struct.toolbar"));
-    structuredBody.push_back(dsl::StatusBar(mFonts.body, "Ready", "UTF-8",
-      { dsl::Link("main", mFonts.small, {}, "lay.struct.branch") },
-      { dsl::Link("Ln 1", mFonts.small, {}, "lay.struct.line") }, "lay.struct.status"));
+    structuredBody.push_back(dsx::StatusBar(mFonts.body, "Ready", "UTF-8",
+      { dsx::Link("main", mFonts.small, {}, "lay.struct.branch") },
+      { dsx::Link("Ln 1", mFonts.small, {}, "lay.struct.line") }, "lay.struct.status"));
     page.insert(page.begin() + 1, card("lay.structured", "Structured containers",
       "TabBar - SplitView - Toolbar - StatusBar", std::move(structuredBody)));
     page.push_back(card("lay.scroll", "Scroll", "One clipped viewport", std::move(scrollBody)));
@@ -894,11 +895,11 @@ private:
         next.lastEvent = "Button clicked";
       });
     }, dsl::ButtonOptions{ .styleName = "button.primary", .key = "in.btn.primary" }));
-    buttons.push_back(dsl::Button("Disabled", mFonts.body, [] {}, "in.btn.disabled", false));
-    buttons.push_back(dsl::IconButton(mIcon, "Star", [this] {
+    buttons.push_back(dsx::Button("Disabled", mFonts.body, [] {}, "in.btn.disabled", false));
+    buttons.push_back(dsx::IconButton(mIcon, "Star", [this] {
       change([](GalleryState& next) { next.lastEvent = "IconButton clicked"; });
     }, "in.btn.icon"));
-    buttons.push_back(dsl::ColorButton(theme.accent, "Accent", [this] {
+    buttons.push_back(dsx::ColorButton(theme.accent, "Accent", [this] {
       change([](GalleryState& next) { next.lastEvent = "ColorButton picked"; });
     }, "in.btn.color"));
     std::vector<ElementPtr> buttonBody;
@@ -909,72 +910,72 @@ private:
 
     std::vector<ElementPtr> interactive;
     std::vector<ElementPtr> interactiveRow;
-    interactiveRow.push_back(dsl::Link("Documentation", mFonts.body, [this] {
+    interactiveRow.push_back(dsx::Link("Documentation", mFonts.body, [this] {
       change([](GalleryState& next) { next.lastEvent = "Link activated"; });
     }, "in.interactive.link"));
-    interactiveRow.push_back(dsl::Chip("alpha", mFonts.small, ChipVariant::Accent, {}, false,
+    interactiveRow.push_back(dsx::Chip("alpha", mFonts.small, ChipVariant::Accent, {}, false,
       true, {}, "in.interactive.chip"));
-    interactiveRow.push_back(dsl::ToggleButton("Bold", mFonts.small, true, {}, "in.interactive.toggle"));
-    interactiveRow.push_back(dsl::Rating(5, 3.0, false, false, [this](const double value) {
+    interactiveRow.push_back(dsx::ToggleButton("Bold", mFonts.small, true, {}, "in.interactive.toggle"));
+    interactiveRow.push_back(dsx::Rating(5, 3.0, false, false, [this](const double value) {
       change([value](GalleryState& next) {
         next.lastEvent = "Rating " + std::to_string(value);
       });
     }, "in.interactive.rating"));
     interactive.push_back(row("in.interactive.row1", std::move(interactiveRow), 12.0f));
     std::vector<ElementPtr> interactiveRow2;
-    interactiveRow2.push_back(dsl::Stepper(0.0, 10.0, 4.0, 1.0, {}, "in.interactive.stepper"));
-    interactiveRow2.push_back(dsl::Pagination(mFonts.body, 5, 1, {}, "in.interactive.pagination"));
+    interactiveRow2.push_back(dsx::Stepper(0.0, 10.0, 4.0, 1.0, {}, "in.interactive.stepper"));
+    interactiveRow2.push_back(dsx::Pagination(mFonts.body, 5, 1, {}, "in.interactive.pagination"));
     interactive.push_back(row("in.interactive.row2", std::move(interactiveRow2), 16.0f));
-    interactive.push_back(dsl::RangeSlider(0.0, 100.0, 20.0, 60.0, 1.0, {},
+    interactive.push_back(dsx::RangeSlider(0.0, 100.0, 20.0, 60.0, 1.0, {},
       "in.interactive.range"));
-    interactive.push_back(dsl::Breadcrumb({ "Library", "Widgets", "Inputs" }, mFonts.small,
+    interactive.push_back(dsx::Breadcrumb({ "Library", "Widgets", "Inputs" }, mFonts.small,
       "/", 1, {}, "in.interactive.crumbs"));
-    interactive.push_back(dsl::Banner("Draft saved automatically.", mFonts.small,
+    interactive.push_back(dsx::Banner("Draft saved automatically.", mFonts.small,
       BannerSeverity::Success, "Undo", [this] {
         change([](GalleryState& next) { next.lastEvent = "Banner action"; });
       }, true, {}, {}, "in.interactive.banner"));
-    interactive.push_back(dsl::SplitButton("Run", mFonts.small, { "Run all", "Debug" }, {},
+    interactive.push_back(dsx::SplitButton("Run", mFonts.small, { "Run all", "Debug" }, {},
       {}, "in.interactive.split"));
     cards.push_back(card("in.interactive", "New interactive leaves", "Self-contained widgets",
       std::move(interactive)));
     std::vector<ElementPtr> groupsBody;
-    groupsBody.push_back(dsl::ToggleGroup({ "Bold", "Italic", "Underline" }, mFonts.small,
+    groupsBody.push_back(dsx::ToggleGroup({ "Bold", "Italic", "Underline" }, mFonts.small,
       { 0 }, {}, "in.groups.toggle"));
-    groupsBody.push_back(dsl::RadioGroup({ "Free", "Studio", "Team" }, mFonts.small, 1, {},
+    groupsBody.push_back(dsx::RadioGroup({ "Free", "Studio", "Team" }, mFonts.small, 1, {},
       "in.groups.radio"));
-    groupsBody.push_back(dsl::CheckBoxGroup({ "Email", "Push", "SMS" }, mFonts.small,
+    groupsBody.push_back(dsx::CheckBoxGroup({ "Email", "Push", "SMS" }, mFonts.small,
       { 0, 2 }, {}, "in.groups.checks"));
-    groupsBody.push_back(dsl::MultiSelect({ "Alpha", "Beta", "Gamma" }, mFonts.small,
+    groupsBody.push_back(dsx::MultiSelect({ "Alpha", "Beta", "Gamma" }, mFonts.small,
       { 0, 1 }, "Pick channels", {}, "in.groups.multi"));
     cards.push_back(card("in.groups", "Selection groups", "Options + selected indices",
       std::move(groupsBody)));
     std::vector<ElementPtr> editorBody;
-    editorBody.push_back(dsl::Select({ "Free", "Studio", "Team" }, mFonts.small, 1, {},
+    editorBody.push_back(dsx::Select({ "Free", "Studio", "Team" }, mFonts.small, 1, {},
       [this](const int index) {
         change([index](GalleryState& next) {
           next.lastEvent = "Select " + std::to_string(index);
         });
       }, "in.editors.select"));
-    editorBody.push_back(dsl::ComboBox({ "Coral", "Swift", "C++" }, mFonts.small, "Coral", 0,
+    editorBody.push_back(dsx::ComboBox({ "Coral", "Swift", "C++" }, mFonts.small, "Coral", 0,
       "Type or pick", {}, "in.editors.combo"));
-    editorBody.push_back(dsl::SearchField("Search widgets", mFonts.small, {}, {},
+    editorBody.push_back(dsx::SearchField("Search widgets", mFonts.small, {}, {},
       [this](const std::string& text) {
         change([text](GalleryState& next) { next.lastEvent = "Search " + text; });
       }, "in.editors.search"));
-    editorBody.push_back(dsl::PasswordField("Password", mFonts.small, "secret", 32, {},
+    editorBody.push_back(dsx::PasswordField("Password", mFonts.small, "secret", 32, {},
       "in.editors.password"));
-    editorBody.push_back(dsl::NumberField(mFonts.small, 0.0, 100.0, 42.0, 1.0, 0, {},
+    editorBody.push_back(dsx::NumberField(mFonts.small, 0.0, 100.0, 42.0, 1.0, 0, {},
       "in.editors.number"));
-    editorBody.push_back(dsl::TagInput(mFonts.small, { "ui", "declarative" }, "Add tag", {},
+    editorBody.push_back(dsx::TagInput(mFonts.small, { "ui", "declarative" }, "Add tag", {},
       "in.editors.tags"));
-    editorBody.push_back(dsl::ColorInput(mFonts.small, theme.accent, {}, "in.editors.color"));
+    editorBody.push_back(dsx::ColorInput(mFonts.small, theme.accent, {}, "in.editors.color"));
     cards.push_back(card("in.editors", "Editor fields", "Select - ComboBox - Search - Password - Number - Tags - Color",
       std::move(editorBody)));
 
 
 
     std::vector<ElementPtr> inputBody;
-    inputBody.push_back(dsl::TextInput(state.name, mFonts.body,
+    inputBody.push_back(dsx::TextInput(state.name, mFonts.body,
       [this](const std::string& value) {
         change([value](GalleryState& next) {
           next.name = value;
@@ -987,14 +988,14 @@ private:
       std::move(inputBody)));
 
     std::vector<ElementPtr> checkBody;
-    checkBody.push_back(dsl::CheckBox("Desktop notifications", mFonts.body,
+    checkBody.push_back(dsx::CheckBox("Desktop notifications", mFonts.body,
       state.notifications, [this](const bool value) {
         change([value](GalleryState& next) {
           next.notifications = value;
           next.lastEvent = value ? "notifications on" : "notifications off";
         });
       }, "in.check.box"));
-    checkBody.push_back(dsl::Toggle("Beta channel", mFonts.body, state.beta,
+    checkBody.push_back(dsx::Toggle("Beta channel", mFonts.body, state.beta,
       [this](const bool value) {
         change([value](GalleryState& next) {
           next.beta = value;
@@ -1008,7 +1009,7 @@ private:
     const char* plans[] = { "Free", "Studio", "Team" };
     for (int index = 0; index < 3; ++index) {
       const std::string plan = plans[index];
-      radioBody.push_back(dsl::RadioButton(plan, mFonts.body, state.plan == index,
+      radioBody.push_back(dsx::RadioButton(plan, mFonts.body, state.plan == index,
         [this, index, plan] {
           change([index, plan](GalleryState& next) {
             next.plan = index;
@@ -1020,7 +1021,7 @@ private:
       std::move(radioBody)));
 
     std::vector<ElementPtr> sliderBody;
-    sliderBody.push_back(dsl::Slider("Volume", mFonts.body, 0.0, 100.0, state.volume,
+    sliderBody.push_back(dsx::Slider("Volume", mFonts.body, 0.0, 100.0, state.volume,
       [this](const double value) {
         change([value](GalleryState& next) {
           next.volume = value;
@@ -1034,7 +1035,7 @@ private:
     cards.push_back(card("in.slider", "Slider", "Drag or use the arrow keys", std::move(sliderBody)));
 
     std::vector<ElementPtr> segmentBody;
-    segmentBody.push_back(dsl::SegmentedControl({ "Compact", "Cosy", "Room" }, mFonts.body,
+    segmentBody.push_back(dsx::SegmentedControl({ "Compact", "Cosy", "Room" }, mFonts.body,
       state.density, [this](const int index) {
         change([index](GalleryState& next) {
           next.density = index;
@@ -1058,15 +1059,15 @@ private:
     std::vector<ElementPtr> cards;
 
     std::vector<ElementPtr> progressBody;
-    progressBody.push_back(dsl::ProgressBar(mFonts.body, state.progress, "disp.progress.bar"));
+    progressBody.push_back(dsx::ProgressBar(mFonts.body, state.progress, "disp.progress.bar"));
     std::vector<ElementPtr> progressButtons;
-    progressButtons.push_back(dsl::Button("-10%", mFonts.body, [this] {
+    progressButtons.push_back(dsx::Button("-10%", mFonts.body, [this] {
       change([](GalleryState& next) { next.progress = std::max(0.0, next.progress - 0.1); });
     }, "disp.progress.minus"));
-    progressButtons.push_back(dsl::Button("+10%", mFonts.body, [this] {
+    progressButtons.push_back(dsx::Button("+10%", mFonts.body, [this] {
       change([](GalleryState& next) { next.progress = std::min(1.0, next.progress + 0.1); });
     }, "disp.progress.plus"));
-    progressButtons.push_back(dsl::Button("Reset", mFonts.body, [this] {
+    progressButtons.push_back(dsx::Button("Reset", mFonts.body, [this] {
       change([](GalleryState& next) { next.progress = 0.35; });
     }, "disp.progress.reset"));
     progressBody.push_back(row("disp.progress.buttons", std::move(progressButtons), 8.0f));
@@ -1083,19 +1084,19 @@ private:
     styledDocument.paragraph.maxLines = 2;
     styledDocument.paragraph.ellipsis = true;
     styledDocument.paragraph.selectable = true;
-    styledBody.push_back(dsl::StyledText(styledDocument, [this](std::string_view id) {
+    styledBody.push_back(dsx::StyledText(styledDocument, [this](std::string_view id) {
       change([id = std::string(id)](GalleryState& next) { next.lastEvent = "Link " + id; });
     }, "disp.styled.text"));
     styledBody.push_back(label("StyledTextElement: spans, paragraph style, link hit-testing",
       mFonts.small, theme.textMuted, "disp.styled.caption"));
     cards.push_back(card("disp.styled", "StyledText", "R1 rendering + R2 links", std::move(styledBody)));
     std::vector<ElementPtr> moreBody;
-    moreBody.push_back(dsl::Timeline({
+    moreBody.push_back(dsx::Timeline({
       TimelineEntry{ "Build", "all targets", "09:12", TimelineState::Complete },
       TimelineEntry{ "Review", "waiting", "now", TimelineState::Current },
       TimelineEntry{ "Publish", "later", "--", TimelineState::Pending },
     }, mFonts.small, "disp.more.timeline"));
-    moreBody.push_back(dsl::ColorPicker({ theme.accent, theme.controls.backgroundHover,
+    moreBody.push_back(dsx::ColorPicker({ theme.accent, theme.controls.backgroundHover,
       theme.controls.border }, ColorPickerMode::Palette, theme.accent, 1.0f, 0, {},
       "disp.more.picker"));
     cards.push_back(card("disp.more", "Timeline & ColorPicker", "Data and palette leaves",
@@ -1103,12 +1104,12 @@ private:
     cards.push_back(card("disp.progress", "ProgressBar", "A model fraction", std::move(progressBody)));
 
     std::vector<ElementPtr> spinnerRow;
-    spinnerRow.push_back(dsl::Spinner(state.busy, theme.accent, "disp.spinner.spinner"));
+    spinnerRow.push_back(dsx::Spinner(state.busy, theme.accent, "disp.spinner.spinner"));
     spinnerRow.push_back(label(state.busy ? "spinning" : "stopped", mFonts.body, theme.textMuted,
       "disp.spinner.state"));
     std::vector<ElementPtr> spinnerBody;
     spinnerBody.push_back(row("disp.spinner.row", std::move(spinnerRow), 10.0f));
-    spinnerBody.push_back(dsl::Button("Toggle spinning", mFonts.body, [this] {
+    spinnerBody.push_back(dsx::Button("Toggle spinning", mFonts.body, [this] {
       change([](GalleryState& next) { next.busy = !next.busy; });
     }, "disp.spinner.toggle"));
     cards.push_back(card("disp.spinner", "Spinner", "Drives the frame loop while spinning",
@@ -1118,7 +1119,7 @@ private:
     std::vector<ElementPtr> swatches;
     const Color palette[] = { theme.accent, theme.controls.backgroundHover, theme.controls.border };
     for (int index = 0; index < 3; ++index) {
-      swatches.push_back(dsl::ColorButton(palette[index], "Palette " + std::to_string(index),
+      swatches.push_back(dsx::ColorButton(palette[index], "Palette " + std::to_string(index),
         [this] {
           change([](GalleryState& next) { next.lastEvent = "palette swatch picked"; });
         }, "disp.colors." + std::to_string(index)));
@@ -1138,7 +1139,7 @@ private:
       std::move(typeBody)));
 
     std::vector<ElementPtr> whenBody;
-    whenBody.push_back(dsl::CheckBox("Show the conditional branch", mFonts.body, state.detail,
+    whenBody.push_back(dsx::CheckBox("Show the conditional branch", mFonts.body, state.detail,
       [this](const bool value) {
         change([value](GalleryState& next) { next.detail = value; });
       }, "disp.when.check"));
@@ -1164,35 +1165,35 @@ private:
       cell("value + callbacks", theme.textMuted) });
     rows.push_back({ cell("TableElement", theme.text), cell("Table", theme.textMuted),
       cell("columns + rows", theme.textMuted) });
-    tableBody.push_back(dsl::Table(columns, rows, 6.0f, Insets{}.all(2.0f), "disp.table"));
+    tableBody.push_back(dsx::Table(columns, rows, 6.0f, Insets{}.all(2.0f), "disp.table"));
     cards.push_back(card("disp.table", "Table", "Cells are live layers, not elements",
       std::move(tableBody)));
 
     std::vector<ElementPtr> leavesBody;
     std::vector<ElementPtr> leafRow;
-    leafRow.push_back(dsl::Badge("New", mFonts.small, false, {}, "disp.leaves.badge"));
-    leafRow.push_back(dsl::Kbd("Ctrl+K", mFonts.small, "disp.leaves.kbd"));
-    leafRow.push_back(dsl::Avatar("CU", mFonts.small, 28.0f, {}, false, {}, "disp.leaves.avatar"));
-    leafRow.push_back(dsl::AvatarGroup({ "A", "B", "C" }, mFonts.small, 4, 24.0f,
+    leafRow.push_back(dsx::Badge("New", mFonts.small, false, {}, "disp.leaves.badge"));
+    leafRow.push_back(dsx::Kbd("Ctrl+K", mFonts.small, "disp.leaves.kbd"));
+    leafRow.push_back(dsx::Avatar("CU", mFonts.small, 28.0f, {}, false, {}, "disp.leaves.avatar"));
+    leafRow.push_back(dsx::AvatarGroup({ "A", "B", "C" }, mFonts.small, 4, 24.0f,
       "disp.leaves.group"));
-    leafRow.push_back(dsl::StatusIndicator("Online", mFonts.small, StatusKind::Online,
+    leafRow.push_back(dsx::StatusIndicator("Online", mFonts.small, StatusKind::Online,
       "disp.leaves.status"));
     leavesBody.push_back(row("disp.leaves.row", std::move(leafRow), 10.0f));
     std::vector<ElementPtr> leafMetrics;
-    leafMetrics.push_back(dsl::ProgressRing(32.0f, 0.7, 3.0f, false, "disp.leaves.ring"));
-    leafMetrics.push_back(dsl::Stat("Kinds", "80", mFonts.body, "first-class",
+    leafMetrics.push_back(dsx::ProgressRing(32.0f, 0.7, 3.0f, false, "disp.leaves.ring"));
+    leafMetrics.push_back(dsx::Stat("Kinds", "80", mFonts.body, "first-class",
       StatTrend::Up, "disp.leaves.stat"));
-    leafMetrics.push_back(dsl::Skeleton(120.0f, 12.0f, 1, 6.0f, Skeleton::Shape::Rounded,
+    leafMetrics.push_back(dsx::Skeleton(120.0f, 12.0f, 1, 6.0f, Skeleton::Shape::Rounded,
       false, "disp.leaves.skeleton"));
     leavesBody.push_back(row("disp.leaves.metrics", std::move(leafMetrics), 14.0f));
-    leavesBody.push_back(dsl::Divider(Divider::Orientation::Horizontal, 1.0f, 0.0f, {},
+    leavesBody.push_back(dsx::Divider(Divider::Orientation::Horizontal, 1.0f, 0.0f, {},
       "disp.leaves.divider"));
-    leavesBody.push_back(dsl::Meter(0.0, 100.0, 64.0, "disp.leaves.meter"));
-    leavesBody.push_back(dsl::StepIndicator({ "Draft", "Review", "Ship" }, mFonts.small, 1,
+    leavesBody.push_back(dsx::Meter(0.0, 100.0, 64.0, "disp.leaves.meter"));
+    leavesBody.push_back(dsx::StepIndicator({ "Draft", "Review", "Ship" }, mFonts.small, 1,
       {}, "disp.leaves.steps"));
-    leavesBody.push_back(dsl::PropertyRow("Coverage", "80 / 89", mFonts.small,
+    leavesBody.push_back(dsx::PropertyRow("Coverage", "80 / 89", mFonts.small,
       "first-class wrappers", 0.0f, "disp.leaves.property"));
-    leavesBody.push_back(dsl::TagList({ "ui", "declarative", "new" }, mFonts.small, 4,
+    leavesBody.push_back(dsx::TagList({ "ui", "declarative", "new" }, mFonts.small, 4,
       "disp.leaves.tags"));
     cards.insert(cards.begin(), card("disp.leaves", "New declarative leaves",
       "Display widgets with no escape hatch", std::move(leavesBody)));
@@ -1208,7 +1209,7 @@ private:
     std::vector<ElementPtr> cards;
 
     std::vector<ElementPtr> listBody;
-    listBody.push_back(dsl::ListView(state.tasks, mFonts.body, 28.0f,
+    listBody.push_back(dsx::ListView(state.tasks, mFonts.body, 28.0f,
       [this](const int index, const std::string& item) {
         change([index, item](GalleryState& next) {
           next.selectedTask = index;
@@ -1230,13 +1231,13 @@ private:
       return dsl::Row(dsl::StackOptions{ .gap = 8.0f, .padding = Insets{}.all(4.0f),
       .align = Align::Center, .key = "recycle." + key }, std::move(children));
     };
-    auto recycling = dsl::RecyclingList(state.tasks, rowBuilder, 28.0f, "lists.recycle");
+    auto recycling = dsx::RecyclingList(state.tasks, rowBuilder, 28.0f, "lists.recycle");
     ElementProps recycleProps;
     recycleProps.layout.basis = 160.0f;
     recycleProps.layout.shrink = 0.0f;
     recycleProps.ref = mRecyclingListRef;
     std::vector<ElementPtr> recycleBody;
-    recycleBody.push_back(dsl::WithProps(std::move(recycling), recycleProps,
+    recycleBody.push_back(dsx::WithProps(std::move(recycling), recycleProps,
       "lists.recycle.wrap"));
     recycleBody.push_back(label("Every row is a real Element subtree returned by the builder",
       mFonts.small, theme.textMuted, "lists.recycle.caption"));
@@ -1245,20 +1246,20 @@ private:
 
     std::vector<ElementPtr> mutateBody;
     std::vector<ElementPtr> mutateButtons;
-    mutateButtons.push_back(dsl::Button("Add task", mFonts.body, [this] {
+    mutateButtons.push_back(dsx::Button("Add task", mFonts.body, [this] {
       change([](GalleryState& next) {
         next.tasks.push_back("Task " + std::to_string(next.tasks.size() + 1));
         next.lastEvent = "task added";
       });
     }, "lists.mutate.add"));
-    mutateButtons.push_back(dsl::Button("Remove last", mFonts.body, [this] {
+    mutateButtons.push_back(dsx::Button("Remove last", mFonts.body, [this] {
       change([](GalleryState& next) {
         if (next.tasks.size() > 1) next.tasks.pop_back();
         next.selectedTask = std::min(next.selectedTask, static_cast<int>(next.tasks.size()) - 1);
         next.lastEvent = "task removed";
       });
     }, "lists.mutate.remove"));
-    mutateButtons.push_back(dsl::Button("Reverse", mFonts.body, [this] {
+    mutateButtons.push_back(dsx::Button("Reverse", mFonts.body, [this] {
       change([](GalleryState& next) {
         std::reverse(next.tasks.begin(), next.tasks.end());
         next.lastEvent = "tasks reversed";
@@ -1298,13 +1299,13 @@ private:
     stateBody.push_back(label("clicks: " + std::to_string(state.clicks), mFonts.section, theme.text,
       "state.model.count"));
     std::vector<ElementPtr> stateButtons;
-    stateButtons.push_back(dsl::Button("+1 click", mFonts.body, [this] {
+    stateButtons.push_back(dsx::Button("+1 click", mFonts.body, [this] {
       change([](GalleryState& next) {
         ++next.clicks;
         next.lastEvent = "click counted";
       });
     }, "state.model.plus"));
-    stateButtons.push_back(dsl::Button("Reset", mFonts.body, [this] {
+    stateButtons.push_back(dsx::Button("Reset", mFonts.body, [this] {
       change([](GalleryState& next) {
         next.clicks = 0;
         next.lastEvent = "clicks reset";
@@ -1326,7 +1327,7 @@ private:
       tagProps.backgroundRole = ThemeColorRole::SurfaceRaised;
       tagProps.clip = false;
       tagProps.layout.shrink = 0.0f;
-      tags.push_back(dsl::WithProps(std::move(chip), tagProps, "state.foreach." + task));
+      tags.push_back(dsx::WithProps(std::move(chip), tagProps, "state.foreach." + task));
     }
     forEachBody.push_back(label("dsl::ForEach maps the task list to keyed children.",
       mFonts.small, theme.textMuted, "state.foreach.caption"));
@@ -1376,7 +1377,7 @@ private:
     cards.push_back(card("state.spec", "ElementSpec", "A flat text form (v0)", std::move(specBody)));
 
     std::vector<ElementPtr> detailBody;
-    detailBody.push_back(dsl::CheckBox("Show the detail branch", mFonts.body, state.detail,
+    detailBody.push_back(dsx::CheckBox("Show the detail branch", mFonts.body, state.detail,
       [this](const bool value) {
         change([value](GalleryState& next) { next.detail = value; });
       }, "state.detail.check"));
@@ -1399,23 +1400,23 @@ private:
     std::vector<ElementPtr> intro;
     intro.push_back(label(
       "These widgets are full Layer implementations without a first-class Element wrapper yet. "
-      "dsl::Layer hosts a prebuilt layer inside the element tree, so they can be used today; "
+      "dsx::Layer hosts a prebuilt layer inside the element tree, so they can be used today; "
       "the trade-off is that the layer owns its state and props, and a new instance replaces the "
       "node instead of patching it.",
       mFonts.body, theme.textMuted, "esc.intro.text"));
-    page.push_back(card("esc.intro", "Escape hatch", "dsl::Layer", std::move(intro)));
+    page.push_back(card("esc.intro", "Escape hatch", "dsx::Layer", std::move(intro)));
 
     std::vector<ElementPtr> cards;
     std::vector<ElementPtr> cardBody;
-    cardBody.push_back(dsl::Layer(mCardWidget, "esc.card.widget"));
+    cardBody.push_back(dsx::Layer(mCardWidget, "esc.card.widget"));
     cardBody.push_back(label("Card also has a declarative wrapper; this page hosts the layer directly.",
       mFonts.small, theme.textMuted, "esc.card.caption"));
     cards.push_back(card("esc.card", "Card", "A real Card layer", std::move(cardBody)));
 
     std::vector<ElementPtr> chipBody;
     std::vector<ElementPtr> chipRow;
-    chipRow.push_back(dsl::Layer(mChipWidget, "esc.chip.widget"));
-    chipRow.push_back(dsl::Layer(mBadgeWidget, "esc.badge.widget"));
+    chipRow.push_back(dsx::Layer(mChipWidget, "esc.chip.widget"));
+    chipRow.push_back(dsx::Layer(mBadgeWidget, "esc.badge.widget"));
     chipBody.push_back(row("esc.chip.row", std::move(chipRow), 10.0f));
     chipBody.push_back(label("Chip stays a hosted layer; Badge now has a wrapper and can still be hosted.",
       mFonts.small, theme.textMuted, "esc.chip.caption"));

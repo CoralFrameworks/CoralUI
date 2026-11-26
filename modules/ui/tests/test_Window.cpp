@@ -74,6 +74,7 @@
 namespace {
 
 using namespace coral::ui;
+namespace dsx = coral::ui::dsl::experimental;
 
 #if defined(_WIN32)
 // Catches a regression where the Win32 TaskDialog backend stops being linked and the -1 fallback
@@ -1762,6 +1763,7 @@ TEST(UiWindow, FrameStatsOverlayKeepsAFrameTimeHistory) {
 
 TEST(UiWindow, CatalogDirectoryLoadsTheFallbackChain) {
   using namespace coral::ui;
+namespace dsx = coral::ui::dsl::experimental;
   namespace fs = std::filesystem;
   const std::string directory = (fs::current_path() /
     ("coral-i18n-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())))
@@ -1810,6 +1812,7 @@ TEST(UiWindow, CatalogDirectoryLoadsTheFallbackChain) {
 
 TEST(UiWindow, TranslationsLayerAndInterpolate) {
   using namespace coral::ui;
+namespace dsx = coral::ui::dsl::experimental;
   Translator translator(Locale::parse("zh-CN"));
   std::string error;
   // Base catalog, then the locale catalog on top: a key the locale does not translate keeps the base.
@@ -1841,6 +1844,7 @@ TEST(UiWindow, TranslationsLayerAndInterpolate) {
 
 TEST(UiWindow, LocaleDrivesNumberAndDateFormats) {
   using namespace coral::ui;
+namespace dsx = coral::ui::dsl::experimental;
   const auto formatNumberIn = [](const char* tag, const double value) {
     return formatNumber(value, numberFormatForLocale(Locale::parse(tag)));
   };
@@ -1866,6 +1870,7 @@ TEST(UiWindow, LocaleDrivesNumberAndDateFormats) {
 
 TEST(UiWindow, TranslationCatalogAndPluralRules) {
   using namespace coral::ui;
+namespace dsx = coral::ui::dsl::experimental;
   Translator translator(Locale::parse("en-US"));
   std::string error;
   ASSERT_TRUE(translator.load(
@@ -3226,7 +3231,7 @@ TEST(UiWindow, ToastDismissRemovesTheOverlayEntry) {
   overlayOptions.anchor = Rect::MakeXYWH(0.0f, 150.0f, 320.0f, 32.0f);
   overlayOptions.preferred = Placement::Center;
   overlayOptions.passThroughPointer = true;
-  const uint64_t id = host.show(dsl::Layer(toast, "toast-test"), overlayOptions);
+  const uint64_t id = host.show(dsx::Layer(toast, "toast-test"), overlayOptions);
   ASSERT_NE(id, 0u);
   EXPECT_EQ(window->root()->hitTest(Point{ 10.0f, 10.0f }), page.get());
   toast->setOnDismissed([&host, id] { host.dismiss(id); });
@@ -3264,7 +3269,7 @@ TEST(UiWindow, OverlaySurvivesAPageRebuild) {
   OverlayOptions overlayOptions;
   overlayOptions.anchor = Rect::MakeXYWH(0.0f, 150.0f, 320.0f, 32.0f);
   overlayOptions.passThroughPointer = true;
-  const uint64_t id = host.show(dsl::Layer(toast, "toast-rebuild"), overlayOptions);
+  const uint64_t id = host.show(dsx::Layer(toast, "toast-rebuild"), overlayOptions);
   ASSERT_NE(id, 0u);
 
   reconciler.update(dsl::Column(dsl::StackOptions{ .key = "page" },
@@ -3298,7 +3303,7 @@ TEST(UiWindow, OverlayDoesNotTakePageLayoutSpace) {
   OverlayOptions overlayOptions;
   overlayOptions.anchor = Rect::MakeXYWH(0.0f, 150.0f, 320.0f, 32.0f);
   overlayOptions.passThroughPointer = true;
-  ASSERT_NE(host.show(dsl::Layer(toast, "toast-layout"), overlayOptions), 0u);
+  ASSERT_NE(host.show(dsx::Layer(toast, "toast-layout"), overlayOptions), 0u);
 
   window->requestFrame();
   window->renderFrame();
@@ -3323,11 +3328,11 @@ TEST(UiWindow, TwoToastsDismissWithoutCrash) {
   OverlayHost host(*window);
   auto first = std::make_shared<Toast>("one", nullptr);
   first->showFor("one", std::chrono::milliseconds(1));
-  const uint64_t firstId = host.show(dsl::Layer(first, "toast-one"));
+  const uint64_t firstId = host.show(dsx::Layer(first, "toast-one"));
   first->setOnDismissed([&host, firstId] { host.dismiss(firstId); });
   auto second = std::make_shared<Toast>("two", nullptr);
   second->showFor("two", std::chrono::milliseconds(1));
-  const uint64_t secondId = host.show(dsl::Layer(second, "toast-two"));
+  const uint64_t secondId = host.show(dsx::Layer(second, "toast-two"));
   second->setOnDismissed([&host, secondId] { host.dismiss(secondId); });
   ASSERT_NE(firstId, 0u);
   ASSERT_NE(secondId, 0u);
@@ -3352,7 +3357,7 @@ TEST(UiWindow, SplitButtonMenuIsFloatingAndDoesNotShiftThePage) {
 
   Reconciler reconciler;
   auto root = reconciler.mount(dsl::Column(dsl::StackOptions{ .key = "page" },
-    dsl::SplitButton("Run", nullptr, { "Run all", "Debug" }, {}, {}, "run")));
+    dsx::SplitButton("Run", nullptr, { "Run all", "Debug" }, {}, {}, "run")));
   window->setRoot(root);
   window->requestFrame();
   window->renderFrame();
