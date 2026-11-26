@@ -1314,6 +1314,8 @@ private:
   std::shared_ptr<detail::LayerRecording> mRecording;
   Matrix mRecordingTransform;
   Rect mRecordingClip;
+  /** Bounds at record time; a device-space list is stale after a move even when the transform is not. */
+  Rect mRecordingBounds;
   bool mRecordingValid = false;
   Rect mDamage {};
   bool mHasDamage = false;

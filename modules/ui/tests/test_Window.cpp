@@ -25,7 +25,9 @@
 #include <ui/NativeAlert.h>
 #include <ui/ThemeFile.h>
 #include <ui/ThemeHotReload.h>
+#include <ui/Element.h>
 #include <ui/NumberFormat.h>
+#include <ui/OverlayHost.h>
 #include <ui/DateFormat.h>
 #include <ui/Translation.h>
 #include <ui/RenderContext.h>
@@ -3126,4 +3128,30 @@ TEST(UiWindow, APointerCaptureKeepsReceivingMovesOutsideItsBounds) {
   ASSERT_TRUE(window->pointerUp(up));
   ASSERT_EQ(sink->ups, 1);
   EXPECT_EQ(window->pointerCapture(), nullptr) << "a pointer up releases the capture";
+}
+
+TEST(UiWindow, OverlayHostMountsAndDismissesAnElement) {
+  Window::Options options;
+  options.width = 320;
+  options.height = 200;
+  options.headless = true;
+  options.frameLimit = 0;
+  auto window = Window::create(options);
+  if (window == nullptr) GTEST_SKIP() << "no GPU device is available for the headless surface";
+
+  window->setRoot(std::make_shared<ColorLayer>(Color::MakeRGBA8(20, 24, 30, 255)));
+
+  OverlayHost host(*window);
+  ElementProps props;
+  props.bounds = Rect::MakeWH(120.0f, 48.0f);
+  const uint64_t id = host.show(components::WithProps(
+    std::make_shared<ColorElement>(Color::MakeRGBA8(200, 100, 50, 255)), props), {});
+  ASSERT_NE(id, 0u);
+  EXPECT_TRUE(window->hasOverlay());
+  EXPECT_EQ(host.size(), 1u);
+  EXPECT_TRUE(host.contains(id));
+
+  EXPECT_TRUE(host.dismiss(id));
+  EXPECT_FALSE(window->hasOverlay());
+  EXPECT_EQ(host.size(), 0u);
 }

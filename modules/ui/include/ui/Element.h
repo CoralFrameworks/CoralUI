@@ -17,8 +17,24 @@
 #ifndef CORAL_UI_ELEMENT_H
 #define CORAL_UI_ELEMENT_H
 
+#include <ui/Banner.h>
+#include <ui/Chip.h>
+#include <ui/ColorPicker.h>
+#include <ui/DateField.h>
+#include <ui/DateTimeField.h>
+#include <ui/DateRangeField.h>
+#include <ui/Divider.h>
+#include <ui/TimeField.h>
+#include <ui/TimePicker.h>
+#include <ui/TimeRangeField.h>
+#include <ui/TreeView.h>
 #include <ui/Flex.h>
+#include <ui/Skeleton.h>
+#include <ui/Stat.h>
+#include <ui/StatusIndicator.h>
+#include <ui/StyledText.h>
 #include <ui/Table.h>
+#include <ui/Timeline.h>
 #include <ui/Ref.h>
 #include <ui/Types.h>
 
@@ -31,6 +47,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -80,6 +97,65 @@ enum class ElementKind : uint8_t {
   RecyclingList,
   Scroll,
   ContentView,
+  Divider,
+  Kbd,
+  Badge,
+  Icon,
+  Avatar,
+  AvatarGroup,
+  Skeleton,
+  Stat,
+  Meter,
+  ProgressRing,
+  StatusIndicator,
+  StepIndicator,
+  PropertyRow,
+  TagList,
+  Link,
+  Chip,
+  Rating,
+  Stepper,
+  RangeSlider,
+  Pagination,
+  ToggleButton,
+  Breadcrumb,
+  Banner,
+  TitleBar,
+  SplitButton,
+  DropZone,
+  Calendar,
+  StyledText,
+  ToggleGroup,
+  RadioGroup,
+  CheckBoxGroup,
+  MultiSelect,
+  Card,
+  Expander,
+  FormField,
+  SectionHeader,
+  EmptyState,
+  SplitView,
+  TabBar,
+  Toolbar,
+  StatusBar,
+  Select,
+  ComboBox,
+  SearchField,
+  PasswordField,
+  NumberField,
+  TagInput,
+  ColorInput,
+  Timeline,
+  ColorPicker,
+  CandidateListView,
+  TableView,
+  DateField,
+  TimeField,
+  DateTimeField,
+  DateRangeField,
+  TimeRangeField,
+  TimePicker,
+  TreeView,
   Layer,
 };
 
@@ -186,6 +262,11 @@ inline bool sameShadow(const Shadow& left, const Shadow& right) {
     left.offsetY == right.offsetY && left.color == right.color;
 }
 
+inline bool sameOptionalColor(const std::optional<Color>& left, const std::optional<Color>& right) {
+  if (left.has_value() != right.has_value()) return false;
+  return !left.has_value() || *left == *right;
+}
+
 /**
  * Value equality of a `PropsElement`'s props.
  *
@@ -269,6 +350,1923 @@ class ColorElement final : public Element {
   Color mColor;
 };
 
+/** A horizontal or vertical rule. */
+class DividerElement final : public Element {
+ public:
+  explicit DividerElement(Divider::Orientation orientation = Divider::Orientation::Horizontal,
+    float thickness = 1.0f, float inset = 0.0f, std::optional<Color> color = {}, std::string key = {})
+    : Element(std::move(key)), mOrientation(orientation), mThickness(thickness), mInset(inset),
+      mColor(color) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::Divider; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::Divider || key() != other.key()) return false;
+    const auto& divider = static_cast<const DividerElement&>(other);
+    return mOrientation == divider.mOrientation && mThickness == divider.mThickness &&
+      mInset == divider.mInset && detail::sameOptionalColor(mColor, divider.mColor);
+  }
+  [[nodiscard]] Divider::Orientation orientation() const noexcept { return mOrientation; }
+  [[nodiscard]] float thickness() const noexcept { return mThickness; }
+  [[nodiscard]] float inset() const noexcept { return mInset; }
+  [[nodiscard]] const std::optional<Color>& color() const noexcept { return mColor; }
+
+ private:
+  Divider::Orientation mOrientation;
+  float mThickness;
+  float mInset;
+  std::optional<Color> mColor;
+};
+
+/** A keyboard shortcut cap. */
+class KbdElement final : public Element {
+ public:
+  KbdElement(std::string label, std::shared_ptr<const graphics::Font> font, std::string key = {})
+    : Element(std::move(key)), mLabel(std::move(label)), mFont(std::move(font)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::Kbd; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::Kbd || key() != other.key()) return false;
+    const auto& kbd = static_cast<const KbdElement&>(other);
+    return mLabel == kbd.mLabel && mFont == kbd.mFont;
+  }
+  [[nodiscard]] const std::string& label() const noexcept { return mLabel; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+
+ private:
+  std::string mLabel;
+  std::shared_ptr<const graphics::Font> mFont;
+};
+
+/** A status/count pill. */
+class BadgeElement final : public Element {
+ public:
+  BadgeElement(std::string text, std::shared_ptr<const graphics::Font> font, bool dot = false,
+    std::shared_ptr<const graphics::Image> icon = {}, std::string key = {})
+    : Element(std::move(key)), mText(std::move(text)), mFont(std::move(font)), mDot(dot),
+      mIcon(std::move(icon)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::Badge; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::Badge || key() != other.key()) return false;
+    const auto& badge = static_cast<const BadgeElement&>(other);
+    return mText == badge.mText && mFont == badge.mFont && mDot == badge.mDot &&
+      mIcon == badge.mIcon;
+  }
+  [[nodiscard]] const std::string& text() const noexcept { return mText; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] bool dot() const noexcept { return mDot; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Image>& icon() const noexcept { return mIcon; }
+
+ private:
+  std::string mText;
+  std::shared_ptr<const graphics::Font> mFont;
+  bool mDot;
+  std::shared_ptr<const graphics::Image> mIcon;
+};
+
+/** A square tinted image. */
+class IconElement final : public Element {
+ public:
+  explicit IconElement(std::shared_ptr<const graphics::Image> image = {}, float size = 20.0f,
+    std::optional<Color> color = {}, std::string key = {})
+    : Element(std::move(key)), mImage(std::move(image)), mSize(size), mColor(color) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::Icon; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::Icon || key() != other.key()) return false;
+    const auto& icon = static_cast<const IconElement&>(other);
+    return mImage == icon.mImage && mSize == icon.mSize &&
+      detail::sameOptionalColor(mColor, icon.mColor);
+  }
+  [[nodiscard]] const std::shared_ptr<const graphics::Image>& image() const noexcept { return mImage; }
+  [[nodiscard]] float size() const noexcept { return mSize; }
+  [[nodiscard]] const std::optional<Color>& color() const noexcept { return mColor; }
+
+ private:
+  std::shared_ptr<const graphics::Image> mImage;
+  float mSize;
+  std::optional<Color> mColor;
+};
+
+/** A round initials/image avatar. */
+class AvatarElement final : public Element {
+ public:
+  AvatarElement(std::string initials, std::shared_ptr<const graphics::Font> font, float size = 32.0f,
+    std::shared_ptr<const graphics::Image> image = {}, bool statusVisible = false,
+    std::optional<Color> statusColor = {}, std::string key = {})
+    : Element(std::move(key)), mInitials(std::move(initials)), mFont(std::move(font)), mSize(size),
+      mImage(std::move(image)), mStatusVisible(statusVisible), mStatusColor(statusColor) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::Avatar; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::Avatar || key() != other.key()) return false;
+    const auto& avatar = static_cast<const AvatarElement&>(other);
+    return mInitials == avatar.mInitials && mFont == avatar.mFont && mSize == avatar.mSize &&
+      mImage == avatar.mImage && mStatusVisible == avatar.mStatusVisible &&
+      detail::sameOptionalColor(mStatusColor, avatar.mStatusColor);
+  }
+  [[nodiscard]] const std::string& initials() const noexcept { return mInitials; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] float size() const noexcept { return mSize; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Image>& image() const noexcept { return mImage; }
+  [[nodiscard]] bool statusVisible() const noexcept { return mStatusVisible; }
+  [[nodiscard]] const std::optional<Color>& statusColor() const noexcept { return mStatusColor; }
+
+ private:
+  std::string mInitials;
+  std::shared_ptr<const graphics::Font> mFont;
+  float mSize;
+  std::shared_ptr<const graphics::Image> mImage;
+  bool mStatusVisible;
+  std::optional<Color> mStatusColor;
+};
+
+/** An overlapping row of avatars. */
+class AvatarGroupElement final : public Element {
+ public:
+  AvatarGroupElement(std::vector<std::string> initials, std::shared_ptr<const graphics::Font> font,
+    int maxVisible = 4, float size = 28.0f, std::string key = {})
+    : Element(std::move(key)), mInitials(std::move(initials)), mFont(std::move(font)),
+      mMaxVisible(maxVisible), mSize(size) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::AvatarGroup; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::AvatarGroup || key() != other.key()) return false;
+    const auto& group = static_cast<const AvatarGroupElement&>(other);
+    return mInitials == group.mInitials && mFont == group.mFont &&
+      mMaxVisible == group.mMaxVisible && mSize == group.mSize;
+  }
+  [[nodiscard]] const std::vector<std::string>& initials() const noexcept { return mInitials; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] int maxVisible() const noexcept { return mMaxVisible; }
+  [[nodiscard]] float size() const noexcept { return mSize; }
+
+ private:
+  std::vector<std::string> mInitials;
+  std::shared_ptr<const graphics::Font> mFont;
+  int mMaxVisible;
+  float mSize;
+};
+
+/** A loading placeholder block. */
+class SkeletonElement final : public Element {
+ public:
+  explicit SkeletonElement(float width = 160.0f, float height = 14.0f, int lines = 1,
+    float lineGap = 6.0f, Skeleton::Shape shape = Skeleton::Shape::Rounded, bool animating = true,
+    std::string key = {})
+    : Element(std::move(key)), mWidth(width), mHeight(height), mLines(lines), mLineGap(lineGap),
+      mShape(shape), mAnimating(animating) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::Skeleton; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::Skeleton || key() != other.key()) return false;
+    const auto& skeleton = static_cast<const SkeletonElement&>(other);
+    return mWidth == skeleton.mWidth && mHeight == skeleton.mHeight && mLines == skeleton.mLines &&
+      mLineGap == skeleton.mLineGap && mShape == skeleton.mShape &&
+      mAnimating == skeleton.mAnimating;
+  }
+  [[nodiscard]] float width() const noexcept { return mWidth; }
+  [[nodiscard]] float height() const noexcept { return mHeight; }
+  [[nodiscard]] int lines() const noexcept { return mLines; }
+  [[nodiscard]] float lineGap() const noexcept { return mLineGap; }
+  [[nodiscard]] Skeleton::Shape shape() const noexcept { return mShape; }
+  [[nodiscard]] bool animating() const noexcept { return mAnimating; }
+
+ private:
+  float mWidth;
+  float mHeight;
+  int mLines;
+  float mLineGap;
+  Skeleton::Shape mShape;
+  bool mAnimating;
+};
+
+/** A compact dashboard statistic. */
+class StatElement final : public Element {
+ public:
+  StatElement(std::string label, std::string value, std::shared_ptr<const graphics::Font> font,
+    std::string caption = {}, StatTrend trend = StatTrend::None, std::string key = {})
+    : Element(std::move(key)), mLabel(std::move(label)), mValue(std::move(value)),
+      mFont(std::move(font)), mCaption(std::move(caption)), mTrend(trend) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::Stat; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::Stat || key() != other.key()) return false;
+    const auto& stat = static_cast<const StatElement&>(other);
+    return mLabel == stat.mLabel && mValue == stat.mValue && mFont == stat.mFont &&
+      mCaption == stat.mCaption && mTrend == stat.mTrend;
+  }
+  [[nodiscard]] const std::string& label() const noexcept { return mLabel; }
+  [[nodiscard]] const std::string& value() const noexcept { return mValue; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] const std::string& caption() const noexcept { return mCaption; }
+  [[nodiscard]] StatTrend trend() const noexcept { return mTrend; }
+
+ private:
+  std::string mLabel;
+  std::string mValue;
+  std::shared_ptr<const graphics::Font> mFont;
+  std::string mCaption;
+  StatTrend mTrend;
+};
+
+/** A low/high meter with thresholds. */
+class MeterElement final : public Element {
+ public:
+  explicit MeterElement(double minimum = 0.0, double maximum = 1.0, double value = 0.0,
+    std::string key = {})
+    : Element(std::move(key)), mMinimum(minimum), mMaximum(maximum), mValue(value) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::Meter; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::Meter || key() != other.key()) return false;
+    const auto& meter = static_cast<const MeterElement&>(other);
+    return mMinimum == meter.mMinimum && mMaximum == meter.mMaximum && mValue == meter.mValue;
+  }
+  [[nodiscard]] double minimum() const noexcept { return mMinimum; }
+  [[nodiscard]] double maximum() const noexcept { return mMaximum; }
+  [[nodiscard]] double value() const noexcept { return mValue; }
+
+ private:
+  double mMinimum;
+  double mMaximum;
+  double mValue;
+};
+
+/** A circular progress indicator. */
+class ProgressRingElement final : public Element {
+ public:
+  explicit ProgressRingElement(float size = 36.0f, double value = 0.0, float thickness = 4.0f,
+    bool indeterminate = false, std::string key = {})
+    : Element(std::move(key)), mSize(size), mValue(value), mThickness(thickness),
+      mIndeterminate(indeterminate) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::ProgressRing; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::ProgressRing || key() != other.key()) return false;
+    const auto& ring = static_cast<const ProgressRingElement&>(other);
+    return mSize == ring.mSize && mValue == ring.mValue && mThickness == ring.mThickness &&
+      mIndeterminate == ring.mIndeterminate;
+  }
+  [[nodiscard]] float size() const noexcept { return mSize; }
+  [[nodiscard]] double value() const noexcept { return mValue; }
+  [[nodiscard]] float thickness() const noexcept { return mThickness; }
+  [[nodiscard]] bool indeterminate() const noexcept { return mIndeterminate; }
+
+ private:
+  float mSize;
+  double mValue;
+  float mThickness;
+  bool mIndeterminate;
+};
+
+/** A coloured status dot with a label. */
+class StatusIndicatorElement final : public Element {
+ public:
+  StatusIndicatorElement(std::string label, std::shared_ptr<const graphics::Font> font,
+    StatusKind status = StatusKind::Online, std::string key = {})
+    : Element(std::move(key)), mLabel(std::move(label)), mFont(std::move(font)), mStatus(status) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override {
+    return ElementKind::StatusIndicator;
+  }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::StatusIndicator || key() != other.key()) return false;
+    const auto& status = static_cast<const StatusIndicatorElement&>(other);
+    return mLabel == status.mLabel && mFont == status.mFont && mStatus == status.mStatus;
+  }
+  [[nodiscard]] const std::string& label() const noexcept { return mLabel; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] StatusKind status() const noexcept { return mStatus; }
+
+ private:
+  std::string mLabel;
+  std::shared_ptr<const graphics::Font> mFont;
+  StatusKind mStatus;
+};
+
+/** A numbered step trail. */
+class StepIndicatorElement final : public Element {
+ public:
+  using ChangeHandler = std::function<void(int)>;
+
+  StepIndicatorElement(std::vector<std::string> steps, std::shared_ptr<const graphics::Font> font,
+    int current = 0, ChangeHandler onChanged = {}, std::string key = {})
+    : Element(std::move(key)), mSteps(std::move(steps)), mFont(std::move(font)), mCurrent(current),
+      mOnChanged(std::move(onChanged)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::StepIndicator; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::StepIndicator || key() != other.key()) return false;
+    const auto& steps = static_cast<const StepIndicatorElement&>(other);
+    return mSteps == steps.mSteps && mFont == steps.mFont && mCurrent == steps.mCurrent;
+  }
+  [[nodiscard]] const std::vector<std::string>& steps() const noexcept { return mSteps; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] int current() const noexcept { return mCurrent; }
+  [[nodiscard]] const ChangeHandler& onChanged() const noexcept { return mOnChanged; }
+
+ private:
+  std::vector<std::string> mSteps;
+  std::shared_ptr<const graphics::Font> mFont;
+  int mCurrent;
+  ChangeHandler mOnChanged;
+};
+
+/** A label/value settings row. */
+class PropertyRowElement final : public Element {
+ public:
+  PropertyRowElement(std::string label, std::string value,
+    std::shared_ptr<const graphics::Font> font, std::string help = {}, float labelWidth = 0.0f,
+    std::string key = {})
+    : Element(std::move(key)), mLabel(std::move(label)), mValue(std::move(value)),
+      mFont(std::move(font)), mHelp(std::move(help)), mLabelWidth(labelWidth) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::PropertyRow; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::PropertyRow || key() != other.key()) return false;
+    const auto& row = static_cast<const PropertyRowElement&>(other);
+    return mLabel == row.mLabel && mValue == row.mValue && mFont == row.mFont &&
+      mHelp == row.mHelp && mLabelWidth == row.mLabelWidth;
+  }
+  [[nodiscard]] const std::string& label() const noexcept { return mLabel; }
+  [[nodiscard]] const std::string& value() const noexcept { return mValue; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] const std::string& help() const noexcept { return mHelp; }
+  [[nodiscard]] float labelWidth() const noexcept { return mLabelWidth; }
+
+ private:
+  std::string mLabel;
+  std::string mValue;
+  std::shared_ptr<const graphics::Font> mFont;
+  std::string mHelp;
+  float mLabelWidth;
+};
+
+/** A single-line tag list with a +N overflow marker. */
+class TagListElement final : public Element {
+ public:
+  TagListElement(std::vector<std::string> tags, std::shared_ptr<const graphics::Font> font,
+    int maxVisible = 4, std::string key = {})
+    : Element(std::move(key)), mTags(std::move(tags)), mFont(std::move(font)),
+      mMaxVisible(maxVisible) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::TagList; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::TagList || key() != other.key()) return false;
+    const auto& tags = static_cast<const TagListElement&>(other);
+    return mTags == tags.mTags && mFont == tags.mFont && mMaxVisible == tags.mMaxVisible;
+  }
+  [[nodiscard]] const std::vector<std::string>& tags() const noexcept { return mTags; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] int maxVisible() const noexcept { return mMaxVisible; }
+
+ private:
+  std::vector<std::string> mTags;
+  std::shared_ptr<const graphics::Font> mFont;
+  int mMaxVisible;
+};
+/** An inline text link. */
+class LinkElement final : public Element {
+ public:
+  LinkElement(std::string text, std::shared_ptr<const graphics::Font> font,
+    std::function<void()> onActivate = {}, std::string key = {})
+    : Element(std::move(key)), mText(std::move(text)), mFont(std::move(font)),
+      mOnActivate(std::move(onActivate)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::Link; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::Link || key() != other.key()) return false;
+    const auto& link = static_cast<const LinkElement&>(other);
+    return mText == link.mText && mFont == link.mFont;
+  }
+  [[nodiscard]] const std::string& text() const noexcept { return mText; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] const std::function<void()>& onActivate() const noexcept { return mOnActivate; }
+
+ private:
+  std::string mText;
+  std::shared_ptr<const graphics::Font> mFont;
+  std::function<void()> mOnActivate;
+};
+
+/** A compact tag/chip with an optional remove button. */
+class ChipElement final : public Element {
+ public:
+  ChipElement(std::string text, std::shared_ptr<const graphics::Font> font,
+    ChipVariant variant = ChipVariant::Neutral, std::shared_ptr<const graphics::Image> icon = {},
+    bool removable = false, bool selected = false, std::function<void()> onRemove = {},
+    std::string key = {})
+    : Element(std::move(key)), mText(std::move(text)), mFont(std::move(font)), mVariant(variant),
+      mIcon(std::move(icon)), mRemovable(removable), mSelected(selected),
+      mOnRemove(std::move(onRemove)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::Chip; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::Chip || key() != other.key()) return false;
+    const auto& chip = static_cast<const ChipElement&>(other);
+    return mText == chip.mText && mFont == chip.mFont && mVariant == chip.mVariant &&
+      mIcon == chip.mIcon && mRemovable == chip.mRemovable && mSelected == chip.mSelected;
+  }
+  [[nodiscard]] const std::string& text() const noexcept { return mText; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] ChipVariant variant() const noexcept { return mVariant; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Image>& icon() const noexcept { return mIcon; }
+  [[nodiscard]] bool removable() const noexcept { return mRemovable; }
+  [[nodiscard]] bool selected() const noexcept { return mSelected; }
+  [[nodiscard]] const std::function<void()>& onRemove() const noexcept { return mOnRemove; }
+
+ private:
+  std::string mText;
+  std::shared_ptr<const graphics::Font> mFont;
+  ChipVariant mVariant;
+  std::shared_ptr<const graphics::Image> mIcon;
+  bool mRemovable;
+  bool mSelected;
+  std::function<void()> mOnRemove;
+};
+
+/** A star rating; integer or half-step. */
+class RatingElement final : public Element {
+ public:
+  explicit RatingElement(int stars = 5, double rating = 0.0, bool halfSteps = false,
+    bool readOnly = false, std::function<void(double)> onChanged = {}, std::string key = {})
+    : Element(std::move(key)), mStars(stars), mRating(rating), mHalfSteps(halfSteps),
+      mReadOnly(readOnly), mOnChanged(std::move(onChanged)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::Rating; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::Rating || key() != other.key()) return false;
+    const auto& rating = static_cast<const RatingElement&>(other);
+    return mStars == rating.mStars && mRating == rating.mRating &&
+      mHalfSteps == rating.mHalfSteps && mReadOnly == rating.mReadOnly;
+  }
+  [[nodiscard]] int stars() const noexcept { return mStars; }
+  [[nodiscard]] double rating() const noexcept { return mRating; }
+  [[nodiscard]] bool halfSteps() const noexcept { return mHalfSteps; }
+  [[nodiscard]] bool readOnly() const noexcept { return mReadOnly; }
+  [[nodiscard]] const std::function<void(double)>& onChanged() const noexcept { return mOnChanged; }
+
+ private:
+  int mStars;
+  double mRating;
+  bool mHalfSteps;
+  bool mReadOnly;
+  std::function<void(double)> mOnChanged;
+};
+
+/** A numeric stepper. */
+class StepperElement final : public Element {
+ public:
+  StepperElement(double minimum, double maximum, double value, double step = 1.0,
+    std::function<void(double)> onChanged = {}, std::string key = {})
+    : Element(std::move(key)), mMinimum(minimum), mMaximum(maximum), mValue(value), mStep(step),
+      mOnChanged(std::move(onChanged)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::Stepper; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::Stepper || key() != other.key()) return false;
+    const auto& stepper = static_cast<const StepperElement&>(other);
+    return mMinimum == stepper.mMinimum && mMaximum == stepper.mMaximum &&
+      mValue == stepper.mValue && mStep == stepper.mStep;
+  }
+  [[nodiscard]] double minimum() const noexcept { return mMinimum; }
+  [[nodiscard]] double maximum() const noexcept { return mMaximum; }
+  [[nodiscard]] double value() const noexcept { return mValue; }
+  [[nodiscard]] double step() const noexcept { return mStep; }
+  [[nodiscard]] const std::function<void(double)>& onChanged() const noexcept { return mOnChanged; }
+
+ private:
+  double mMinimum;
+  double mMaximum;
+  double mValue;
+  double mStep;
+  std::function<void(double)> mOnChanged;
+};
+
+/** A two-handle range slider. */
+class RangeSliderElement final : public Element {
+ public:
+  explicit RangeSliderElement(double minimum = 0.0, double maximum = 1.0, double low = 0.25,
+    double high = 0.75, double step = 0.01, std::function<void(double, double)> onChanged = {},
+    std::string key = {})
+    : Element(std::move(key)), mMinimum(minimum), mMaximum(maximum), mLow(low), mHigh(high),
+      mStep(step), mOnChanged(std::move(onChanged)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::RangeSlider; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::RangeSlider || key() != other.key()) return false;
+    const auto& range = static_cast<const RangeSliderElement&>(other);
+    return mMinimum == range.mMinimum && mMaximum == range.mMaximum && mLow == range.mLow &&
+      mHigh == range.mHigh && mStep == range.mStep;
+  }
+  [[nodiscard]] double minimum() const noexcept { return mMinimum; }
+  [[nodiscard]] double maximum() const noexcept { return mMaximum; }
+  [[nodiscard]] double low() const noexcept { return mLow; }
+  [[nodiscard]] double high() const noexcept { return mHigh; }
+  [[nodiscard]] double step() const noexcept { return mStep; }
+  [[nodiscard]] const std::function<void(double, double)>& onChanged() const noexcept {
+    return mOnChanged;
+  }
+
+ private:
+  double mMinimum;
+  double mMaximum;
+  double mLow;
+  double mHigh;
+  double mStep;
+  std::function<void(double, double)> mOnChanged;
+};
+
+/** A numbered page selector. */
+class PaginationElement final : public Element {
+ public:
+  PaginationElement(std::shared_ptr<const graphics::Font> font, int pageCount = 1, int page = 0,
+    std::function<void(int)> onChanged = {}, std::string key = {})
+    : Element(std::move(key)), mFont(std::move(font)), mPageCount(pageCount), mPage(page),
+      mOnChanged(std::move(onChanged)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::Pagination; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::Pagination || key() != other.key()) return false;
+    const auto& pagination = static_cast<const PaginationElement&>(other);
+    return mFont == pagination.mFont && mPageCount == pagination.mPageCount &&
+      mPage == pagination.mPage;
+  }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] int pageCount() const noexcept { return mPageCount; }
+  [[nodiscard]] int page() const noexcept { return mPage; }
+  [[nodiscard]] const std::function<void(int)>& onChanged() const noexcept { return mOnChanged; }
+
+ private:
+  std::shared_ptr<const graphics::Font> mFont;
+  int mPageCount;
+  int mPage;
+  std::function<void(int)> mOnChanged;
+};
+
+/** A button with a persistent selected state. */
+class ToggleButtonElement final : public Element {
+ public:
+  ToggleButtonElement(std::string label, std::shared_ptr<const graphics::Font> font,
+    bool selected = false, std::function<void(bool)> onChanged = {}, std::string key = {})
+    : Element(std::move(key)), mLabel(std::move(label)), mFont(std::move(font)),
+      mSelected(selected), mOnChanged(std::move(onChanged)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::ToggleButton; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::ToggleButton || key() != other.key()) return false;
+    const auto& button = static_cast<const ToggleButtonElement&>(other);
+    return mLabel == button.mLabel && mFont == button.mFont && mSelected == button.mSelected;
+  }
+  [[nodiscard]] const std::string& label() const noexcept { return mLabel; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] bool selected() const noexcept { return mSelected; }
+  [[nodiscard]] const std::function<void(bool)>& onChanged() const noexcept { return mOnChanged; }
+
+ private:
+  std::string mLabel;
+  std::shared_ptr<const graphics::Font> mFont;
+  bool mSelected;
+  std::function<void(bool)> mOnChanged;
+};
+
+/** A clickable trail of path segments. */
+class BreadcrumbElement final : public Element {
+ public:
+  using SelectHandler = std::function<void(int, std::string_view)>;
+
+  BreadcrumbElement(std::vector<std::string> items, std::shared_ptr<const graphics::Font> font,
+    std::string separator = "/", int currentIndex = -1, SelectHandler onSelect = {},
+    std::string key = {})
+    : Element(std::move(key)), mItems(std::move(items)), mFont(std::move(font)),
+      mSeparator(std::move(separator)), mCurrentIndex(currentIndex),
+      mOnSelect(std::move(onSelect)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::Breadcrumb; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::Breadcrumb || key() != other.key()) return false;
+    const auto& crumb = static_cast<const BreadcrumbElement&>(other);
+    return mItems == crumb.mItems && mFont == crumb.mFont && mSeparator == crumb.mSeparator &&
+      mCurrentIndex == crumb.mCurrentIndex;
+  }
+  [[nodiscard]] const std::vector<std::string>& items() const noexcept { return mItems; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] const std::string& separator() const noexcept { return mSeparator; }
+  [[nodiscard]] int currentIndex() const noexcept { return mCurrentIndex; }
+  [[nodiscard]] const SelectHandler& onSelect() const noexcept { return mOnSelect; }
+
+ private:
+  std::vector<std::string> mItems;
+  std::shared_ptr<const graphics::Font> mFont;
+  std::string mSeparator;
+  int mCurrentIndex;
+  SelectHandler mOnSelect;
+};
+
+/** A severity banner with an optional action and dismiss button. */
+class BannerElement final : public Element {
+ public:
+  BannerElement(std::string text, std::shared_ptr<const graphics::Font> font,
+    BannerSeverity severity = BannerSeverity::Info, std::string actionLabel = {},
+    std::function<void()> onAction = {}, bool dismissible = false,
+    std::shared_ptr<const graphics::Image> icon = {}, std::function<void()> onDismiss = {},
+    std::string key = {})
+    : Element(std::move(key)), mText(std::move(text)), mFont(std::move(font)), mSeverity(severity),
+      mActionLabel(std::move(actionLabel)), mOnAction(std::move(onAction)),
+      mDismissible(dismissible), mIcon(std::move(icon)), mOnDismiss(std::move(onDismiss)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::Banner; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::Banner || key() != other.key()) return false;
+    const auto& banner = static_cast<const BannerElement&>(other);
+    return mText == banner.mText && mFont == banner.mFont && mSeverity == banner.mSeverity &&
+      mActionLabel == banner.mActionLabel && mDismissible == banner.mDismissible &&
+      mIcon == banner.mIcon;
+  }
+  [[nodiscard]] const std::string& text() const noexcept { return mText; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] BannerSeverity severity() const noexcept { return mSeverity; }
+  [[nodiscard]] const std::string& actionLabel() const noexcept { return mActionLabel; }
+  [[nodiscard]] const std::function<void()>& onAction() const noexcept { return mOnAction; }
+  [[nodiscard]] bool dismissible() const noexcept { return mDismissible; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Image>& icon() const noexcept { return mIcon; }
+  [[nodiscard]] const std::function<void()>& onDismiss() const noexcept { return mOnDismiss; }
+
+ private:
+  std::string mText;
+  std::shared_ptr<const graphics::Font> mFont;
+  BannerSeverity mSeverity;
+  std::string mActionLabel;
+  std::function<void()> mOnAction;
+  bool mDismissible;
+  std::shared_ptr<const graphics::Image> mIcon;
+  std::function<void()> mOnDismiss;
+};
+
+/** A client-side window title bar. */
+class TitleBarElement final : public Element {
+ public:
+  TitleBarElement(std::string title, std::shared_ptr<const graphics::Font> font,
+    std::function<void()> onMinimize = {}, std::function<void()> onMaximize = {},
+    std::function<void()> onClose = {}, bool showMinimize = true, bool showMaximize = true,
+    bool showClose = true, std::string key = {})
+    : Element(std::move(key)), mTitle(std::move(title)), mFont(std::move(font)),
+      mOnMinimize(std::move(onMinimize)), mOnMaximize(std::move(onMaximize)),
+      mOnClose(std::move(onClose)), mShowMinimize(showMinimize), mShowMaximize(showMaximize),
+      mShowClose(showClose) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::TitleBar; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::TitleBar || key() != other.key()) return false;
+    const auto& bar = static_cast<const TitleBarElement&>(other);
+    return mTitle == bar.mTitle && mFont == bar.mFont && mShowMinimize == bar.mShowMinimize &&
+      mShowMaximize == bar.mShowMaximize && mShowClose == bar.mShowClose;
+  }
+  [[nodiscard]] const std::string& title() const noexcept { return mTitle; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] const std::function<void()>& onMinimize() const noexcept { return mOnMinimize; }
+  [[nodiscard]] const std::function<void()>& onMaximize() const noexcept { return mOnMaximize; }
+  [[nodiscard]] const std::function<void()>& onClose() const noexcept { return mOnClose; }
+  [[nodiscard]] bool showMinimize() const noexcept { return mShowMinimize; }
+  [[nodiscard]] bool showMaximize() const noexcept { return mShowMaximize; }
+  [[nodiscard]] bool showClose() const noexcept { return mShowClose; }
+
+ private:
+  std::string mTitle;
+  std::shared_ptr<const graphics::Font> mFont;
+  std::function<void()> mOnMinimize;
+  std::function<void()> mOnMaximize;
+  std::function<void()> mOnClose;
+  bool mShowMinimize;
+  bool mShowMaximize;
+  bool mShowClose;
+};
+
+/** A primary action plus a dropdown of related options. */
+class SplitButtonElement final : public Element {
+ public:
+  using OptionHandler = std::function<void(int, std::string_view)>;
+
+  SplitButtonElement(std::string text, std::shared_ptr<const graphics::Font> font,
+    std::vector<std::string> options = {}, std::function<void()> onClick = {},
+    OptionHandler onOption = {}, std::string key = {})
+    : Element(std::move(key)), mText(std::move(text)), mFont(std::move(font)),
+      mOptions(std::move(options)), mOnClick(std::move(onClick)), mOnOption(std::move(onOption)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::SplitButton; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::SplitButton || key() != other.key()) return false;
+    const auto& button = static_cast<const SplitButtonElement&>(other);
+    return mText == button.mText && mFont == button.mFont && mOptions == button.mOptions;
+  }
+  [[nodiscard]] const std::string& text() const noexcept { return mText; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] const std::vector<std::string>& options() const noexcept { return mOptions; }
+  [[nodiscard]] const std::function<void()>& onClick() const noexcept { return mOnClick; }
+  [[nodiscard]] const OptionHandler& onOption() const noexcept { return mOnOption; }
+
+ private:
+  std::string mText;
+  std::shared_ptr<const graphics::Font> mFont;
+  std::vector<std::string> mOptions;
+  std::function<void()> mOnClick;
+  OptionHandler mOnOption;
+};
+
+/** A drop target for files or text. */
+class DropZoneElement final : public Element {
+ public:
+  DropZoneElement(std::string label, std::shared_ptr<const graphics::Font> font,
+    std::function<void(std::vector<std::string>)> onFilesDropped = {},
+    std::function<void(std::string)> onTextDropped = {}, std::string key = {})
+    : Element(std::move(key)), mLabel(std::move(label)), mFont(std::move(font)),
+      mOnFilesDropped(std::move(onFilesDropped)), mOnTextDropped(std::move(onTextDropped)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::DropZone; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::DropZone || key() != other.key()) return false;
+    const auto& zone = static_cast<const DropZoneElement&>(other);
+    return mLabel == zone.mLabel && mFont == zone.mFont;
+  }
+  [[nodiscard]] const std::string& label() const noexcept { return mLabel; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] const std::function<void(std::vector<std::string>)>& onFilesDropped() const noexcept {
+    return mOnFilesDropped;
+  }
+  [[nodiscard]] const std::function<void(std::string)>& onTextDropped() const noexcept {
+    return mOnTextDropped;
+  }
+
+ private:
+  std::string mLabel;
+  std::shared_ptr<const graphics::Font> mFont;
+  std::function<void(std::vector<std::string>)> mOnFilesDropped;
+  std::function<void(std::string)> mOnTextDropped;
+};
+
+/** A month grid with a selected date. */
+class CalendarElement final : public Element {
+ public:
+  CalendarElement(std::chrono::year_month_day date, std::shared_ptr<const graphics::Font> font,
+    int firstWeekday = 0, std::function<void(std::chrono::year_month_day)> onSelect = {},
+    std::function<void()> onCancel = {}, std::string key = {})
+    : Element(std::move(key)), mDate(date), mFont(std::move(font)), mFirstWeekday(firstWeekday),
+      mOnSelect(std::move(onSelect)), mOnCancel(std::move(onCancel)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::Calendar; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::Calendar || key() != other.key()) return false;
+    const auto& calendar = static_cast<const CalendarElement&>(other);
+    return mDate == calendar.mDate && mFont == calendar.mFont &&
+      mFirstWeekday == calendar.mFirstWeekday;
+  }
+  [[nodiscard]] const std::chrono::year_month_day& date() const noexcept { return mDate; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] int firstWeekday() const noexcept { return mFirstWeekday; }
+  [[nodiscard]] const std::function<void(std::chrono::year_month_day)>& onSelect() const noexcept {
+    return mOnSelect;
+  }
+  [[nodiscard]] const std::function<void()>& onCancel() const noexcept { return mOnCancel; }
+
+ private:
+  std::chrono::year_month_day mDate;
+  std::shared_ptr<const graphics::Font> mFont;
+  int mFirstWeekday;
+  std::function<void(std::chrono::year_month_day)> mOnSelect;
+  std::function<void()> mOnCancel;
+};
+/** A styled rich-text document with optional links. */
+class StyledTextElement final : public Element {
+ public:
+  explicit StyledTextElement(TextDocument document = {},
+    std::function<void(std::string_view)> onLinkActivated = {}, std::string key = {})
+    : Element(std::move(key)), mDocument(std::move(document)),
+      mOnLinkActivated(std::move(onLinkActivated)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::StyledText; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::StyledText || key() != other.key()) return false;
+    return mDocument == static_cast<const StyledTextElement&>(other).mDocument;
+  }
+  [[nodiscard]] const TextDocument& document() const noexcept { return mDocument; }
+  [[nodiscard]] const std::function<void(std::string_view)>& onLinkActivated() const noexcept {
+    return mOnLinkActivated;
+  }
+
+ private:
+  TextDocument mDocument;
+  std::function<void(std::string_view)> mOnLinkActivated;
+};
+/** A multi-select row of toggle buttons. */
+class ToggleGroupElement final : public Element {
+ public:
+  using ChangeHandler = std::function<void(std::vector<int>)>;
+
+  ToggleGroupElement(std::vector<std::string> options, std::shared_ptr<const graphics::Font> font,
+    std::vector<int> selected = {}, ChangeHandler onChanged = {}, std::string key = {})
+    : Element(std::move(key)), mOptions(std::move(options)), mFont(std::move(font)),
+      mSelected(std::move(selected)), mOnChanged(std::move(onChanged)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::ToggleGroup; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::ToggleGroup || key() != other.key()) return false;
+    const auto& group = static_cast<const ToggleGroupElement&>(other);
+    return mOptions == group.mOptions && mFont == group.mFont && mSelected == group.mSelected;
+  }
+  [[nodiscard]] const std::vector<std::string>& options() const noexcept { return mOptions; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] const std::vector<int>& selected() const noexcept { return mSelected; }
+  [[nodiscard]] const ChangeHandler& onChanged() const noexcept { return mOnChanged; }
+
+ private:
+  std::vector<std::string> mOptions;
+  std::shared_ptr<const graphics::Font> mFont;
+  std::vector<int> mSelected;
+  ChangeHandler mOnChanged;
+};
+
+/** An exclusive radio group. */
+class RadioGroupElement final : public Element {
+ public:
+  RadioGroupElement(std::vector<std::string> options, std::shared_ptr<const graphics::Font> font,
+    int selected = 0, std::function<void(int)> onChanged = {}, std::string key = {})
+    : Element(std::move(key)), mOptions(std::move(options)), mFont(std::move(font)),
+      mSelected(selected), mOnChanged(std::move(onChanged)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::RadioGroup; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::RadioGroup || key() != other.key()) return false;
+    const auto& group = static_cast<const RadioGroupElement&>(other);
+    return mOptions == group.mOptions && mFont == group.mFont && mSelected == group.mSelected;
+  }
+  [[nodiscard]] const std::vector<std::string>& options() const noexcept { return mOptions; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] int selected() const noexcept { return mSelected; }
+  [[nodiscard]] const std::function<void(int)>& onChanged() const noexcept { return mOnChanged; }
+
+ private:
+  std::vector<std::string> mOptions;
+  std::shared_ptr<const graphics::Font> mFont;
+  int mSelected;
+  std::function<void(int)> mOnChanged;
+};
+
+/** A multi-select check box group. */
+class CheckBoxGroupElement final : public Element {
+ public:
+  using ChangeHandler = std::function<void(std::vector<int>)>;
+
+  CheckBoxGroupElement(std::vector<std::string> options, std::shared_ptr<const graphics::Font> font,
+    std::vector<int> selected = {}, ChangeHandler onChanged = {}, std::string key = {})
+    : Element(std::move(key)), mOptions(std::move(options)), mFont(std::move(font)),
+      mSelected(std::move(selected)), mOnChanged(std::move(onChanged)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::CheckBoxGroup; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::CheckBoxGroup || key() != other.key()) return false;
+    const auto& group = static_cast<const CheckBoxGroupElement&>(other);
+    return mOptions == group.mOptions && mFont == group.mFont && mSelected == group.mSelected;
+  }
+  [[nodiscard]] const std::vector<std::string>& options() const noexcept { return mOptions; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] const std::vector<int>& selected() const noexcept { return mSelected; }
+  [[nodiscard]] const ChangeHandler& onChanged() const noexcept { return mOnChanged; }
+
+ private:
+  std::vector<std::string> mOptions;
+  std::shared_ptr<const graphics::Font> mFont;
+  std::vector<int> mSelected;
+  ChangeHandler mOnChanged;
+};
+
+/** A dropdown multi-select. */
+class MultiSelectElement final : public Element {
+ public:
+  using ChangeHandler = std::function<void(std::vector<int>)>;
+
+  MultiSelectElement(std::vector<std::string> options, std::shared_ptr<const graphics::Font> font,
+    std::vector<int> selected = {}, std::string placeholder = {}, ChangeHandler onChanged = {},
+    std::string key = {})
+    : Element(std::move(key)), mOptions(std::move(options)), mFont(std::move(font)),
+      mSelected(std::move(selected)), mPlaceholder(std::move(placeholder)),
+      mOnChanged(std::move(onChanged)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::MultiSelect; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::MultiSelect || key() != other.key()) return false;
+    const auto& select = static_cast<const MultiSelectElement&>(other);
+    return mOptions == select.mOptions && mFont == select.mFont && mSelected == select.mSelected &&
+      mPlaceholder == select.mPlaceholder;
+  }
+  [[nodiscard]] const std::vector<std::string>& options() const noexcept { return mOptions; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] const std::vector<int>& selected() const noexcept { return mSelected; }
+  [[nodiscard]] const std::string& placeholder() const noexcept { return mPlaceholder; }
+  [[nodiscard]] const ChangeHandler& onChanged() const noexcept { return mOnChanged; }
+
+ private:
+  std::vector<std::string> mOptions;
+  std::shared_ptr<const graphics::Font> mFont;
+  std::vector<int> mSelected;
+  std::string mPlaceholder;
+  ChangeHandler mOnChanged;
+};
+/** A titled card with a content slot and an optional header action. */
+class CardElement final : public Element {
+ public:
+  CardElement(std::string title, std::shared_ptr<const graphics::Font> font,
+    ElementPtr content = {}, ElementPtr headerAction = {}, std::string key = {})
+    : Element(std::move(key), { std::move(content), std::move(headerAction) }),
+      mTitle(std::move(title)), mFont(std::move(font)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::Card; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::Card || key() != other.key()) return false;
+    const auto& card = static_cast<const CardElement&>(other);
+    return mTitle == card.mTitle && mFont == card.mFont &&
+      detail::sameChildren(children(), other.children());
+  }
+  [[nodiscard]] const std::string& title() const noexcept { return mTitle; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] const ElementPtr& content() const noexcept { return children()[0]; }
+  [[nodiscard]] const ElementPtr& headerAction() const noexcept { return children()[1]; }
+
+ private:
+  std::string mTitle;
+  std::shared_ptr<const graphics::Font> mFont;
+};
+
+/** A collapsible section with one content slot. */
+class ExpanderElement final : public Element {
+ public:
+  ExpanderElement(std::string title, std::shared_ptr<const graphics::Font> font,
+    ElementPtr content = {}, bool expanded = true,
+    std::function<void(bool)> onChanged = {}, std::string key = {})
+    : Element(std::move(key), { std::move(content) }), mTitle(std::move(title)),
+      mFont(std::move(font)), mExpanded(expanded), mOnChanged(std::move(onChanged)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::Expander; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::Expander || key() != other.key()) return false;
+    const auto& expander = static_cast<const ExpanderElement&>(other);
+    return mTitle == expander.mTitle && mFont == expander.mFont &&
+      mExpanded == expander.mExpanded && detail::sameChildren(children(), other.children());
+  }
+  [[nodiscard]] const std::string& title() const noexcept { return mTitle; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] bool expanded() const noexcept { return mExpanded; }
+  [[nodiscard]] const ElementPtr& content() const noexcept { return children()[0]; }
+  [[nodiscard]] const std::function<void(bool)>& onChanged() const noexcept { return mOnChanged; }
+
+ private:
+  std::string mTitle;
+  std::shared_ptr<const graphics::Font> mFont;
+  bool mExpanded;
+  std::function<void(bool)> mOnChanged;
+};
+
+/** A labelled form row with help/error text and a content slot. */
+class FormFieldElement final : public Element {
+ public:
+  FormFieldElement(std::string label, std::shared_ptr<const graphics::Font> font,
+    ElementPtr content = {}, std::string help = {}, std::string error = {}, std::string key = {})
+    : Element(std::move(key), { std::move(content) }), mLabel(std::move(label)),
+      mFont(std::move(font)), mHelp(std::move(help)), mError(std::move(error)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::FormField; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::FormField || key() != other.key()) return false;
+    const auto& field = static_cast<const FormFieldElement&>(other);
+    return mLabel == field.mLabel && mFont == field.mFont && mHelp == field.mHelp &&
+      mError == field.mError && detail::sameChildren(children(), other.children());
+  }
+  [[nodiscard]] const std::string& label() const noexcept { return mLabel; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] const std::string& help() const noexcept { return mHelp; }
+  [[nodiscard]] const std::string& error() const noexcept { return mError; }
+  [[nodiscard]] const ElementPtr& content() const noexcept { return children()[0]; }
+
+ private:
+  std::string mLabel;
+  std::shared_ptr<const graphics::Font> mFont;
+  std::string mHelp;
+  std::string mError;
+};
+
+/** A section title/subtitle with an optional action slot. */
+class SectionHeaderElement final : public Element {
+ public:
+  SectionHeaderElement(std::string title, std::shared_ptr<const graphics::Font> font,
+    std::string subtitle = {}, ElementPtr action = {}, std::string key = {})
+    : Element(std::move(key), { std::move(action) }), mTitle(std::move(title)),
+      mFont(std::move(font)), mSubtitle(std::move(subtitle)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::SectionHeader; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::SectionHeader || key() != other.key()) return false;
+    const auto& header = static_cast<const SectionHeaderElement&>(other);
+    return mTitle == header.mTitle && mFont == header.mFont && mSubtitle == header.mSubtitle &&
+      detail::sameChildren(children(), other.children());
+  }
+  [[nodiscard]] const std::string& title() const noexcept { return mTitle; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] const std::string& subtitle() const noexcept { return mSubtitle; }
+  [[nodiscard]] const ElementPtr& action() const noexcept { return children()[0]; }
+
+ private:
+  std::string mTitle;
+  std::shared_ptr<const graphics::Font> mFont;
+  std::string mSubtitle;
+};
+
+/** An empty-state panel with content and action slots. */
+class EmptyStateElement final : public Element {
+ public:
+  EmptyStateElement(std::string title, std::shared_ptr<const graphics::Font> font,
+    std::string description = {}, ElementPtr content = {}, ElementPtr action = {},
+    std::shared_ptr<const graphics::Image> icon = {}, std::string key = {})
+    : Element(std::move(key), { std::move(content), std::move(action) }),
+      mTitle(std::move(title)), mFont(std::move(font)), mDescription(std::move(description)),
+      mIcon(std::move(icon)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::EmptyState; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::EmptyState || key() != other.key()) return false;
+    const auto& empty = static_cast<const EmptyStateElement&>(other);
+    return mTitle == empty.mTitle && mFont == empty.mFont &&
+      mDescription == empty.mDescription && mIcon == empty.mIcon &&
+      detail::sameChildren(children(), other.children());
+  }
+  [[nodiscard]] const std::string& title() const noexcept { return mTitle; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] const std::string& description() const noexcept { return mDescription; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Image>& icon() const noexcept { return mIcon; }
+  [[nodiscard]] const ElementPtr& content() const noexcept { return children()[0]; }
+  [[nodiscard]] const ElementPtr& action() const noexcept { return children()[1]; }
+
+ private:
+  std::string mTitle;
+  std::shared_ptr<const graphics::Font> mFont;
+  std::string mDescription;
+  std::shared_ptr<const graphics::Image> mIcon;
+};
+/** A two-pane split with a draggable fraction. */
+class SplitViewElement final : public Element {
+ public:
+  SplitViewElement(Axis axis, float fraction, ElementPtr first, ElementPtr second,
+    std::function<void(float)> onFractionChanged = {}, std::string key = {})
+    : Element(std::move(key), { std::move(first), std::move(second) }), mAxis(axis),
+      mFraction(fraction), mOnFractionChanged(std::move(onFractionChanged)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::SplitView; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::SplitView || key() != other.key()) return false;
+    const auto& split = static_cast<const SplitViewElement&>(other);
+    return mAxis == split.mAxis && mFraction == split.mFraction &&
+      detail::sameChildren(children(), other.children());
+  }
+  [[nodiscard]] Axis axis() const noexcept { return mAxis; }
+  [[nodiscard]] float fraction() const noexcept { return mFraction; }
+  [[nodiscard]] const ElementPtr& first() const noexcept { return children()[0]; }
+  [[nodiscard]] const ElementPtr& second() const noexcept { return children()[1]; }
+  [[nodiscard]] const std::function<void(float)>& onFractionChanged() const noexcept {
+    return mOnFractionChanged;
+  }
+
+ private:
+  Axis mAxis;
+  float mFraction;
+  std::function<void(float)> mOnFractionChanged;
+};
+/** One tab: a label, a content element and an identity key. */
+struct TabItem {
+  std::string label;
+  ElementPtr content;
+  std::string key;
+};
+
+/** A tab bar with one content slot per tab. */
+class TabBarElement final : public Element {
+ public:
+  TabBarElement(std::shared_ptr<const graphics::Font> font, std::vector<TabItem> tabs,
+    int active = 0, std::function<void(int)> onChanged = {}, std::string key = {})
+    : Element(std::move(key), contentsOf(tabs)), mFont(std::move(font)), mTabs(std::move(tabs)),
+      mActive(active), mOnChanged(std::move(onChanged)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::TabBar; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::TabBar || key() != other.key()) return false;
+    const auto& bar = static_cast<const TabBarElement&>(other);
+    if (mActive != bar.mActive || mFont != bar.mFont || mTabs.size() != bar.mTabs.size()) {
+      return false;
+    }
+    for (size_t i = 0; i < mTabs.size(); ++i) {
+      if (mTabs[i].label != bar.mTabs[i].label || mTabs[i].key != bar.mTabs[i].key) return false;
+    }
+    return detail::sameChildren(children(), other.children());
+  }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] const std::vector<TabItem>& tabs() const noexcept { return mTabs; }
+  [[nodiscard]] int active() const noexcept { return mActive; }
+  [[nodiscard]] const std::function<void(int)>& onChanged() const noexcept { return mOnChanged; }
+
+ private:
+  static std::vector<ElementPtr> contentsOf(const std::vector<TabItem>& tabs) {
+    std::vector<ElementPtr> content;
+    content.reserve(tabs.size());
+    for (const TabItem& tab: tabs) content.push_back(tab.content);
+    return content;
+  }
+
+  std::shared_ptr<const graphics::Font> mFont;
+  std::vector<TabItem> mTabs;
+  int mActive;
+  std::function<void(int)> mOnChanged;
+};
+/** One toolbar entry: a control, a separator, or a virtualized overflow item. */
+struct ToolbarItem {
+  ElementPtr element;
+  bool flexible = false;
+  bool separator = false;
+  std::string overflowLabel;
+  std::function<void()> overflowAction;
+  std::string key;
+};
+
+/** A horizontal toolbar; items may be flexible or overflow into a menu. */
+class ToolbarElement final : public Element {
+ public:
+  ToolbarElement(std::shared_ptr<const graphics::Font> font, std::vector<ToolbarItem> items,
+    float height = 44.0f, std::string key = {})
+    : Element(std::move(key), contentsOf(items)), mFont(std::move(font)), mItems(std::move(items)),
+      mHeight(height) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::Toolbar; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::Toolbar || key() != other.key()) return false;
+    const auto& toolbar = static_cast<const ToolbarElement&>(other);
+    if (mFont != toolbar.mFont || mHeight != toolbar.mHeight ||
+        mItems.size() != toolbar.mItems.size()) {
+      return false;
+    }
+    for (size_t i = 0; i < mItems.size(); ++i) {
+      if (mItems[i].flexible != toolbar.mItems[i].flexible ||
+          mItems[i].separator != toolbar.mItems[i].separator ||
+          mItems[i].key != toolbar.mItems[i].key ||
+          mItems[i].overflowLabel != toolbar.mItems[i].overflowLabel) {
+        return false;
+      }
+    }
+    return detail::sameChildren(children(), other.children());
+  }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] const std::vector<ToolbarItem>& items() const noexcept { return mItems; }
+  [[nodiscard]] float height() const noexcept { return mHeight; }
+
+ private:
+  static std::vector<ElementPtr> contentsOf(const std::vector<ToolbarItem>& items) {
+    std::vector<ElementPtr> content;
+    content.reserve(items.size());
+    for (const ToolbarItem& item: items) content.push_back(item.element);
+    return content;
+  }
+
+  std::shared_ptr<const graphics::Font> mFont;
+  std::vector<ToolbarItem> mItems;
+  float mHeight;
+};
+/** A left/right status strip with leading/trailing item slots. */
+class StatusBarElement final : public Element {
+ public:
+  StatusBarElement(std::shared_ptr<const graphics::Font> font, std::string left = {},
+    std::string right = {}, std::vector<ElementPtr> leading = {},
+    std::vector<ElementPtr> trailing = {}, std::string key = {})
+    : Element(std::move(key), join(leading, trailing)), mFont(std::move(font)),
+      mLeft(std::move(left)), mRight(std::move(right)), mLeadingCount(leading.size()),
+      mTrailingCount(trailing.size()) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::StatusBar; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::StatusBar || key() != other.key()) return false;
+    const auto& bar = static_cast<const StatusBarElement&>(other);
+    return mLeft == bar.mLeft && mRight == bar.mRight && mFont == bar.mFont &&
+      mLeadingCount == bar.mLeadingCount && mTrailingCount == bar.mTrailingCount &&
+      detail::sameChildren(children(), other.children());
+  }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] const std::string& leftText() const noexcept { return mLeft; }
+  [[nodiscard]] const std::string& rightText() const noexcept { return mRight; }
+  [[nodiscard]] size_t leadingCount() const noexcept { return mLeadingCount; }
+  [[nodiscard]] size_t trailingCount() const noexcept { return mTrailingCount; }
+
+ private:
+  static std::vector<ElementPtr> join(const std::vector<ElementPtr>& leading,
+      const std::vector<ElementPtr>& trailing) {
+    std::vector<ElementPtr> items = leading;
+    items.insert(items.end(), trailing.begin(), trailing.end());
+    return items;
+  }
+
+  std::shared_ptr<const graphics::Font> mFont;
+  std::string mLeft;
+  std::string mRight;
+  size_t mLeadingCount;
+  size_t mTrailingCount;
+};
+/** A dropdown select. */
+class SelectElement final : public Element {
+ public:
+  SelectElement(std::vector<std::string> options, std::shared_ptr<const graphics::Font> font,
+    int selected = -1, std::string placeholder = {}, std::function<void(int)> onChanged = {},
+    std::string key = {})
+    : Element(std::move(key)), mOptions(std::move(options)), mFont(std::move(font)),
+      mSelected(selected), mPlaceholder(std::move(placeholder)), mOnChanged(std::move(onChanged)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::Select; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::Select || key() != other.key()) return false;
+    const auto& select = static_cast<const SelectElement&>(other);
+    return mOptions == select.mOptions && mFont == select.mFont && mSelected == select.mSelected &&
+      mPlaceholder == select.mPlaceholder;
+  }
+  [[nodiscard]] const std::vector<std::string>& options() const noexcept { return mOptions; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] int selected() const noexcept { return mSelected; }
+  [[nodiscard]] const std::string& placeholder() const noexcept { return mPlaceholder; }
+  [[nodiscard]] const std::function<void(int)>& onChanged() const noexcept { return mOnChanged; }
+
+ private:
+  std::vector<std::string> mOptions;
+  std::shared_ptr<const graphics::Font> mFont;
+  int mSelected;
+  std::string mPlaceholder;
+  std::function<void(int)> mOnChanged;
+};
+
+/** An editable combo box. */
+class ComboBoxElement final : public Element {
+ public:
+  using ChangeHandler = std::function<void(int, std::string_view)>;
+
+  ComboBoxElement(std::vector<std::string> options, std::shared_ptr<const graphics::Font> font,
+    std::string text = {}, int selected = -1, std::string placeholder = {},
+    ChangeHandler onChanged = {}, std::string key = {})
+    : Element(std::move(key)), mOptions(std::move(options)), mFont(std::move(font)),
+      mText(std::move(text)), mSelected(selected), mPlaceholder(std::move(placeholder)),
+      mOnChanged(std::move(onChanged)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::ComboBox; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::ComboBox || key() != other.key()) return false;
+    const auto& combo = static_cast<const ComboBoxElement&>(other);
+    return mOptions == combo.mOptions && mFont == combo.mFont && mText == combo.mText &&
+      mSelected == combo.mSelected && mPlaceholder == combo.mPlaceholder;
+  }
+  [[nodiscard]] const std::vector<std::string>& options() const noexcept { return mOptions; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] const std::string& text() const noexcept { return mText; }
+  [[nodiscard]] int selected() const noexcept { return mSelected; }
+  [[nodiscard]] const std::string& placeholder() const noexcept { return mPlaceholder; }
+  [[nodiscard]] const ChangeHandler& onChanged() const noexcept { return mOnChanged; }
+
+ private:
+  std::vector<std::string> mOptions;
+  std::shared_ptr<const graphics::Font> mFont;
+  std::string mText;
+  int mSelected;
+  std::string mPlaceholder;
+  ChangeHandler mOnChanged;
+};
+
+/** A text field with a search affordance. */
+class SearchFieldElement final : public Element {
+ public:
+  SearchFieldElement(std::string placeholder, std::shared_ptr<const graphics::Font> font,
+    std::string text = {}, std::function<void(const std::string&)> onChanged = {},
+    std::function<void(const std::string&)> onSearch = {}, std::string key = {})
+    : Element(std::move(key)), mPlaceholder(std::move(placeholder)), mFont(std::move(font)),
+      mText(std::move(text)), mOnChanged(std::move(onChanged)), mOnSearch(std::move(onSearch)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::SearchField; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::SearchField || key() != other.key()) return false;
+    const auto& search = static_cast<const SearchFieldElement&>(other);
+    return mPlaceholder == search.mPlaceholder && mFont == search.mFont &&
+      mText == search.mText;
+  }
+  [[nodiscard]] const std::string& placeholder() const noexcept { return mPlaceholder; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] const std::string& text() const noexcept { return mText; }
+  [[nodiscard]] const std::function<void(const std::string&)>& onChanged() const noexcept {
+    return mOnChanged;
+  }
+  [[nodiscard]] const std::function<void(const std::string&)>& onSearch() const noexcept {
+    return mOnSearch;
+  }
+
+ private:
+  std::string mPlaceholder;
+  std::shared_ptr<const graphics::Font> mFont;
+  std::string mText;
+  std::function<void(const std::string&)> mOnChanged;
+  std::function<void(const std::string&)> mOnSearch;
+};
+
+/** A masked text field. */
+class PasswordFieldElement final : public Element {
+ public:
+  PasswordFieldElement(std::string placeholder, std::shared_ptr<const graphics::Font> font,
+    std::string text = {}, size_t maxLength = 0,
+    std::function<void(const std::string&)> onChanged = {}, std::string key = {})
+    : Element(std::move(key)), mPlaceholder(std::move(placeholder)), mFont(std::move(font)),
+      mText(std::move(text)), mMaxLength(maxLength), mOnChanged(std::move(onChanged)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::PasswordField; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::PasswordField || key() != other.key()) return false;
+    const auto& password = static_cast<const PasswordFieldElement&>(other);
+    return mPlaceholder == password.mPlaceholder && mFont == password.mFont &&
+      mText == password.mText && mMaxLength == password.mMaxLength;
+  }
+  [[nodiscard]] const std::string& placeholder() const noexcept { return mPlaceholder; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] const std::string& text() const noexcept { return mText; }
+  [[nodiscard]] size_t maxLength() const noexcept { return mMaxLength; }
+  [[nodiscard]] const std::function<void(const std::string&)>& onChanged() const noexcept {
+    return mOnChanged;
+  }
+
+ private:
+  std::string mPlaceholder;
+  std::shared_ptr<const graphics::Font> mFont;
+  std::string mText;
+  size_t mMaxLength;
+  std::function<void(const std::string&)> mOnChanged;
+};
+
+/** A formatted numeric field. */
+class NumberFieldElement final : public Element {
+ public:
+  NumberFieldElement(std::shared_ptr<const graphics::Font> font, double minimum, double maximum,
+    double value, double step = 1.0, int decimals = 0,
+    std::function<void(double)> onChanged = {}, std::string key = {})
+    : Element(std::move(key)), mFont(std::move(font)), mMinimum(minimum), mMaximum(maximum),
+      mValue(value), mStep(step), mDecimals(decimals), mOnChanged(std::move(onChanged)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::NumberField; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::NumberField || key() != other.key()) return false;
+    const auto& field = static_cast<const NumberFieldElement&>(other);
+    return mFont == field.mFont && mMinimum == field.mMinimum && mMaximum == field.mMaximum &&
+      mValue == field.mValue && mStep == field.mStep && mDecimals == field.mDecimals;
+  }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] double minimum() const noexcept { return mMinimum; }
+  [[nodiscard]] double maximum() const noexcept { return mMaximum; }
+  [[nodiscard]] double value() const noexcept { return mValue; }
+  [[nodiscard]] double step() const noexcept { return mStep; }
+  [[nodiscard]] int decimals() const noexcept { return mDecimals; }
+  [[nodiscard]] const std::function<void(double)>& onChanged() const noexcept { return mOnChanged; }
+
+ private:
+  std::shared_ptr<const graphics::Font> mFont;
+  double mMinimum;
+  double mMaximum;
+  double mValue;
+  double mStep;
+  int mDecimals;
+  std::function<void(double)> mOnChanged;
+};
+
+/** A token/tag editor. */
+class TagInputElement final : public Element {
+ public:
+  TagInputElement(std::shared_ptr<const graphics::Font> font, std::vector<std::string> tokens,
+    std::string placeholder = "Add tag",
+    std::function<void(const std::vector<std::string>&)> onChanged = {}, std::string key = {})
+    : Element(std::move(key)), mFont(std::move(font)), mTokens(std::move(tokens)),
+      mPlaceholder(std::move(placeholder)), mOnChanged(std::move(onChanged)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::TagInput; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::TagInput || key() != other.key()) return false;
+    const auto& tags = static_cast<const TagInputElement&>(other);
+    return mFont == tags.mFont && mTokens == tags.mTokens && mPlaceholder == tags.mPlaceholder;
+  }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] const std::vector<std::string>& tokens() const noexcept { return mTokens; }
+  [[nodiscard]] const std::string& placeholder() const noexcept { return mPlaceholder; }
+  [[nodiscard]] const std::function<void(const std::vector<std::string>&)>& onChanged() const noexcept {
+    return mOnChanged;
+  }
+
+ private:
+  std::shared_ptr<const graphics::Font> mFont;
+  std::vector<std::string> mTokens;
+  std::string mPlaceholder;
+  std::function<void(const std::vector<std::string>&)> mOnChanged;
+};
+
+/** A colour field with a swatch. */
+class ColorInputElement final : public Element {
+ public:
+  ColorInputElement(std::shared_ptr<const graphics::Font> font, Color color,
+    std::function<void(Color)> onChanged = {}, std::string key = {})
+    : Element(std::move(key)), mFont(std::move(font)), mColor(color),
+      mOnChanged(std::move(onChanged)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::ColorInput; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::ColorInput || key() != other.key()) return false;
+    const auto& input = static_cast<const ColorInputElement&>(other);
+    return mFont == input.mFont && mColor == input.mColor;
+  }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] Color color() const noexcept { return mColor; }
+  [[nodiscard]] const std::function<void(Color)>& onChanged() const noexcept { return mOnChanged; }
+
+ private:
+  std::shared_ptr<const graphics::Font> mFont;
+  Color mColor;
+  std::function<void(Color)> mOnChanged;
+};
+/** A vertical activity timeline. */
+class TimelineElement final : public Element {
+ public:
+  TimelineElement(std::vector<TimelineEntry> entries, std::shared_ptr<const graphics::Font> font,
+    std::string key = {})
+    : Element(std::move(key)), mEntries(std::move(entries)), mFont(std::move(font)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::Timeline; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::Timeline || key() != other.key()) return false;
+    const auto& timeline = static_cast<const TimelineElement&>(other);
+    if (mFont != timeline.mFont || mEntries.size() != timeline.mEntries.size()) return false;
+    for (size_t i = 0; i < mEntries.size(); ++i) {
+      const TimelineEntry& a = mEntries[i];
+      const TimelineEntry& b = timeline.mEntries[i];
+      if (a.title != b.title || a.detail != b.detail || a.time != b.time || a.state != b.state) {
+        return false;
+      }
+    }
+    return true;
+  }
+  [[nodiscard]] const std::vector<TimelineEntry>& entries() const noexcept { return mEntries; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+
+ private:
+  std::vector<TimelineEntry> mEntries;
+  std::shared_ptr<const graphics::Font> mFont;
+};
+
+/** A palette/HSV colour picker. */
+class ColorPickerElement final : public Element {
+ public:
+  ColorPickerElement(std::vector<Color> palette, ColorPickerMode mode, Color color, float alpha,
+    int selected, std::function<void(Color)> onChanged = {}, std::string key = {})
+    : Element(std::move(key)), mPalette(std::move(palette)), mMode(mode), mColor(color),
+      mAlpha(alpha), mSelected(selected), mOnChanged(std::move(onChanged)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::ColorPicker; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::ColorPicker || key() != other.key()) return false;
+    const auto& picker = static_cast<const ColorPickerElement&>(other);
+    return mPalette == picker.mPalette && mMode == picker.mMode && mColor == picker.mColor &&
+      mAlpha == picker.mAlpha && mSelected == picker.mSelected;
+  }
+  [[nodiscard]] const std::vector<Color>& palette() const noexcept { return mPalette; }
+  [[nodiscard]] ColorPickerMode mode() const noexcept { return mMode; }
+  [[nodiscard]] Color color() const noexcept { return mColor; }
+  [[nodiscard]] float alpha() const noexcept { return mAlpha; }
+  [[nodiscard]] int selected() const noexcept { return mSelected; }
+  [[nodiscard]] const std::function<void(Color)>& onChanged() const noexcept { return mOnChanged; }
+
+ private:
+  std::vector<Color> mPalette;
+  ColorPickerMode mMode;
+  Color mColor;
+  float mAlpha;
+  int mSelected;
+  std::function<void(Color)> mOnChanged;
+};
+
+/** An IME candidate list. */
+class CandidateListViewElement final : public Element {
+ public:
+  CandidateListViewElement(std::vector<std::string> candidates, size_t selected,
+    std::shared_ptr<const graphics::Font> font, std::string key = {})
+    : Element(std::move(key)), mCandidates(std::move(candidates)), mSelected(selected),
+      mFont(std::move(font)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override {
+    return ElementKind::CandidateListView;
+  }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::CandidateListView || key() != other.key()) return false;
+    const auto& list = static_cast<const CandidateListViewElement&>(other);
+    return mCandidates == list.mCandidates && mSelected == list.mSelected &&
+      mFont == list.mFont;
+  }
+  [[nodiscard]] const std::vector<std::string>& candidates() const noexcept { return mCandidates; }
+  [[nodiscard]] size_t selected() const noexcept { return mSelected; }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+
+ private:
+  std::vector<std::string> mCandidates;
+  size_t mSelected;
+  std::shared_ptr<const graphics::Font> mFont;
+};
+
+/** A scrolling table view with row activation. */
+class TableViewElement final : public Element {
+ public:
+  TableViewElement(std::vector<TableColumn> columns,
+    std::vector<std::vector<std::shared_ptr<coral::ui::Layer>>> rows,
+    std::shared_ptr<const graphics::Font> font, float gap = 0.0f, Insets padding = {},
+    int selected = -1,
+    std::function<void(int)> onRowActivated = {}, std::string key = {})
+    : Element(std::move(key)), mColumns(std::move(columns)), mRows(std::move(rows)),
+      mFont(std::move(font)), mGap(gap), mPadding(padding), mSelected(selected),
+      mOnRowActivated(std::move(onRowActivated)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::TableView; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::TableView || key() != other.key()) return false;
+    const auto& table = static_cast<const TableViewElement&>(other);
+    if (mFont != table.mFont || mGap != table.mGap || mSelected != table.mSelected ||
+        mColumns.size() != table.mColumns.size() || mRows.size() != table.mRows.size() ||
+        !detail::sameInsets(mPadding, table.mPadding)) {
+      return false;
+    }
+    for (size_t c = 0; c < mColumns.size(); ++c) {
+      if (mColumns[c].width != table.mColumns[c].width ||
+          mColumns[c].weight != table.mColumns[c].weight ||
+          mColumns[c].percent != table.mColumns[c].percent) {
+        return false;
+      }
+    }
+    for (size_t r = 0; r < mRows.size(); ++r) {
+      if (mRows[r].size() != table.mRows[r].size()) return false;
+      for (size_t c = 0; c < mRows[r].size(); ++c) {
+        if (mRows[r][c] != table.mRows[r][c]) return false;
+      }
+    }
+    return true;
+  }
+  [[nodiscard]] const std::vector<TableColumn>& columns() const noexcept { return mColumns; }
+  [[nodiscard]] const std::vector<std::vector<std::shared_ptr<Layer>>>& rows() const noexcept {
+    return mRows;
+  }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] float gap() const noexcept { return mGap; }
+  [[nodiscard]] const Insets& padding() const noexcept { return mPadding; }
+  [[nodiscard]] int selected() const noexcept { return mSelected; }
+  [[nodiscard]] const std::function<void(int)>& onRowActivated() const noexcept {
+    return mOnRowActivated;
+  }
+
+ private:
+  std::vector<TableColumn> mColumns;
+  std::vector<std::vector<std::shared_ptr<Layer>>> mRows;
+  std::shared_ptr<const graphics::Font> mFont;
+  float mGap;
+  Insets mPadding;
+  int mSelected;
+  std::function<void(int)> mOnRowActivated;
+};
+/** A date field with calendar popup. */
+class DateFieldElement final : public Element {
+ public:
+  DateFieldElement(std::shared_ptr<const graphics::Font> font,
+    std::chrono::year_month_day date = {}, std::function<void(std::chrono::year_month_day)> onChanged = {},
+    std::string key = {})
+    : Element(std::move(key)), mFont(std::move(font)), mDate(date), mOnChanged(std::move(onChanged)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::DateField; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::DateField || key() != other.key()) return false;
+    const auto& field = static_cast<const DateFieldElement&>(other);
+    return mFont == field.mFont && mDate == field.mDate;
+  }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] std::chrono::year_month_day date() const noexcept { return mDate; }
+  [[nodiscard]] const std::function<void(std::chrono::year_month_day)>& onChanged() const noexcept {
+    return mOnChanged;
+  }
+
+ private:
+  std::shared_ptr<const graphics::Font> mFont;
+  std::chrono::year_month_day mDate;
+  std::function<void(std::chrono::year_month_day)> mOnChanged;
+};
+
+/** A time field with picker popup. */
+class TimeFieldElement final : public Element {
+ public:
+  TimeFieldElement(std::shared_ptr<const graphics::Font> font, int hour = 0, int minute = 0,
+    std::optional<bool> use24HourClock = std::nullopt, std::function<void(int, int)> onChanged = {},
+    std::string key = {})
+    : Element(std::move(key)), mFont(std::move(font)), mHour(hour), mMinute(minute),
+      mUse24Hour(use24HourClock), mOnChanged(std::move(onChanged)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::TimeField; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::TimeField || key() != other.key()) return false;
+    const auto& field = static_cast<const TimeFieldElement&>(other);
+    return mFont == field.mFont && mHour == field.mHour && mMinute == field.mMinute &&
+      mUse24Hour == field.mUse24Hour;
+  }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] int hour() const noexcept { return mHour; }
+  [[nodiscard]] int minute() const noexcept { return mMinute; }
+  [[nodiscard]] const std::optional<bool>& use24HourClock() const noexcept { return mUse24Hour; }
+  [[nodiscard]] const std::function<void(int, int)>& onChanged() const noexcept { return mOnChanged; }
+
+ private:
+  std::shared_ptr<const graphics::Font> mFont;
+  int mHour;
+  int mMinute;
+  std::optional<bool> mUse24Hour;
+  std::function<void(int, int)> mOnChanged;
+};
+
+/** A combined date + time field. */
+class DateTimeFieldElement final : public Element {
+ public:
+  DateTimeFieldElement(std::shared_ptr<const graphics::Font> font,
+    std::chrono::year_month_day date = {}, int hour = 0, int minute = 0,
+    std::function<void(std::chrono::year_month_day, int, int)> onChanged = {}, std::string key = {})
+    : Element(std::move(key)), mFont(std::move(font)), mDate(date), mHour(hour), mMinute(minute),
+      mOnChanged(std::move(onChanged)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::DateTimeField; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::DateTimeField || key() != other.key()) return false;
+    const auto& field = static_cast<const DateTimeFieldElement&>(other);
+    return mFont == field.mFont && mDate == field.mDate && mHour == field.mHour &&
+      mMinute == field.mMinute;
+  }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] std::chrono::year_month_day date() const noexcept { return mDate; }
+  [[nodiscard]] int hour() const noexcept { return mHour; }
+  [[nodiscard]] int minute() const noexcept { return mMinute; }
+  [[nodiscard]] const std::function<void(std::chrono::year_month_day, int, int)>& onChanged()
+    const noexcept {
+    return mOnChanged;
+  }
+
+ private:
+  std::shared_ptr<const graphics::Font> mFont;
+  std::chrono::year_month_day mDate;
+  int mHour;
+  int mMinute;
+  std::function<void(std::chrono::year_month_day, int, int)> mOnChanged;
+};
+
+/** A date range field. */
+class DateRangeFieldElement final : public Element {
+ public:
+  DateRangeFieldElement(std::shared_ptr<const graphics::Font> font,
+    std::chrono::year_month_day start = {}, std::chrono::year_month_day end = {},
+    std::function<void(std::chrono::year_month_day, std::chrono::year_month_day)> onChanged = {},
+    std::string key = {})
+    : Element(std::move(key)), mFont(std::move(font)), mStart(start), mEnd(end),
+      mOnChanged(std::move(onChanged)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::DateRangeField; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::DateRangeField || key() != other.key()) return false;
+    const auto& field = static_cast<const DateRangeFieldElement&>(other);
+    return mFont == field.mFont && mStart == field.mStart && mEnd == field.mEnd;
+  }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] std::chrono::year_month_day start() const noexcept { return mStart; }
+  [[nodiscard]] std::chrono::year_month_day end() const noexcept { return mEnd; }
+  [[nodiscard]] const std::function<void(std::chrono::year_month_day, std::chrono::year_month_day)>&
+    onChanged() const noexcept {
+    return mOnChanged;
+  }
+
+ private:
+  std::shared_ptr<const graphics::Font> mFont;
+  std::chrono::year_month_day mStart;
+  std::chrono::year_month_day mEnd;
+  std::function<void(std::chrono::year_month_day, std::chrono::year_month_day)> mOnChanged;
+};
+
+/** A time range field. */
+class TimeRangeFieldElement final : public Element {
+ public:
+  TimeRangeFieldElement(std::shared_ptr<const graphics::Font> font, int startHour = 0,
+    int startMinute = 0, int endHour = 1, int endMinute = 0,
+    std::function<void(int, int, int, int)> onChanged = {}, std::string key = {})
+    : Element(std::move(key)), mFont(std::move(font)), mStartHour(startHour),
+      mStartMinute(startMinute), mEndHour(endHour), mEndMinute(endMinute),
+      mOnChanged(std::move(onChanged)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::TimeRangeField; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::TimeRangeField || key() != other.key()) return false;
+    const auto& field = static_cast<const TimeRangeFieldElement&>(other);
+    return mFont == field.mFont && mStartHour == field.mStartHour &&
+      mStartMinute == field.mStartMinute && mEndHour == field.mEndHour &&
+      mEndMinute == field.mEndMinute;
+  }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] int startHour() const noexcept { return mStartHour; }
+  [[nodiscard]] int startMinute() const noexcept { return mStartMinute; }
+  [[nodiscard]] int endHour() const noexcept { return mEndHour; }
+  [[nodiscard]] int endMinute() const noexcept { return mEndMinute; }
+  [[nodiscard]] const std::function<void(int, int, int, int)>& onChanged() const noexcept {
+    return mOnChanged;
+  }
+
+ private:
+  std::shared_ptr<const graphics::Font> mFont;
+  int mStartHour;
+  int mStartMinute;
+  int mEndHour;
+  int mEndMinute;
+  std::function<void(int, int, int, int)> mOnChanged;
+};
+
+/** A compact time picker. */
+class TimePickerElement final : public Element {
+ public:
+  TimePickerElement(std::shared_ptr<const graphics::Font> font, int hour, int minute,
+    bool use24HourClock = true, std::function<void(int, int)> onChanged = {},
+    std::function<void()> onCancel = {}, std::function<void()> onDone = {}, std::string key = {})
+    : Element(std::move(key)), mFont(std::move(font)), mHour(hour), mMinute(minute),
+      mUse24Hour(use24HourClock), mOnChanged(std::move(onChanged)), mOnCancel(std::move(onCancel)),
+      mOnDone(std::move(onDone)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::TimePicker; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::TimePicker || key() != other.key()) return false;
+    const auto& picker = static_cast<const TimePickerElement&>(other);
+    return mFont == picker.mFont && mHour == picker.mHour && mMinute == picker.mMinute &&
+      mUse24Hour == picker.mUse24Hour;
+  }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] int hour() const noexcept { return mHour; }
+  [[nodiscard]] int minute() const noexcept { return mMinute; }
+  [[nodiscard]] bool use24HourClock() const noexcept { return mUse24Hour; }
+  [[nodiscard]] const std::function<void(int, int)>& onChanged() const noexcept { return mOnChanged; }
+  [[nodiscard]] const std::function<void()>& onCancel() const noexcept { return mOnCancel; }
+  [[nodiscard]] const std::function<void()>& onDone() const noexcept { return mOnDone; }
+
+ private:
+  std::shared_ptr<const graphics::Font> mFont;
+  int mHour;
+  int mMinute;
+  bool mUse24Hour;
+  std::function<void(int, int)> mOnChanged;
+  std::function<void()> mOnCancel;
+  std::function<void()> mOnDone;
+};
+/** One node in a declarative tree. */
+struct TreeNodeSpec {
+  std::string label;
+  std::string detail;
+  bool folder = false;
+  bool expanded = true;
+  std::shared_ptr<const graphics::Image> icon;
+  std::vector<TreeNodeSpec> children;
+};
+
+/** A hierarchical tree with stable path-based selection. */
+class TreeViewElement final : public Element {
+ public:
+  using PathHandler = std::function<void(const std::vector<std::size_t>&, std::string_view)>;
+
+  TreeViewElement(std::shared_ptr<const graphics::Font> font, std::vector<TreeNodeSpec> roots,
+    float rowHeight = 28.0f, std::vector<std::size_t> selected = {}, PathHandler onSelected = {},
+    PathHandler onActivated = {}, std::string key = {})
+    : Element(std::move(key)), mFont(std::move(font)), mRoots(std::move(roots)),
+      mRowHeight(rowHeight), mSelected(std::move(selected)), mOnSelected(std::move(onSelected)),
+      mOnActivated(std::move(onActivated)), mPaths(buildPaths(mRoots)) {
+  }
+
+  [[nodiscard]] ElementKind kind() const noexcept override { return ElementKind::TreeView; }
+  [[nodiscard]] bool measureEquivalent(const Element& other) const override {
+    if (other.kind() != ElementKind::TreeView || key() != other.key()) return false;
+    const auto& tree = static_cast<const TreeViewElement&>(other);
+    return mFont == tree.mFont && mRowHeight == tree.mRowHeight && mSelected == tree.mSelected &&
+      sameNodes(mRoots, tree.mRoots);
+  }
+  [[nodiscard]] const std::shared_ptr<const graphics::Font>& font() const noexcept { return mFont; }
+  [[nodiscard]] const std::vector<TreeNodeSpec>& roots() const noexcept { return mRoots; }
+  [[nodiscard]] float rowHeight() const noexcept { return mRowHeight; }
+  [[nodiscard]] const std::vector<std::size_t>& selected() const noexcept { return mSelected; }
+  [[nodiscard]] int selectedId() const noexcept {
+    for (std::size_t i = 0; i < mPaths->size(); ++i) {
+      if ((*mPaths)[i] == mSelected) return static_cast<int>(i);
+    }
+    return -1;
+  }
+  [[nodiscard]] const std::shared_ptr<const std::vector<std::vector<std::size_t>>>& paths()
+    const noexcept {
+    return mPaths;
+  }
+  [[nodiscard]] const PathHandler& onSelected() const noexcept { return mOnSelected; }
+  [[nodiscard]] const PathHandler& onActivated() const noexcept { return mOnActivated; }
+
+ private:
+  static bool sameNodes(const std::vector<TreeNodeSpec>& a, const std::vector<TreeNodeSpec>& b) {
+    if (a.size() != b.size()) return false;
+    for (std::size_t i = 0; i < a.size(); ++i) {
+      if (a[i].label != b[i].label || a[i].detail != b[i].detail ||
+          a[i].folder != b[i].folder || a[i].expanded != b[i].expanded ||
+          a[i].icon != b[i].icon || !sameNodes(a[i].children, b[i].children)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  static std::shared_ptr<const std::vector<std::vector<std::size_t>>> buildPaths(
+      const std::vector<TreeNodeSpec>& roots) {
+    auto paths = std::make_shared<std::vector<std::vector<std::size_t>>>();
+    const auto walk = [&paths](const auto& self, const std::vector<TreeNodeSpec>& nodes,
+                         const std::vector<std::size_t>& prefix) -> void {
+      for (std::size_t i = 0; i < nodes.size(); ++i) {
+        std::vector<std::size_t> path = prefix;
+        path.push_back(i);
+        paths->push_back(path);
+        self(self, nodes[i].children, path);
+      }
+    };
+    walk(walk, roots, {});
+    return paths;
+  }
+
+  std::shared_ptr<const graphics::Font> mFont;
+  std::vector<TreeNodeSpec> mRoots;
+  float mRowHeight;
+  std::vector<std::size_t> mSelected;
+  PathHandler mOnSelected;
+  PathHandler mOnActivated;
+  std::shared_ptr<const std::vector<std::vector<std::size_t>>> mPaths;
+};
 /** A flex container; the element-level equivalent of `ui::Flex`. */
 class StackElement final : public Element {
  public:
@@ -1227,6 +3225,466 @@ template <class T, class Build>
     std::move(key), std::move(rowSnapshot));
 }
 
+/** Builds a horizontal or vertical rule. */
+[[nodiscard]] inline ElementPtr Divider(Divider::Orientation orientation = Divider::Orientation::Horizontal,
+    float thickness = 1.0f, float inset = 0.0f, std::optional<Color> color = {},
+    std::string key = {}) {
+  return std::make_shared<DividerElement>(orientation, thickness, inset, color, std::move(key));
+}
+
+/** Builds a keyboard shortcut cap. */
+[[nodiscard]] inline ElementPtr Kbd(std::string label,
+    std::shared_ptr<const graphics::Font> font, std::string key = {}) {
+  return std::make_shared<KbdElement>(std::move(label), std::move(font), std::move(key));
+}
+
+/** Builds a status/count pill. */
+[[nodiscard]] inline ElementPtr Badge(std::string text,
+    std::shared_ptr<const graphics::Font> font, bool dot = false,
+    std::shared_ptr<const graphics::Image> icon = {}, std::string key = {}) {
+  return std::make_shared<BadgeElement>(std::move(text), std::move(font), dot, std::move(icon),
+    std::move(key));
+}
+
+/** Builds a square tinted image. */
+[[nodiscard]] inline ElementPtr Icon(std::shared_ptr<const graphics::Image> image = {},
+    float size = 20.0f, std::optional<Color> color = {}, std::string key = {}) {
+  return std::make_shared<IconElement>(std::move(image), size, color, std::move(key));
+}
+
+/** Builds a round initials/image avatar. */
+[[nodiscard]] inline ElementPtr Avatar(std::string initials,
+    std::shared_ptr<const graphics::Font> font, float size = 32.0f,
+    std::shared_ptr<const graphics::Image> image = {}, bool statusVisible = false,
+    std::optional<Color> statusColor = {}, std::string key = {}) {
+  return std::make_shared<AvatarElement>(std::move(initials), std::move(font), size,
+    std::move(image), statusVisible, statusColor, std::move(key));
+}
+
+/** Builds an overlapping row of avatars. */
+[[nodiscard]] inline ElementPtr AvatarGroup(std::vector<std::string> initials,
+    std::shared_ptr<const graphics::Font> font, int maxVisible = 4, float size = 28.0f,
+    std::string key = {}) {
+  return std::make_shared<AvatarGroupElement>(std::move(initials), std::move(font), maxVisible, size,
+    std::move(key));
+}
+
+/** Builds a loading placeholder. */
+[[nodiscard]] inline ElementPtr Skeleton(float width = 160.0f, float height = 14.0f, int lines = 1,
+    float lineGap = 6.0f, Skeleton::Shape shape = Skeleton::Shape::Rounded, bool animating = true,
+    std::string key = {}) {
+  return std::make_shared<SkeletonElement>(width, height, lines, lineGap, shape, animating,
+    std::move(key));
+}
+
+/** Builds a dashboard statistic. */
+[[nodiscard]] inline ElementPtr Stat(std::string label, std::string value,
+    std::shared_ptr<const graphics::Font> font, std::string caption = {},
+    StatTrend trend = StatTrend::None, std::string key = {}) {
+  return std::make_shared<StatElement>(std::move(label), std::move(value), std::move(font),
+    std::move(caption), trend, std::move(key));
+}
+
+/** Builds a low/high meter. */
+[[nodiscard]] inline ElementPtr Meter(double minimum = 0.0, double maximum = 1.0, double value = 0.0,
+    std::string key = {}) {
+  return std::make_shared<MeterElement>(minimum, maximum, value, std::move(key));
+}
+
+/** Builds a circular progress indicator. */
+[[nodiscard]] inline ElementPtr ProgressRing(float size = 36.0f, double value = 0.0,
+    float thickness = 4.0f, bool indeterminate = false, std::string key = {}) {
+  return std::make_shared<ProgressRingElement>(size, value, thickness, indeterminate,
+    std::move(key));
+}
+
+/** Builds a coloured status dot with a label. */
+[[nodiscard]] inline ElementPtr StatusIndicator(std::string label,
+    std::shared_ptr<const graphics::Font> font, StatusKind status = StatusKind::Online,
+    std::string key = {}) {
+  return std::make_shared<StatusIndicatorElement>(std::move(label), std::move(font), status,
+    std::move(key));
+}
+
+/** Builds a numbered step trail. */
+[[nodiscard]] inline ElementPtr StepIndicator(std::vector<std::string> steps,
+    std::shared_ptr<const graphics::Font> font, int current = 0,
+    StepIndicatorElement::ChangeHandler onChanged = {}, std::string key = {}) {
+  return std::make_shared<StepIndicatorElement>(std::move(steps), std::move(font), current,
+    std::move(onChanged), std::move(key));
+}
+
+/** Builds a label/value settings row. */
+[[nodiscard]] inline ElementPtr PropertyRow(std::string label, std::string value,
+    std::shared_ptr<const graphics::Font> font, std::string help = {}, float labelWidth = 0.0f,
+    std::string key = {}) {
+  return std::make_shared<PropertyRowElement>(std::move(label), std::move(value), std::move(font),
+    std::move(help), labelWidth, std::move(key));
+}
+
+/** Builds a single-line tag list. */
+[[nodiscard]] inline ElementPtr TagList(std::vector<std::string> tags,
+    std::shared_ptr<const graphics::Font> font, int maxVisible = 4, std::string key = {}) {
+  return std::make_shared<TagListElement>(std::move(tags), std::move(font), maxVisible,
+    std::move(key));
+}
+/** Builds an inline text link. */
+[[nodiscard]] inline ElementPtr Link(std::string text,
+    std::shared_ptr<const graphics::Font> font, std::function<void()> onActivate = {},
+    std::string key = {}) {
+  return std::make_shared<LinkElement>(std::move(text), std::move(font), std::move(onActivate),
+    std::move(key));
+}
+
+/** Builds a compact tag/chip. */
+[[nodiscard]] inline ElementPtr Chip(std::string text,
+    std::shared_ptr<const graphics::Font> font, ChipVariant variant = ChipVariant::Neutral,
+    std::shared_ptr<const graphics::Image> icon = {}, bool removable = false, bool selected = false,
+    std::function<void()> onRemove = {}, std::string key = {}) {
+  return std::make_shared<ChipElement>(std::move(text), std::move(font), variant, std::move(icon),
+    removable, selected, std::move(onRemove), std::move(key));
+}
+
+/** Builds a star rating. */
+[[nodiscard]] inline ElementPtr Rating(int stars = 5, double rating = 0.0, bool halfSteps = false,
+    bool readOnly = false, std::function<void(double)> onChanged = {}, std::string key = {}) {
+  return std::make_shared<RatingElement>(stars, rating, halfSteps, readOnly, std::move(onChanged),
+    std::move(key));
+}
+
+/** Builds a numeric stepper. */
+[[nodiscard]] inline ElementPtr Stepper(double minimum, double maximum, double value,
+    double step = 1.0, std::function<void(double)> onChanged = {}, std::string key = {}) {
+  return std::make_shared<StepperElement>(minimum, maximum, value, step, std::move(onChanged),
+    std::move(key));
+}
+
+/** Builds a two-handle range slider. */
+[[nodiscard]] inline ElementPtr RangeSlider(double minimum = 0.0, double maximum = 1.0,
+    double low = 0.25, double high = 0.75, double step = 0.01,
+    std::function<void(double, double)> onChanged = {}, std::string key = {}) {
+  return std::make_shared<RangeSliderElement>(minimum, maximum, low, high, step,
+    std::move(onChanged), std::move(key));
+}
+
+/** Builds a numbered page selector. */
+[[nodiscard]] inline ElementPtr Pagination(std::shared_ptr<const graphics::Font> font,
+    int pageCount = 1, int page = 0, std::function<void(int)> onChanged = {}, std::string key = {}) {
+  return std::make_shared<PaginationElement>(std::move(font), pageCount, page, std::move(onChanged),
+    std::move(key));
+}
+
+/** Builds a toggle button. */
+[[nodiscard]] inline ElementPtr ToggleButton(std::string label,
+    std::shared_ptr<const graphics::Font> font, bool selected = false,
+    std::function<void(bool)> onChanged = {}, std::string key = {}) {
+  return std::make_shared<ToggleButtonElement>(std::move(label), std::move(font), selected,
+    std::move(onChanged), std::move(key));
+}
+
+/** Builds a clickable breadcrumb trail. */
+[[nodiscard]] inline ElementPtr Breadcrumb(std::vector<std::string> items,
+    std::shared_ptr<const graphics::Font> font, std::string separator = "/", int currentIndex = -1,
+    BreadcrumbElement::SelectHandler onSelect = {}, std::string key = {}) {
+  return std::make_shared<BreadcrumbElement>(std::move(items), std::move(font),
+    std::move(separator), currentIndex, std::move(onSelect), std::move(key));
+}
+
+/** Builds a severity banner. */
+[[nodiscard]] inline ElementPtr Banner(std::string text,
+    std::shared_ptr<const graphics::Font> font, BannerSeverity severity = BannerSeverity::Info,
+    std::string actionLabel = {}, std::function<void()> onAction = {}, bool dismissible = false,
+    std::shared_ptr<const graphics::Image> icon = {}, std::function<void()> onDismiss = {},
+    std::string key = {}) {
+  return std::make_shared<BannerElement>(std::move(text), std::move(font), severity,
+    std::move(actionLabel), std::move(onAction), dismissible, std::move(icon), std::move(onDismiss),
+    std::move(key));
+}
+
+/** Builds a client-side title bar. */
+[[nodiscard]] inline ElementPtr TitleBar(std::string title,
+    std::shared_ptr<const graphics::Font> font, std::function<void()> onMinimize = {},
+    std::function<void()> onMaximize = {}, std::function<void()> onClose = {},
+    bool showMinimize = true, bool showMaximize = true, bool showClose = true,
+    std::string key = {}) {
+  return std::make_shared<TitleBarElement>(std::move(title), std::move(font),
+    std::move(onMinimize), std::move(onMaximize), std::move(onClose), showMinimize, showMaximize,
+    showClose, std::move(key));
+}
+
+/** Builds a primary action with an options dropdown. */
+[[nodiscard]] inline ElementPtr SplitButton(std::string text,
+    std::shared_ptr<const graphics::Font> font, std::vector<std::string> options = {},
+    std::function<void()> onClick = {}, SplitButtonElement::OptionHandler onOption = {},
+    std::string key = {}) {
+  return std::make_shared<SplitButtonElement>(std::move(text), std::move(font),
+    std::move(options), std::move(onClick), std::move(onOption), std::move(key));
+}
+
+/** Builds a drop target. */
+[[nodiscard]] inline ElementPtr DropZone(std::string label,
+    std::shared_ptr<const graphics::Font> font,
+    std::function<void(std::vector<std::string>)> onFilesDropped = {},
+    std::function<void(std::string)> onTextDropped = {}, std::string key = {}) {
+  return std::make_shared<DropZoneElement>(std::move(label), std::move(font),
+    std::move(onFilesDropped), std::move(onTextDropped), std::move(key));
+}
+
+/** Builds a month calendar. */
+[[nodiscard]] inline ElementPtr Calendar(std::chrono::year_month_day date,
+    std::shared_ptr<const graphics::Font> font, int firstWeekday = 0,
+    std::function<void(std::chrono::year_month_day)> onSelect = {},
+    std::function<void()> onCancel = {}, std::string key = {}) {
+  return std::make_shared<CalendarElement>(date, std::move(font), firstWeekday,
+    std::move(onSelect), std::move(onCancel), std::move(key));
+}
+/** Builds a styled rich-text document. */
+[[nodiscard]] inline ElementPtr StyledText(TextDocument document = {},
+    std::function<void(std::string_view)> onLinkActivated = {}, std::string key = {}) {
+  return std::make_shared<StyledTextElement>(std::move(document), std::move(onLinkActivated),
+    std::move(key));
+}
+/** Builds a multi-select toggle group. */
+[[nodiscard]] inline ElementPtr ToggleGroup(std::vector<std::string> options,
+    std::shared_ptr<const graphics::Font> font, std::vector<int> selected = {},
+    ToggleGroupElement::ChangeHandler onChanged = {}, std::string key = {}) {
+  return std::make_shared<ToggleGroupElement>(std::move(options), std::move(font),
+    std::move(selected), std::move(onChanged), std::move(key));
+}
+
+/** Builds an exclusive radio group. */
+[[nodiscard]] inline ElementPtr RadioGroup(std::vector<std::string> options,
+    std::shared_ptr<const graphics::Font> font, int selected = 0,
+    std::function<void(int)> onChanged = {}, std::string key = {}) {
+  return std::make_shared<RadioGroupElement>(std::move(options), std::move(font), selected,
+    std::move(onChanged), std::move(key));
+}
+
+/** Builds a multi-select check box group. */
+[[nodiscard]] inline ElementPtr CheckBoxGroup(std::vector<std::string> options,
+    std::shared_ptr<const graphics::Font> font, std::vector<int> selected = {},
+    CheckBoxGroupElement::ChangeHandler onChanged = {}, std::string key = {}) {
+  return std::make_shared<CheckBoxGroupElement>(std::move(options), std::move(font),
+    std::move(selected), std::move(onChanged), std::move(key));
+}
+
+/** Builds a dropdown multi-select. */
+[[nodiscard]] inline ElementPtr MultiSelect(std::vector<std::string> options,
+    std::shared_ptr<const graphics::Font> font, std::vector<int> selected = {},
+    std::string placeholder = {}, MultiSelectElement::ChangeHandler onChanged = {},
+    std::string key = {}) {
+  return std::make_shared<MultiSelectElement>(std::move(options), std::move(font),
+    std::move(selected), std::move(placeholder), std::move(onChanged), std::move(key));
+}
+/** Builds a titled card. */
+[[nodiscard]] inline ElementPtr Card(std::string title,
+    std::shared_ptr<const graphics::Font> font, ElementPtr content = {},
+    ElementPtr headerAction = {}, std::string key = {}) {
+  return std::make_shared<CardElement>(std::move(title), std::move(font), std::move(content),
+    std::move(headerAction), std::move(key));
+}
+
+/** Builds a collapsible section. */
+[[nodiscard]] inline ElementPtr Expander(std::string title,
+    std::shared_ptr<const graphics::Font> font, ElementPtr content = {}, bool expanded = true,
+    std::function<void(bool)> onChanged = {}, std::string key = {}) {
+  return std::make_shared<ExpanderElement>(std::move(title), std::move(font), std::move(content),
+    expanded, std::move(onChanged), std::move(key));
+}
+
+/** Builds a labelled form row. */
+[[nodiscard]] inline ElementPtr FormField(std::string label,
+    std::shared_ptr<const graphics::Font> font, ElementPtr content = {}, std::string help = {},
+    std::string error = {}, std::string key = {}) {
+  return std::make_shared<FormFieldElement>(std::move(label), std::move(font), std::move(content),
+    std::move(help), std::move(error), std::move(key));
+}
+
+/** Builds a section header. */
+[[nodiscard]] inline ElementPtr SectionHeader(std::string title,
+    std::shared_ptr<const graphics::Font> font, std::string subtitle = {}, ElementPtr action = {},
+    std::string key = {}) {
+  return std::make_shared<SectionHeaderElement>(std::move(title), std::move(font),
+    std::move(subtitle), std::move(action), std::move(key));
+}
+
+/** Builds an empty-state panel. */
+[[nodiscard]] inline ElementPtr EmptyState(std::string title,
+    std::shared_ptr<const graphics::Font> font, std::string description = {},
+    ElementPtr content = {}, ElementPtr action = {},
+    std::shared_ptr<const graphics::Image> icon = {}, std::string key = {}) {
+  return std::make_shared<EmptyStateElement>(std::move(title), std::move(font),
+    std::move(description), std::move(content), std::move(action), std::move(icon),
+    std::move(key));
+}
+/** Builds a two-pane split view. */
+[[nodiscard]] inline ElementPtr SplitView(Axis axis, float fraction, ElementPtr first,
+    ElementPtr second, std::function<void(float)> onFractionChanged = {}, std::string key = {}) {
+  return std::make_shared<SplitViewElement>(axis, fraction, std::move(first), std::move(second),
+    std::move(onFractionChanged), std::move(key));
+}
+/** Builds a tab bar. */
+[[nodiscard]] inline ElementPtr TabBar(std::shared_ptr<const graphics::Font> font,
+    std::vector<TabItem> tabs, int active = 0, std::function<void(int)> onChanged = {},
+    std::string key = {}) {
+  return std::make_shared<TabBarElement>(std::move(font), std::move(tabs), active,
+    std::move(onChanged), std::move(key));
+}
+/** Builds a horizontal toolbar. */
+[[nodiscard]] inline ElementPtr Toolbar(std::shared_ptr<const graphics::Font> font,
+    std::vector<ToolbarItem> items, float height = 44.0f, std::string key = {}) {
+  return std::make_shared<ToolbarElement>(std::move(font), std::move(items), height,
+    std::move(key));
+}
+/** Builds a status bar. */
+[[nodiscard]] inline ElementPtr StatusBar(std::shared_ptr<const graphics::Font> font,
+    std::string left = {}, std::string right = {}, std::vector<ElementPtr> leading = {},
+    std::vector<ElementPtr> trailing = {}, std::string key = {}) {
+  return std::make_shared<StatusBarElement>(std::move(font), std::move(left), std::move(right),
+    std::move(leading), std::move(trailing), std::move(key));
+}
+/** Builds a dropdown select. */
+[[nodiscard]] inline ElementPtr Select(std::vector<std::string> options,
+    std::shared_ptr<const graphics::Font> font, int selected = -1, std::string placeholder = {},
+    std::function<void(int)> onChanged = {}, std::string key = {}) {
+  return std::make_shared<SelectElement>(std::move(options), std::move(font), selected,
+    std::move(placeholder), std::move(onChanged), std::move(key));
+}
+
+/** Builds an editable combo box. */
+[[nodiscard]] inline ElementPtr ComboBox(std::vector<std::string> options,
+    std::shared_ptr<const graphics::Font> font, std::string text = {}, int selected = -1,
+    std::string placeholder = {}, ComboBoxElement::ChangeHandler onChanged = {},
+    std::string key = {}) {
+  return std::make_shared<ComboBoxElement>(std::move(options), std::move(font), std::move(text),
+    selected, std::move(placeholder), std::move(onChanged), std::move(key));
+}
+
+/** Builds a search field. */
+[[nodiscard]] inline ElementPtr SearchField(std::string placeholder,
+    std::shared_ptr<const graphics::Font> font, std::string text = {},
+    std::function<void(const std::string&)> onChanged = {},
+    std::function<void(const std::string&)> onSearch = {}, std::string key = {}) {
+  return std::make_shared<SearchFieldElement>(std::move(placeholder), std::move(font),
+    std::move(text), std::move(onChanged), std::move(onSearch), std::move(key));
+}
+
+/** Builds a masked password field. */
+[[nodiscard]] inline ElementPtr PasswordField(std::string placeholder,
+    std::shared_ptr<const graphics::Font> font, std::string text = {}, size_t maxLength = 0,
+    std::function<void(const std::string&)> onChanged = {}, std::string key = {}) {
+  return std::make_shared<PasswordFieldElement>(std::move(placeholder), std::move(font),
+    std::move(text), maxLength, std::move(onChanged), std::move(key));
+}
+
+/** Builds a numeric field. */
+[[nodiscard]] inline ElementPtr NumberField(std::shared_ptr<const graphics::Font> font,
+    double minimum, double maximum, double value, double step = 1.0, int decimals = 0,
+    std::function<void(double)> onChanged = {}, std::string key = {}) {
+  return std::make_shared<NumberFieldElement>(std::move(font), minimum, maximum, value, step,
+    decimals, std::move(onChanged), std::move(key));
+}
+
+/** Builds a token/tag editor. */
+[[nodiscard]] inline ElementPtr TagInput(std::shared_ptr<const graphics::Font> font,
+    std::vector<std::string> tokens, std::string placeholder = "Add tag",
+    std::function<void(const std::vector<std::string>&)> onChanged = {}, std::string key = {}) {
+  return std::make_shared<TagInputElement>(std::move(font), std::move(tokens),
+    std::move(placeholder), std::move(onChanged), std::move(key));
+}
+
+/** Builds a colour field. */
+[[nodiscard]] inline ElementPtr ColorInput(std::shared_ptr<const graphics::Font> font, Color color,
+    std::function<void(Color)> onChanged = {}, std::string key = {}) {
+  return std::make_shared<ColorInputElement>(std::move(font), color, std::move(onChanged),
+    std::move(key));
+}
+/** Builds a vertical timeline. */
+[[nodiscard]] inline ElementPtr Timeline(std::vector<TimelineEntry> entries,
+    std::shared_ptr<const graphics::Font> font, std::string key = {}) {
+  return std::make_shared<TimelineElement>(std::move(entries), std::move(font), std::move(key));
+}
+
+/** Builds a colour picker. */
+[[nodiscard]] inline ElementPtr ColorPicker(std::vector<Color> palette, ColorPickerMode mode,
+    Color color, float alpha, int selected, std::function<void(Color)> onChanged = {},
+    std::string key = {}) {
+  return std::make_shared<ColorPickerElement>(std::move(palette), mode, color, alpha, selected,
+    std::move(onChanged), std::move(key));
+}
+
+/** Builds an IME candidate list. */
+[[nodiscard]] inline ElementPtr CandidateListView(std::vector<std::string> candidates,
+    size_t selected, std::shared_ptr<const graphics::Font> font, std::string key = {}) {
+  return std::make_shared<CandidateListViewElement>(std::move(candidates), selected,
+    std::move(font), std::move(key));
+}
+
+/** Builds a scrolling table view. */
+[[nodiscard]] inline ElementPtr TableView(std::vector<TableColumn> columns,
+    std::vector<std::vector<std::shared_ptr<coral::ui::Layer>>> rows,
+    std::shared_ptr<const graphics::Font> font, float gap = 0.0f, Insets padding = {},
+    int selected = -1,
+    std::function<void(int)> onRowActivated = {}, std::string key = {}) {
+  return std::make_shared<TableViewElement>(std::move(columns), std::move(rows), std::move(font),
+    gap, padding, selected, std::move(onRowActivated), std::move(key));
+}
+/** Builds a date field. */
+[[nodiscard]] inline ElementPtr DateField(std::shared_ptr<const graphics::Font> font,
+    std::chrono::year_month_day date = {},
+    std::function<void(std::chrono::year_month_day)> onChanged = {}, std::string key = {}) {
+  return std::make_shared<DateFieldElement>(std::move(font), date, std::move(onChanged),
+    std::move(key));
+}
+
+/** Builds a time field. */
+[[nodiscard]] inline ElementPtr TimeField(std::shared_ptr<const graphics::Font> font, int hour = 0,
+    int minute = 0, std::optional<bool> use24HourClock = std::nullopt,
+    std::function<void(int, int)> onChanged = {}, std::string key = {}) {
+  return std::make_shared<TimeFieldElement>(std::move(font), hour, minute, use24HourClock,
+    std::move(onChanged), std::move(key));
+}
+
+/** Builds a combined date + time field. */
+[[nodiscard]] inline ElementPtr DateTimeField(std::shared_ptr<const graphics::Font> font,
+    std::chrono::year_month_day date = {}, int hour = 0, int minute = 0,
+    std::function<void(std::chrono::year_month_day, int, int)> onChanged = {}, std::string key = {}) {
+  return std::make_shared<DateTimeFieldElement>(std::move(font), date, hour, minute,
+    std::move(onChanged), std::move(key));
+}
+
+/** Builds a date range field. */
+[[nodiscard]] inline ElementPtr DateRangeField(std::shared_ptr<const graphics::Font> font,
+    std::chrono::year_month_day start = {}, std::chrono::year_month_day end = {},
+    std::function<void(std::chrono::year_month_day, std::chrono::year_month_day)> onChanged = {},
+    std::string key = {}) {
+  return std::make_shared<DateRangeFieldElement>(std::move(font), start, end, std::move(onChanged),
+    std::move(key));
+}
+
+/** Builds a time range field. */
+[[nodiscard]] inline ElementPtr TimeRangeField(std::shared_ptr<const graphics::Font> font,
+    int startHour = 0, int startMinute = 0, int endHour = 1, int endMinute = 0,
+    std::function<void(int, int, int, int)> onChanged = {}, std::string key = {}) {
+  return std::make_shared<TimeRangeFieldElement>(std::move(font), startHour, startMinute, endHour,
+    endMinute, std::move(onChanged), std::move(key));
+}
+
+/** Builds a compact time picker. */
+[[nodiscard]] inline ElementPtr TimePicker(std::shared_ptr<const graphics::Font> font, int hour,
+    int minute, bool use24HourClock = true, std::function<void(int, int)> onChanged = {},
+    std::function<void()> onCancel = {}, std::function<void()> onDone = {}, std::string key = {}) {
+  return std::make_shared<TimePickerElement>(std::move(font), hour, minute, use24HourClock,
+    std::move(onChanged), std::move(onCancel), std::move(onDone), std::move(key));
+}
+/** Builds a tree view. */
+[[nodiscard]] inline ElementPtr TreeView(std::shared_ptr<const graphics::Font> font,
+    std::vector<TreeNodeSpec> roots, float rowHeight = 28.0f,
+    std::vector<std::size_t> selected = {}, TreeViewElement::PathHandler onSelected = {},
+    TreeViewElement::PathHandler onActivated = {}, std::string key = {}) {
+  return std::make_shared<TreeViewElement>(std::move(font), std::move(roots), rowHeight,
+    std::move(selected), std::move(onSelected), std::move(onActivated), std::move(key));
+}
 } // namespace components
 
 } // namespace coral::ui

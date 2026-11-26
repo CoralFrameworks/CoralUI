@@ -168,10 +168,27 @@ Align resolveAlign(const AlignSelf self, const Align container) {
     case AlignSelf::Center: return Align::Center;
     case AlignSelf::End: return Align::End;
     case AlignSelf::Stretch: return Align::Stretch;
-  case AlignSelf::Baseline: return Align::Baseline;
+    case AlignSelf::Baseline: return Align::Baseline;
     case AlignSelf::Auto: break;
   }
   return container;
+}
+
+/**
+ * The rectangle a child may occupy, in the child's own (width, height) axes.
+ *
+ * `innerMain`/`innerCross` are the container's extents along its main/cross axis. For a Column the
+ * cross extent is the width, so passing `innerMain` as the child's width would hand a text child the
+ * container's height as its wrap width.
+ */
+Size childMeasureSpace(const Axis axis, const float innerMain, const float innerCross,
+    const LayoutParams& params) {
+  const float width = axis == Axis::Row ? innerMain : innerCross;
+  const float height = axis == Axis::Row ? innerCross : innerMain;
+  return Size{
+    std::max(0.0f, width - params.margin.horizontal()),
+    std::max(0.0f, height - params.margin.vertical())
+  };
 }
 
 /** Lays one absolute child out against the parent's inner rectangle. */
@@ -245,10 +262,7 @@ Size Flex::measure(const Size& available) {
       continue;
     }
     const LayoutParams& params = child->layoutParams();
-    Size childAvailable{
-      std::max(0.0f, innerMain - params.margin.horizontal()),
-      std::max(0.0f, innerCross - params.margin.vertical())
-    };
+    Size childAvailable = childMeasureSpace(mAxis, innerMain, innerCross, params);
     // Unbounded measurement: 0 tells widgets such as text "no width constraint, report your
     // natural size"; margins still count against the other axis.
     if (mAxis == Axis::Row) {
@@ -363,10 +377,7 @@ void Flex::layout() {
       continue;
     }
     const LayoutParams& params = child->layoutParams();
-    Size childAvailable{
-      std::max(0.0f, innerMain - params.margin.horizontal()),
-      std::max(0.0f, innerCross - params.margin.vertical())
-    };
+    Size childAvailable = childMeasureSpace(mAxis, innerMain, innerCross, params);
     // Unbounded measurement: 0 tells widgets such as text "no width constraint, report your
     // natural size"; margins still count against the other axis.
     if (mAxis == Axis::Row) {

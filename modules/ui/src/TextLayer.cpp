@@ -106,7 +106,7 @@ std::string encodeUtf8(const uint32_t codePoint) {  std::string text;
   return text;
 }
 
-} // namespace
+} // namespace anonymous
 
 TextLayer::TextLayer(std::string text, std::shared_ptr<const graphics::Font> font, const graphics::Color color)
         : mText(std::move(text)),
@@ -385,12 +385,35 @@ void TextLayer::buildLayoutAt(const float wrap) {
   mRunPainters.clear();
 }
 
+namespace {
+
+/**
+ * Whether a bounds width close to the current layout still needs no re-break.
+ *
+ * A text is measured with the parent's available width, and a Row/table parent then assigns exactly
+ * the measured width back as bounds. Shaping at that same width can report the line a fraction of a
+ * pixel wider than the measured width, which used to re-break e.g. "Task 1" into "Task" / "1" and
+ * overflow the one-line row. If every existing line fits and the box is the tight measured box, there
+ * is nothing to re-break. A materially wider box still re-lays out so centre/right/justify offsets use
+ * the new width.
+ */
+bool layoutFitsTightBox(const TextLayout& layout, const float width) {
+  if (layout.lines.empty() || layout.size.width <= 0.0f) return false;
+  return width + 0.5f >= layout.size.width && width <= layout.size.width + 8.0f;
+}
+
+} // namespace anonymous
+
 void TextLayer::ensureLayout() {
   if (mFont == nullptr) return;
   const float wrap = mWrapWidth > 0.0f ? mWrapWidth : bounds().getWidth();
-  if (mLayout.lines.empty() || std::abs(wrap - mLayoutWrapWidth) > 0.01f) {
+  if (mLayout.lines.empty()) {
     buildLayoutAt(wrap);
+    return;
   }
+  if (std::abs(wrap - mLayoutWrapWidth) <= 0.01f) return;
+  if (layoutFitsTightBox(mLayout, wrap)) return;
+  buildLayoutAt(wrap);
 }
 
 void TextLayer::onBoundsSizeChanged() {
@@ -400,6 +423,7 @@ void TextLayer::onBoundsSizeChanged() {
   // `measure()` was called with the parent's available width; the assigned bounds can be narrower
   // (a fixed-width dock panel, a table column, a shrunk flex item), and without this the text keeps
   // the old line breaks and overflows.
+  if (layoutFitsTightBox(mLayout, width)) return;
   buildLayoutAt(width);
   setNeedsPaint();
 }

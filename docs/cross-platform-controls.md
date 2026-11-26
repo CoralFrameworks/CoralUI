@@ -21,6 +21,12 @@ without a debugger. The demo sits inside an accent `DemoFrame`, and the sidebar 
 an accent selection box. The list has its own scrollbar hit gutter, separate from
 the content, so dragging the thin bar no longer starts a row selection.
 
+The declarative catalog is `ui_declarative_gallery`: the same control groups as an immutable
+`Element` tree, with keys, `When`/`ForEach`, `State<T>` and `ElementHost`. It covers every control
+that has a first-class element wrapper; controls without one are hosted through
+`components::Layer` and labelled as the escape hatch. See
+[declarative-components.md](declarative-components.md) for the wrapper matrix and the gaps.
+
 Selection is data-driven. `GalleryViewModel` derives from `mvvm::ObservableObject` and owns
 `observer::Property<GallerySelection>`. The shell stores it in `ui::mvvm::DataContext`, binds it with
 `bindProperty`, and row clicks only write the model:

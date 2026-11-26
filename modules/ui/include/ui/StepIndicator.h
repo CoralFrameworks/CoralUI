@@ -46,6 +46,9 @@ class StepIndicator final : public Layer {
     return mCurrent;
   }
   void setFont(std::shared_ptr<const Font> font);
+  [[nodiscard]] const std::shared_ptr<const Font>& font() const noexcept {
+    return mFont;
+  }
   void setOnChanged(std::function<void(int)> callback) {
     mOnChanged = std::move(callback);
   }

@@ -66,6 +66,19 @@ void StatusBar::addTrailingItem(std::shared_ptr<Layer> item) {
   setNeedsPaint();
 }
 
+void StatusBar::clearItems() {
+  for (const auto& item: mLeadingItems) {
+    if (item != nullptr) removeChild(item);
+  }
+  for (const auto& item: mTrailingItems) {
+    if (item != nullptr) removeChild(item);
+  }
+  mLeadingItems.clear();
+  mTrailingItems.clear();
+  setNeedsLayout();
+  setNeedsPaint();
+}
+
 void StatusBar::setFont(std::shared_ptr<const Font> font) {
   mFont = std::move(font);
   setNeedsPaint();

@@ -124,6 +124,33 @@ TEST(UiLayout, AColumnStacksVertically) {
   EXPECT_FLOAT_EQ(second->bounds().getTop(), 14.0f);
 }
 
+TEST(UiLayout, AColumnMeasuresChildrenWithItsOwnWidthAndHeight) {
+  /** Records the available size a parent hands to measure(). */
+  class RecordingLayer final : public Layer {
+   public:
+    Size measure(const Size& available) override {
+      lastAvailable = available;
+      setMeasuredSize({ 10.0f, 10.0f });
+      return measuredSize();
+    }
+    Size lastAvailable{};
+  };
+
+  auto column = std::make_shared<Flex>(Axis::Column);
+  column->setPadding(Insets{}.all(10.0f));
+  auto child = std::make_shared<RecordingLayer>();
+  LayoutParams params;
+  params.margin = Insets{}.all(5.0f);
+  child->setLayoutParams(params);
+  column->addChild(child);
+
+  column->measure({ 300.0f, 120.0f });
+  EXPECT_FLOAT_EQ(child->lastAvailable.width, 270.0f)
+    << "a Column's child is measured with the container width, not its height";
+  EXPECT_FLOAT_EQ(child->lastAvailable.height, 90.0f)
+    << "a Column's child is measured with the container height, not its width";
+}
+
 TEST(UiLayout, RowGrowsChildrenWithTheirWeights) {
   auto row = std::make_shared<Flex>(Axis::Row);
   auto first = std::make_shared<FixedLayer>(50.0f, 20.0f);

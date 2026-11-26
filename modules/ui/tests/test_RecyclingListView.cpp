@@ -59,6 +59,87 @@ ElementPtr row(const std::string& key, const size_t index) {
 
 } // namespace anonymous
 
+TEST(UiRecyclingListView, LaysOutAContainerRowAndItsChildren) {
+  const auto font = testFont();
+  if (font == nullptr) GTEST_SKIP() << "the UI test font is not available";
+
+  // A row may be a container (a StackElement), not just a leaf. The viewport assigns the row's
+  // rectangle; the row's own children only get theirs when the row lays out.
+  RecyclingListView list([font](const std::string& key, const size_t,
+      const RecyclingRowState&) -> ElementPtr {
+    std::vector<ElementPtr> children;
+    children.push_back(std::make_shared<TextElement>(key, font, Color::White(), key + ".text"));
+    ElementProps dotProps;
+    dotProps.bounds = Rect::MakeWH(8.0f, 8.0f);
+    children.push_back(components::WithProps(
+      std::make_shared<ColorElement>(Color::MakeRGBA8(10, 20, 30, 255), key + ".dot"), dotProps,
+      key + ".dot.wrap"));
+    return std::make_shared<StackElement>(Axis::Row, std::move(children), key + ".row", 6.0f,
+      Insets{}.all(4.0f), Align::Center);
+  }, 28.0f);
+  list.setBounds(Rect::MakeWH(240.0f, 120.0f));
+  list.setRows({ "alpha", "beta", "gamma" });
+  list.layout();
+
+  const std::shared_ptr<Layer> row = list.rowLayer("alpha");
+  ASSERT_NE(row, nullptr);
+  ASSERT_EQ(row->children().size(), 2u);
+  for (const std::shared_ptr<Layer>& child: row->children()) {
+    EXPECT_GT(child->bounds().getWidth(), 0.0f) << "the row laid its children out horizontally";
+    EXPECT_GT(child->bounds().getHeight(), 0.0f);
+    EXPECT_GE(child->bounds().getTop(), row->bounds().getTop() - 0.5f);
+    EXPECT_LE(child->bounds().getBottom(), row->bounds().getBottom() + 0.5f);
+  }
+}
+
+TEST(UiRecyclingListView, ReusedContainerRowsRelayoutAndKeepTextOnOneLine) {
+  const auto font = testFont();
+  if (font == nullptr) GTEST_SKIP() << "the UI test font is not available";
+
+  // The user-visible case: add rows, scroll, and reuse the top rows for later keys. A container row
+  // must reposition its children on reuse, and a text child must not re-break at its own measured
+  // width ("Task 1" used to wrap into two lines and overflow the 28px row).
+  RecyclingListView list([font](const std::string& key, const size_t,
+      const RecyclingRowState&) -> ElementPtr {
+    std::vector<ElementPtr> children;
+    children.push_back(std::make_shared<TextElement>(key, font, Color::White(), key + ".text"));
+    ElementProps dotProps;
+    dotProps.bounds = Rect::MakeWH(8.0f, 8.0f);
+    children.push_back(components::WithProps(
+      std::make_shared<ColorElement>(Color::MakeRGBA8(10, 20, 30, 255), key + ".dot"), dotProps,
+      key + ".dot.wrap"));
+    return std::make_shared<StackElement>(Axis::Row, std::move(children), key + ".row", 6.0f,
+      Insets{}.all(4.0f), Align::Center);
+  }, 28.0f);
+  list.setBounds(Rect::MakeWH(240.0f, 120.0f));
+  std::vector<std::string> keys;
+  for (int i = 1; i <= 10; ++i) keys.push_back("Task " + std::to_string(i));
+  list.setRows(keys);
+  list.layout();
+
+  list.setScrollOffset(0.0f, 84.0f);
+  list.layout();
+
+  int checked = 0;
+  for (const std::string& key: keys) {
+    const std::shared_ptr<Layer> row = list.rowLayer(key);
+    if (row == nullptr) continue;
+    ++checked;
+    ASSERT_EQ(row->children().size(), 2u);
+    for (const std::shared_ptr<Layer>& child: row->children()) {
+      EXPECT_GE(child->bounds().getTop(), row->bounds().getTop() - 0.5f)
+        << key << " child kept a previous slot's position";
+      EXPECT_LE(child->bounds().getBottom(), row->bounds().getBottom() + 0.5f) << key;
+      EXPECT_GT(child->bounds().getWidth(), 0.0f) << key;
+    }
+    const auto label = std::dynamic_pointer_cast<TextLayer>(row->children().front());
+    ASSERT_NE(label, nullptr);
+    EXPECT_EQ(label->layout().lines.size(), 1u)
+      << key << " re-broke at its own measured width";
+  }
+  EXPECT_GE(checked, 2) << "the scroll should leave several mounted rows";
+}
+
 TEST(UiRecyclingListView, MountsOnlyVisibleRowsAndReusesKeyedLayers) {
   RecyclingListView list([](const std::string& key, const size_t index,
       const RecyclingRowState&) { return row(key, index); }, 20.0f);

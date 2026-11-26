@@ -42,6 +42,10 @@ class RecyclingListView::Content final : public Layer {
 
   void layout() override {
     mOwner.syncRows();
+    // A row may be a container, not just a leaf: the Sync pass assigns the row rectangle, but its
+    // children only get theirs when the row itself lays out. Without this a StackElement row kept
+    // its 409x28 bounds while its text and swatch children stayed at 0x0.
+    Layer::layout();
   }
 
  private:
@@ -800,6 +804,11 @@ void RecyclingListView::syncRows() {
           slot->layer->animateOpacity(1.0f, mRowTransition);
         }
       }
+      // A row rectangle is an assignment, not a layout pass. A row may itself be a container
+      // (a StackElement), whose children are absolute: a same-size move does not dirty them, so a
+      // recycled row would keep the previous slot's child positions and draw its text at the old
+      // place (the "ghost rows" seen while scrolling). Lay the row out after moving it.
+      if (!slot->layer->animatingBounds()) slot->layer->layout();
       // Give the row a stable accessible name (its key) so accessibility bridges announce rows
       // instead of skipping them as anonymous generic layers.
       slot->layer->setAccessibleName(key);

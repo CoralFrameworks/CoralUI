@@ -52,6 +52,7 @@
 #include <ui/Motion.h>
 #include <ui/NumberFormat.h>
 #include <ui/Overlay.h>
+#include <ui/OverlayHost.h>
 #include <ui/ProgressBar.h>
 #include <ui/RadioButton.h>
 #include <ui/Reconciler.h>

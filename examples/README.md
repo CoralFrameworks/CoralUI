@@ -14,6 +14,7 @@ examples/
     ├── CMakeLists.txt    # the executables and their headless CTest checks
     ├── gallery_sections.cpp # sectioned gallery pages
     ├── ui_demo.cpp       # gallery + window/layout/input/AX/IME acceptance app
+    ├── ui_declarative_gallery.cpp # the same catalogue written as an Element tree
     └── ui_mvvm_demo.cpp  # DataContext + Element/Reconciler reference page, headless
 ```
 
@@ -97,6 +98,12 @@ out/examples/ui/ui_demo --frames 0 --width 960 --height 700
 
 # The declarative reference page (headless by default)
 out/examples/ui/ui_mvvm_demo --out out/ui_mvvm_demo.png --frames 1
+
+# The declarative gallery: same sectioned catalogue, every page an immutable Element tree
+out/examples/ui/ui_declarative_gallery --headless --frames 2 --out out/declarative_gallery.png
+out/examples/ui/ui_declarative_gallery --headless --frames 2 --section 4 --out out/declarative_lists.png
+out/examples/ui/ui_declarative_gallery --headless --frames 2 --theme light --out out/declarative_light.png
+out/examples/ui/ui_declarative_gallery --headless --self-check --out out/declarative_self_check.png
 ```
 
 `ui_demo` also accepts `--bookmark-panel` (NSOpenPanel + security-scoped bookmark),
@@ -144,20 +151,28 @@ registered:
 | `example_ui_demo_native_headless` | the Native page renders its fallback text offscreen (native children are not in the GPU frame) |
 | `example_ui_demo_more_headless` | the More page renders additional framework controls |
 | `example_ui_mvvm_headless` | the Element/Reconciler page mounts, patches from a Command and renders |
+| `example_ui_declarative_gallery_sectionN_headless` (N = 0..6) | each declarative gallery page mounts, lays out and snapshots |
+| `example_ui_declarative_gallery_light_headless` | the declarative gallery renders with the light theme |
+| `example_ui_declarative_gallery_self_check` | all pages and every state kind reconcile, a scrolled 12-row RecyclingList keeps reused rows positioned with one-line labels, and the footer layer identity survives |
 
 The native window path is the manual check; `ui_demo --frames N --out frame.png` also snapshots the
 presented GPU frame, so a macOS or Windows run can be verified without a screenshot. A snapshot does
 not include platform-native children (`NSView`/child HWND); the Native gallery page labels that block
 as live native only.
 
-The two programs have different jobs and are intentionally kept separate:
+The three programs have different jobs and are intentionally kept separate:
 
 - `ui_demo` is the macOS bundle/acceptance app and the cross-platform control gallery. It owns the
   `.app`, Info.plist, signing/entitlement options, `--platform`/`--render-host`/`--theme` flags,
   the manual AX/IME/window checks and the visual control catalog.
+- `ui_declarative_gallery` is the same kind of sectioned catalogue written entirely with
+  `Element`/`Reconciler`/`ElementHost`/`State`: 80 first-class element kinds, keyed lists, `When`,
+  `ForEach`, a `Component`, an `ElementRegistry` type, an `ElementSpec` parse, and one labelled escape
+  hatch page. `--dump-tree` prints the layers the element tree produced.
 - `ui_mvvm_demo` is the DataContext/Element/Reconciler reference page.
 
-Deleting `ui_mvvm_demo` would remove the MVVM reference path; the gallery is part of `ui_demo`.
+Deleting `ui_mvvm_demo` would remove the MVVM reference path; the gallery is part of `ui_demo`, and
+the declarative catalogue is the separate `ui_declarative_gallery`.
 
 ```sh
 ctest --test-dir out/examples -C Release -L examples --output-on-failure

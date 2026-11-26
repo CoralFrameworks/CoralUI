@@ -27,14 +27,99 @@ third_party/        the shared libz / libyuv / libgtest submodules
 `modules/ui/README.md` documents the toolkit's features and supported platforms;
 `modules/mvvm/README.md` documents the view-model layer; `examples/README.md` documents the demos.
 
+## Two ways to build a UI
+
+CoralUI keeps the retained layer tree as the primitive and offers a declarative `Element` layer on
+top of it. Both styles are public API and can be mixed in one window; neither is a compatibility
+shim.
+
+**Traditional: build and update layers directly.** You own the rectangles and the calls that change
+them. This is the right path for custom drawing, precise layout control and the largest virtualized
+surfaces.
+
+```cpp
+using namespace coral::ui;
+
+auto page = std::make_shared<Layer>();
+page->setBackgroundColorRole(ThemeColorRole::Background);
+
+auto title = std::make_shared<TextLayer>("Library", window->theme().title, window->theme().text);
+title->setBounds(Rect::MakeXYWH(24.0f, 20.0f, 320.0f, 32.0f));
+page->addChild(title);
+
+auto search = std::make_shared<TextInput>("Search", window->theme().body);
+search->setBounds(Rect::MakeXYWH(24.0f, 64.0f, 320.0f, 32.0f));
+search->observeChanged([&](const std::string& value) { model.setQuery(value); });
+page->addChild(search);
+
+window->setRoot(page);
+```
+
+**Declarative: describe the tree, let the reconciler patch it.** A `State<T>` (or an
+`observer::Property` / `mvvm::Property`) drives a build function; `ElementHost` coalesces writes and
+`Reconciler` matches `(kind, key)` so layer identity, focus, scroll position and animations survive
+the rebuild.
+
+```cpp
+using namespace coral::ui;
+
+State<int> selected{0};
+ElementHost host(*window, [&] {
+  const Theme& theme = window->theme();
+  std::vector<ElementPtr> rows;
+  for (size_t i = 0; i < model.items().size(); ++i) {
+    rows.push_back(components::WithProps(
+      components::Button(model.items()[i], theme.body,
+        [&, i] { selected.set(static_cast<int>(i)); }, "row-" + std::to_string(i)),
+      [] { ElementProps p; p.layout.basis = 32.0f; p.layout.shrink = 0.0f; return p; }(),
+      "row-" + std::to_string(i) + ".wrap"));
+  }
+  return std::make_shared<StackElement>(Axis::Column, std::vector<ElementPtr>{
+    std::make_shared<TextElement>("Library", theme.title, theme.text, "title"),
+    components::TextInput(model.query(), theme.body,
+      [&](const std::string& value) { model.setQuery(value); }, "search"),
+    std::make_shared<TextElement>(std::to_string(selected.get()) + " selected",
+      theme.body, theme.textMuted, "selection"),
+    std::make_shared<StackElement>(Axis::Column, std::move(rows), "rows", 6.0f,
+      Insets{}.all(24.0f), Align::Stretch),
+  }, "page", 12.0f, Insets{}.all(24.0f), Align::Stretch);
+});
+auto binding = host.bind(selected.property());   // keep the observation alive
+host.mount();
+window->setRoot(host.root());
+```
+
+`ComponentHost` adds component lifecycle, an error boundary and `provide`/`find` dependency
+injection; `ElementRegistry` registers an application type name; `ElementSpec` parses a flat text
+form. The gallery example is built entirely in this style.
+
+**Which one?**
+
+| Need | Use |
+|---|---|
+| Canvas, waveform, timeline, custom `drawSelf` | Retained layers |
+| Exact measure/layout for a container, pixel-level benchmarks | Retained layers |
+| Forms, settings pages, lists, dialogs driven by a model | Declarative elements |
+| Keyed reorder, `When` branches, component state | Declarative elements |
+| A widget with no wrapper yet inside an element page | `components::Layer` (escape hatch) |
+
+**Coverage, as of this checkout:** 80 of the 89 public `Layer` types have a first-class element
+wrapper (text, styled text, colour, layout/form controls, display and data leaves, interactive
+widgets, selection groups, content/structured containers, editor/date-time fields and the tree view).
+The other 9 are reachable from an element tree through
+`components::Layer`, but the layer owns its state. The complete matrix, the `ElementSpec` grammar,
+the wrapper checklist and the list of gaps are in
+[docs/declarative-components.md](docs/declarative-components.md).
+
 ## Features
 
 - **Retained layer tree** — bounds, clipping, z-order, transforms, opacity, blend modes, rounded and
   path clips, shadows, hit testing and focus; layout recomputed only when invalidated.
 - **Layout** — `Flex` (grow/shrink/basis, percent, margins, min/max, alignment, wrapping, justify),
   `Grid`, `ScrollView`, `SplitView`, `DockView`, `TabBar`, `Overlay`, `ContentView`.
-- **Declarative UI** — immutable `Element` tree, keyed `Reconciler` patching, `Component` state and
-  lifecycle, `ElementHost`, and a flat element-spec parser.
+- **Declarative UI** — immutable `Element` tree, keyed `Reconciler` patching, `OverlayHost`, `Component` state and
+  lifecycle, `ElementHost`, `State<T>`, a flat element-spec parser and a registry for application
+  types; 80 first-class control wrappers (see [docs/declarative-components.md](docs/declarative-components.md)).
 - **Widgets** — buttons, check boxes, toggles, radio buttons, segmented controls, sliders, progress,
   spinners, number/search/text inputs, list/table/tree views, recycling lists, menus, dialogs,
   popups, toasts, tooltips, colour pickers, dock/split/tab layouts and a client-side title bar.

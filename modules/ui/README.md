@@ -28,16 +28,22 @@ separate `modules/mvvm` library; `modules/ui` is the toolkit.
 ### Declarative elements
 
 - Immutable `Element` tree with keyed `Reconciler` patching, `Component` state and context,
-  lifecycle hooks, `ElementHost` binding and `LayerRef`.
+  lifecycle hooks, `ElementHost` binding, `State<T>` and `LayerRef`.
+- `OverlayHost` owns transient Dialog/Popup/Toast/Tooltip/Menu subtrees above the page through
+  `Window::pushOverlay` (stacking, light dismiss, Escape, focus restore).
 - `ElementRegistry` builds subtrees from a flat `type#key prop=value` specification
   (`<ui/ElementSpec.h>`), so a UI description can be data as well as code.
+- 80 of the 89 public layer types have a first-class element wrapper; the rest are hosted through
+  `components::Layer`. The wrapper matrix, the `ElementSpec` v0 properties and the gaps are in
+  [docs/declarative-components.md](../../docs/declarative-components.md).
 - `ui/mvvm`: `DataContext`, command and observable-list bindings, and a UI-thread `Dispatcher`
   adapter over the `mvvm` library.
 
 ### Text
 
-- `TextLayer` and `RichTextLayer` with wrapping, alignment (including justify), line height,
-  ellipsis and truncation, selection, hit testing and RTL.
+- `TextLayer`, `RichTextLayer` and the declarative `StyledText`/`TextDocument` with wrapping,
+  alignment (including justify), line height, ellipsis and truncation, selection, link hit testing
+  and RTL.
 - Unicode text stack: UAX #9 bidi resolution (including nested isolate/override spans), UAX #14
   line breaking with the Unicode test corpus, UAX #29 grapheme and word boundaries, and Liang/TeX
   hyphenation for thirteen languages (English, Italian, Spanish, French, Portuguese, German,

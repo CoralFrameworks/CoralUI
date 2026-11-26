@@ -53,6 +53,8 @@ class StatusBar final : public Layer {
   void setTrailingItem(std::shared_ptr<Layer> item);
   void addTrailingItem(std::shared_ptr<Layer> item);
   void addLeadingItem(std::shared_ptr<Layer> item);
+  /** Removes every leading and trailing item; the text fields stay. */
+  void clearItems();
   [[nodiscard]] int leadingItemCount() const noexcept {
     return static_cast<int>(mLeadingItems.size());
   }

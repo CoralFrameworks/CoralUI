@@ -99,6 +99,7 @@ set(PUBLIC_HDRS
     include/ui/MenuBar.h
     include/ui/NumberField.h
     include/ui/Overlay.h
+include/ui/OverlayHost.h
     include/ui/Pagination.h
     include/ui/PasswordField.h
     include/ui/Popup.h
@@ -121,6 +122,7 @@ set(PUBLIC_HDRS
     include/ui/WindowBackend.h
     include/ui/RichText.h
     include/ui/RichTextLayer.h
+include/ui/StyledText.h
     include/ui/ScrollView.h
     include/ui/SearchField.h
     include/ui/SegmentedControl.h
@@ -260,6 +262,7 @@ set(SRCS
     src/NativeViewLayer.cpp
     src/NumberField.cpp
     src/Overlay.cpp
+    src/OverlayHost.cpp
     src/Pagination.cpp
     src/PasswordField.cpp
     src/Popup.cpp
@@ -282,6 +285,7 @@ set(SRCS
     src/RichText.cpp
     src/RichTextLayoutCache.cpp
     src/RichTextLayer.cpp
+    src/StyledText.cpp
     src/ScrollView.cpp
     src/SearchField.cpp
     src/SegmentedControl.cpp

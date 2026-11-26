@@ -123,7 +123,7 @@ void refreshBoundaryAncestry(Layer* layer) {
     ancestor->noteHasBoundaryDescendant(descendant);
   }
 }
-} // namespace
+} // namespace anonymous
 
 constexpr float kPi = 3.14159265358979323846f;
 
@@ -207,7 +207,7 @@ std::size_t estimatedRecordingBytes(
   return bytes;
 }
 
-} // namespace
+} // namespace anonymous
 
 void Layer::setRecordingCacheAreaLimit(const float areaPixelsSquared) noexcept {
   gRecordingCacheAreaLimit.store(areaPixelsSquared, std::memory_order_release);
@@ -1123,6 +1123,7 @@ void Layer::draw(RenderContext& context) {
   auto& native = detail::nativeCanvas(canvas);
   const graphics::Matrix transform = canvas.transform();
   const Rect clip = canvas.deviceClipBounds();
+
   const std::size_t childCount = mChildren.size();
 
   // ## The clip in this layer's logical space, for the segment replay
@@ -1196,7 +1197,8 @@ void Layer::draw(RenderContext& context) {
   if (segmentable) {
     // Replay: patch only the child segments that changed, then append everything else as recorded.
     if (mRecordingValid && mRecording != nullptr && transform == mRecordingTransform &&
-        clip == mRecordingClip && mRecording->childCount == childCount &&
+        clip == mRecordingClip && mBounds == mRecordingBounds &&
+        mRecording->childCount == childCount &&
         mRecording->segments.size() == childCount + 1 &&
         mRecording->owners.size() == childCount) {
       if (mRecording->dirtySegments.size() != childCount) {
@@ -1262,6 +1264,7 @@ void Layer::draw(RenderContext& context) {
     }
     mRecordingTransform = transform;
     mRecordingClip = clip;
+    mRecordingBounds = mBounds;
     mRecordingValid = true;
     if (!appendAll()) {
       releaseRecording();
@@ -1278,7 +1281,8 @@ void Layer::draw(RenderContext& context) {
 
   // Legacy path: the whole subtree is one list and is invalidated as one.
   if (mRecordingValid && mRecording != nullptr && transform == mRecordingTransform &&
-      clip == mRecordingClip && mRecording->segments.size() == 1 &&
+      clip == mRecordingClip && mBounds == mRecordingBounds &&
+      mRecording->segments.size() == 1 &&
       appendListCounted(native, *mRecording->segments[0])) {
     mNeedsPaint = false;
     mSubtreeNeedsPaint = false;
@@ -1300,6 +1304,7 @@ void Layer::draw(RenderContext& context) {
   }
   mRecordingTransform = transform;
   mRecordingClip = clip;
+  mRecordingBounds = mBounds;
   mRecordingValid = true;
   if (!appendListCounted(native, *mRecording->segments[0])) {
     releaseRecording();
@@ -1387,8 +1392,10 @@ void Layer::drawSelfCached(RenderContext& context) {
 
   const graphics::Matrix transform = canvas.transform();
   const Rect clip = canvas.deviceClipBounds();
+
   if (mRecordingValid && mRecording != nullptr && transform == mRecordingTransform &&
-      clip == mRecordingClip && mRecording->segments.size() == 1 &&
+      clip == mRecordingClip && mBounds == mRecordingBounds &&
+      mRecording->segments.size() == 1 &&
       appendListCounted(detail::nativeCanvas(canvas), *mRecording->segments[0])) {
     return;
   }
@@ -1409,6 +1416,7 @@ void Layer::drawSelfCached(RenderContext& context) {
   }
   mRecordingTransform = transform;
   mRecordingClip = clip;
+  mRecordingBounds = mBounds;
   mRecordingValid = true;
   if (!appendListCounted(detail::nativeCanvas(canvas), *mRecording->segments[0])) {
     releaseRecording();
@@ -1473,6 +1481,10 @@ graphics::Bitmap* Layer::clipMaskFor(RenderContext& context) {
   if (maskCanvas == nullptr) {
     return nullptr;
   }
+  // A mask is coverage: every pixel the shape does not cover must be transparent. The bitmap is a
+  // recycled allocation, so leaving it uninitialised leaks whatever a previous surface drew there
+  // into the clip, which showed up as stale glyph and tile fragments inside rounded clips.
+  maskCanvas->clear(graphics::Color::MakeRGBA8(0, 0, 0, 0));
   maskCanvas->translate(-layerBounds.getLeft(), -layerBounds.getTop());
   graphics::Paint paint;
   paint.color = graphics::Color::White();
@@ -1849,7 +1861,7 @@ Rect offsetRect(const Rect& rect, const Point offset) {
     rect.getRight() + offset.x, rect.getBottom() + offset.y);
 }
 
-} // namespace
+} // namespace anonymous
 
 bool Layer::collectDamage(Rect& out, const Point parentOffset, const Rect clip) const {
   if (mDamageUnbounded) return false;

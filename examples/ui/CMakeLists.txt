@@ -5,7 +5,8 @@
 # or `--headless` for an offscreen surface, with a sectioned control gallery, a scrollable sidebar and
 # a control page on the right. `ui_mvvm_demo` is the reference page for the declarative slice: a
 # view model in a `DataContext`, an immutable `Element` tree and the `Reconciler` patching the layer
-# tree.
+# tree. `ui_declarative_gallery` is the same kind of sectioned catalogue written entirely in the
+# declarative style, with one CTest per page and a `--self-check` model/identity pass.
 #
 # `ui_demo` is also the visual catalog for the cross-platform control set.
 # All examples are clients of the public API only and can write a PNG, which is what the headless
@@ -22,6 +23,13 @@ target_compile_definitions(ui_demo PRIVATE CORAL_ASSETS_DIR="${CORALUI_EXAMPLE_A
 add_executable(ui_mvvm_demo ui_mvvm_demo.cpp)
 target_link_libraries(ui_mvvm_demo PRIVATE ui mvvm minilog)
 target_compile_definitions(ui_mvvm_demo PRIVATE CORAL_ASSETS_DIR="${CORALUI_EXAMPLE_ASSETS}")
+
+# The declarative gallery is the counterpart of `ui_demo`: the same kind of sectioned catalogue, but
+# every page is an immutable Element tree reconciled into the layer tree, and no page class derives
+# from Layer. `--self-check` drives every page and asserts the footer layer identity survives.
+add_executable(ui_declarative_gallery ui_declarative_gallery.cpp)
+target_link_libraries(ui_declarative_gallery PRIVATE ui minilog)
+target_compile_definitions(ui_declarative_gallery PRIVATE CORAL_ASSETS_DIR="${CORALUI_EXAMPLE_ASSETS}")
 
 # On macOS the interactive demo is a real application bundle: Finder launch, Dock identity, a bundle
 # id and version. The headless checks still invoke the executable inside the bundle, so `ctest` needs
@@ -78,7 +86,7 @@ if (APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   endif ()
 endif ()
 
-foreach (example ui_demo ui_mvvm_demo)
+foreach (example ui_demo ui_mvvm_demo ui_declarative_gallery)
   if (MSVC)
     target_compile_options(${example} PRIVATE /W4 /utf-8)
   else ()
@@ -129,8 +137,29 @@ if (EXISTS "${CORALUI_EXAMPLE_ASSETS}/fonts/NotoSansSC-Regular.otf")
       COMMAND $<TARGET_FILE:ui_mvvm_demo> --frames 1
           --out "${CMAKE_CURRENT_BINARY_DIR}/ui_mvvm_demo.png")
   set_tests_properties(example_ui_mvvm_headless PROPERTIES LABELS examples)
+
+  # One check per declarative gallery page: each page is an independent Element tree, so a broken
+  # page fails only its own test. The self-check additionally drives every page and asserts that the
+  # footer layer identity survives a rebuild.
+  foreach (section RANGE 0 6)
+    add_test(NAME example_ui_declarative_gallery_section${section}_headless
+        COMMAND $<TARGET_FILE:ui_declarative_gallery> --headless --frames 2
+            --section ${section}
+            --out "${CMAKE_CURRENT_BINARY_DIR}/ui_declarative_gallery_${section}.png")
+    set_tests_properties(example_ui_declarative_gallery_section${section}_headless
+        PROPERTIES LABELS examples)
+  endforeach ()
+  add_test(NAME example_ui_declarative_gallery_light_headless
+      COMMAND $<TARGET_FILE:ui_declarative_gallery> --headless --frames 2 --theme light
+          --out "${CMAKE_CURRENT_BINARY_DIR}/ui_declarative_gallery_light.png")
+  set_tests_properties(example_ui_declarative_gallery_light_headless PROPERTIES LABELS examples)
+
+  add_test(NAME example_ui_declarative_gallery_self_check
+      COMMAND $<TARGET_FILE:ui_declarative_gallery> --headless --self-check
+          --out "${CMAKE_CURRENT_BINARY_DIR}/ui_declarative_gallery_self_check.png")
+  set_tests_properties(example_ui_declarative_gallery_self_check PROPERTIES LABELS examples)
 else ()
   message(STATUS
       "CoralUI examples: the bundled reference font examples/fonts/NotoSansSC-Regular.otf is missing; "
-      "the ui_mvvm_demo check is not registered")
+      "the ui_mvvm_demo and ui_declarative_gallery checks are not registered")
 endif ()
