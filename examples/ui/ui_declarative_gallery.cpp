@@ -454,9 +454,7 @@ private:
     props.bounds = Rect::MakeWH(width, height);
     props.background = color;
     props.cornerRadius = radius;
-    // Small demo swatches avoid a rounded clip mask: at fractional DPI scales the mask path
-    // can clip the whole recording instead of just the corners.
-    props.clip = false;
+    props.clip = true;
     props.layout.minWidth = width;
     props.layout.minHeight = height;
     return components::WithProps(
@@ -768,7 +766,7 @@ private:
       props.background = fill;
       props.cornerRadius = looks[index].radius;
       props.opacity = looks[index].opacity;
-      props.clip = false;
+      props.clip = true;
       if (looks[index].shadow) props.shadow = theme.shadow.sm;
       styled.push_back(components::WithProps(
         std::make_shared<ColorElement>(fill, "lay.props." + std::to_string(index) + ".color"), props,

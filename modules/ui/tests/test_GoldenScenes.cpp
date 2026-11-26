@@ -134,6 +134,25 @@ void buildDslPanel(Window& window) {
     coral::ui::dsl::Body("DSL", "golden.text")));
   window.setRoot(std::move(root));
 }
+/** A page-level DSL composition: page background, raised panel and a two-column grid. */
+void buildDslPage(Window& window) {
+  coral::ui::Theme theme = coral::ui::Theme::dark();
+  coral::ui::dsl::ThemeScope scope(theme);
+  coral::ui::Reconciler reconciler;
+  auto root = reconciler.mount(coral::ui::dsl::Page("",
+    coral::ui::dsl::Panel(coral::ui::dsl::PanelOptions{ .padding = 8.0f, .gap = 6.0f,
+      .key = "page.panel" },
+      coral::ui::dsl::Swatch(graphics::Color::MakeRGBA8(56, 132, 220, 255), 80.0f, 30.0f, 4.0f,
+        "page.a"),
+      coral::ui::dsl::Swatch(graphics::Color::MakeRGBA8(240, 180, 64, 255), 40.0f, 30.0f, 4.0f,
+        "page.b")),
+    coral::ui::dsl::Grid(coral::ui::dsl::GridOptions{ .columns = 2, .gap = 6.0f, .key = "page.grid" },
+      coral::ui::dsl::Swatch(graphics::Color::MakeRGBA8(62, 67, 78, 255), 60.0f, 24.0f, 3.0f,
+        "page.c"),
+      coral::ui::dsl::Swatch(graphics::Color::MakeRGBA8(86, 156, 255, 255), 60.0f, 24.0f, 3.0f,
+        "page.d"))));
+  window.setRoot(std::move(root));
+}
 const GoldenScene kScenes[] = {
   { "window_scene_blend.png", 64, 64, 1.0f, buildBlend },
   { "window_scene_path_clip.png", 64, 64, 1.0f, buildPathClip },
@@ -141,6 +160,8 @@ const GoldenScene kScenes[] = {
   { "window_scene_dpi2.png", 64, 64, 2.0f, buildDpi },
   { "dsl_panel.png", 64, 64, 1.0f, buildDslPanel },
   { "dsl_panel_dpi15.png", 64, 64, 1.5f, buildDslPanel },
+  { "dsl_page.png", 240, 160, 1.0f, buildDslPage },
+  { "dsl_page_dpi15.png", 240, 160, 1.5f, buildDslPage },
 };
 
 graphics::Bitmap renderScene(const GoldenScene& scene) {

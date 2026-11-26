@@ -267,8 +267,7 @@ template <class... Children>
   ElementProps props;
   props.backgroundRole = options.raised ? ThemeColorRole::SurfaceRaised : ThemeColorRole::Surface;
   props.cornerRadius = options.radius >= 0.0f ? options.radius : t.radius.md;
-  // Panels are rectangular until composed masks at fractional DPI are reliable.
-  props.clip = false;
+  props.clip = true;
   return components::WithProps(std::move(content), props,
     options.key.empty() ? "dsl.panel" : std::move(options.key));
 }
@@ -313,8 +312,7 @@ template <class... Children>
   props.bounds = Rect::MakeWH(width, height);
   props.background = color;
   props.cornerRadius = radius;
-  // A rounded mask on a tiny leaf is not worth the fractional-DPI clip risk in the demo.
-  props.clip = false;
+  props.clip = true;
   props.layout.minWidth = width;
   props.layout.minHeight = height;
   return components::WithProps(std::make_shared<ColorElement>(color, key + ".color"), props,

@@ -165,6 +165,8 @@ entry runs a small iteration count so the path stays built and exercised.
 
 - `modules/ui/tests/dsl_panel.png` at 1.0 scale
 - `modules/ui/tests/dsl_panel_dpi15.png` at 1.5 scale
+- `modules/ui/tests/dsl_page.png` at 1.0 scale
+- `modules/ui/tests/dsl_page_dpi15.png` at 1.5 scale
 
 Regenerate them with:
 
@@ -172,5 +174,10 @@ Regenerate them with:
 CORAL_UPDATE_GOLDEN=1 test_ui --gtest_filter=UiGolden.TheExtraScenesMatchTheirGoldenImages
 ```
 
-The scene covers `dsl::Panel`, `dsl::Column`, `dsl::Swatch` and a text role through the full
-Element -> Reconciler -> GPU path at two scales.
+The panel scenes cover `dsl::Panel`, `dsl::Column`, `dsl::Swatch` and a text role; the page scenes
+add `dsl::Page` and `dsl::Grid`. Both go through the full Element -> Reconciler -> GPU path at two
+scales.
+## Platform matrix
+
+- macOS CI (`macos.yml`) builds and runs `ui_dsl_gallery`, `ui_dsl_bench`, the DSL page/DPI tests and the golden suite.
+- Windows CI (`windows.yml`) runs `scripts/build-windows.cmd -Tests`, which now includes the DSL gallery and benchmark plus the native Win32 smoke targets.
