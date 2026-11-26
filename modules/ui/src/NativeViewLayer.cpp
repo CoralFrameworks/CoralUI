@@ -95,6 +95,20 @@ void NativeViewLayer::layout() {
   syncFrame();
 }
 
+void NativeViewLayer::onBoundsSizeChanged() {
+  // Parent layout positions hosted controls with setBounds, not always with layout(); sync as soon as
+  // the first real size arrives so the native HWND/NSView is shown in the first presented frame.
+  Layer::onBoundsSizeChanged();
+  syncFrame();
+}
+
+void NativeViewLayer::onFrame(const std::chrono::steady_clock::time_point now) {
+  Layer::onFrame(now);
+  // A parent can move or resize this layer without a size change; keep the platform view in step even
+  // when the page itself does not repaint.
+  syncFrame();
+}
+
 void NativeViewLayer::drawSelf(RenderContext&) {
   syncFrame();
 }

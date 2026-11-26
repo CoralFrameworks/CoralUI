@@ -19,6 +19,8 @@
 
 #include <ui/Layer.h>
 
+#include <chrono>
+
 namespace coral::ui {
 
 /**
@@ -51,6 +53,8 @@ class NativeViewLayer : public Layer {
   }
 
   void layout() override;
+  void onBoundsSizeChanged() override;
+  void onFrame(std::chrono::steady_clock::time_point now) override;
   void drawSelf(RenderContext& context) override;
   void onWindowChanged(Window* previous, Window* current) override;
   void onVisibilityChanged(bool visible) override;

@@ -1130,6 +1130,7 @@ void SectionedGallery::showSection(const std::size_t index, std::string control)
     buildControl(*mBody, mTheme, selection.control);
   }
   mBody->setNeedsLayout();
+  mBody->setNeedsPaint();
   setNeedsLayout();
   if (window() != nullptr) window()->requestFrame();
 }
