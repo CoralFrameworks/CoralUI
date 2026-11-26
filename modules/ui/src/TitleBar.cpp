@@ -61,6 +61,13 @@ void TitleBar::setTitle(std::string title) {
   if (mTitle != nullptr) mTitle->setText(std::move(title));
 }
 
+void TitleBar::applyTheme(const Theme& theme) {
+  // The title is a plain TextLayer with an explicit colour; the bar owns the text, so the title
+  // follows the window skin like the rest of the chrome. A caller that wants a fixed colour can
+  // still set it after the theme has been applied.
+  if (mTitle != nullptr) mTitle->setColor(theme.controls.foreground);
+}
+
 const std::string& TitleBar::title() const noexcept {
   static const std::string empty;
   return mTitle != nullptr ? mTitle->text() : empty;

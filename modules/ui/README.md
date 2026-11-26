@@ -94,6 +94,11 @@ separate `modules/mvvm` library; `modules/ui` is the toolkit.
 
 - `Theme` tokens (colours, spacing, radii, shadows, control colours), `ThemeFile` loading with hot
   reload, light/dark presets, and runtime theme switching.
+- All built-in custom-drawn controls except the debug-only `FrameStatsOverlay` override
+  `applyTheme`, so `Window::setTheme` retokens the live tree without rebuilding it. Caller-owned child
+  layers (table cells, popup content) have to use theme colours themselves; `Chip`/`Banner` severity
+  colours, `ColorPicker` hue fields, native dialogs and platform-native controls keep their
+  semantic/system colours by design.
 - `Style`, `StylePatch`, `StyleVariant`, `StyleSheet` and `ControlState` for per-control states.
 - Animation: cubic-bezier/spring curves, animation controllers, implicit transitions, shared-element
   transitions, and a process-wide reduced-motion switch.

@@ -354,6 +354,16 @@ void RecyclingListView::invalidateRowHeights() {
   syncRows();
 }
 
+void RecyclingListView::refreshRowHeights() {
+  rebuildRowMetrics();
+  setNeedsLayout();
+  if (mContent != nullptr) mContent->setNeedsLayout();
+  syncRows();
+  // The scrollbar thumb is drawn from mContentSize; when an animated row changes the total height the
+  // old thumb must be repainted away even though no row content itself changed.
+  setNeedsPaint();
+}
+
 float RecyclingListView::rowHeightAt(const size_t index) const {
   return index < mRowHeights.size() ? mRowHeights[index] : mRowHeight;
 }
@@ -391,7 +401,9 @@ void RecyclingListView::rebuildRowMetrics() {
         height = measured->second;
       }
     }
-    if (!std::isfinite(height) || height <= 0.0f) height = mRowHeight;
+    // A zero-height row is meaningful: an expandable list collapses a section by animating its row
+    // heights to zero. Only a negative or non-finite provider result falls back to the default.
+    if (!std::isfinite(height) || height < 0.0f) height = mRowHeight;
     mRowHeights.push_back(height);
     mRowOffsets.push_back(mRowOffsets.back() + height);
   }

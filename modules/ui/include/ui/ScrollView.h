@@ -167,6 +167,13 @@ class ScrollView : public Layer {
   [[nodiscard]] Rect scrollbarThumbBounds() const;
   /** The horizontal scrollbar thumb; empty when the content fits horizontally. */
   [[nodiscard]] Rect horizontalScrollbarThumbBounds() const;
+
+  /**
+   * Whether this view paints its built-in slim scrollbar. Callers that draw their own thumb (a themed
+   * sidebar, for example) can turn the built-in one off without disabling scrolling.
+   */
+  void setScrollbarVisible(bool visible);
+  [[nodiscard]] bool scrollbarVisible() const noexcept { return mScrollbarVisible; }
   [[nodiscard]] bool hasRunningAnimation() const override;
 
   Size measure(const Size& available) override;
@@ -208,6 +215,7 @@ class ScrollView : public Layer {
   float mPreferredHeight = 0.0f;
   Color mBackground = Color::MakeRGBA8(0, 0, 0, 0);
   Color mThumbColor = Color::MakeRGBA8(148, 163, 184, 180);
+  bool mScrollbarVisible = true;
   float mScrollX = 0.0f;
   float mScrollY = 0.0f;
   /** Plan-mode frames position the content with an item translation instead of with its bounds. */

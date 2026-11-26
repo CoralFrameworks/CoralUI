@@ -44,7 +44,9 @@ struct TableColumn {
  * table reports the resulting content height during measure.
  *
  * The table owns no cells: `setRows` inserts the given layers as children and drops the previous
- * ones. Reuse cell layers across updates to keep focus and animations alive.
+ * ones. Reuse cell layers across updates to keep focus and animations alive. Cells keep their own
+ * colours: a `TextLayer` created without an explicit colour defaults to white, so build cells with
+ * `theme.controls.foreground` (and the matching muted colour) when the table must follow a skin.
  */
 class Table final : public Layer {
  public:
@@ -111,6 +113,8 @@ class Table final : public Layer {
   }
 
  private:
+  void applyTheme(const Theme& theme) override;
+
   std::vector<TableColumn> mColumns;
   std::vector<std::vector<std::shared_ptr<Layer>>> mRows;
   float mGap = 8.0f;
@@ -118,6 +122,9 @@ class Table final : public Layer {
   int mHoveredRow = -1;
   Color mSelectionColor = Color::MakeRGBA8(86, 156, 255, 48);
   Color mHoverColor = Color::MakeRGBA8(255, 255, 255, 20);
+  Color mFocusColor = Color::MakeRGBA8(86, 156, 255, 200);
+  bool mSelectionColorExplicit = false;
+  bool mHoverColorExplicit = false;
   bool mFocused = false;
   Insets mPadding{};
 };

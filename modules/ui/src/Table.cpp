@@ -15,6 +15,7 @@
  */
 
 #include <ui/Table.h>
+#include <ui/Theme.h>
 
 #include <algorithm>
 #include <cmath>
@@ -202,6 +203,21 @@ Rect Table::rowBounds(const int row) const {
 
 void Table::setSelectionColor(const Color color) {
   mSelectionColor = color;
+  mSelectionColorExplicit = true;
+  setNeedsPaint();
+}
+
+void Table::applyTheme(const Theme& theme) {
+  if (!mSelectionColorExplicit) {
+    mSelectionColor = theme.accent;
+    mSelectionColor.alpha = 48.0f / 255.0f;
+  }
+  if (!mHoverColorExplicit) {
+    mHoverColor = theme.controls.backgroundHover;
+    mHoverColor.alpha = 40.0f / 255.0f;
+  }
+  mFocusColor = theme.accent;
+  mFocusColor.alpha = 200.0f / 255.0f;
   setNeedsPaint();
 }
 
@@ -225,7 +241,7 @@ void Table::drawSelf(RenderContext& context) {
   }
   if (mFocused) {
     graphics::Paint outline;
-    outline.color = Color::MakeRGBA8(86, 156, 255, 200);
+    outline.color = mFocusColor;
     outline.style = graphics::Paint::Style::kStroke;
     outline.strokeWidth = 1.5f;
     context.canvas().drawRoundRect(
@@ -263,6 +279,7 @@ void Table::setHoveredRow(const int row) {
 
 void Table::setHoverColor(const Color color) {
   mHoverColor = color;
+  mHoverColorExplicit = true;
   setNeedsPaint();
 }
 

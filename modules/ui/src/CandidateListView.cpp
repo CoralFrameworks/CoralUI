@@ -15,6 +15,7 @@
  */
 
 #include <ui/CandidateListView.h>
+#include <ui/Theme.h>
 
 #include <graphics/Canvas.h>
 #include <graphics/Font.h>
@@ -73,20 +74,28 @@ Size CandidateListView::preferredSize() const {
   return { width, rowHeight() * static_cast<float>(mCandidates.size()) + kPaddingY * 2.0f };
 }
 
+void CandidateListView::applyTheme(const Theme& theme) {
+  mBackgroundColor = theme.surfaceRaised;
+  mBackgroundColor.alpha = 238.0f / 255.0f;
+  mSelectionColor = theme.accent;
+  mTextColor = theme.controls.foreground;
+  setNeedsPaint();
+}
+
 void CandidateListView::drawSelf(RenderContext& context) {
   if (!visible() || mCandidates.empty() || mFont == nullptr) return;
   auto& canvas = context.canvas();
   const Rect box = bounds();
 
   graphics::Paint background;
-  background.color = graphics::Color::MakeRGBA8(32, 36, 44, 238);
+  background.color = mBackgroundColor;
   background.style = graphics::Paint::Style::kFill;
   canvas.drawRoundRect(graphics::RoundRect::MakeRectRadius(box, 6.0f), background);
 
   const auto& metrics = mFont->metrics();
   const float height = rowHeight();
   graphics::Paint selectedPaint;
-  selectedPaint.color = graphics::Color::MakeRGBA8(56, 104, 190, 255);
+  selectedPaint.color = mSelectionColor;
   selectedPaint.style = graphics::Paint::Style::kFill;
   const Rect selectedRect = Rect::MakeLTRB(box.getLeft() + 3.0f,
     box.getTop() + kPaddingY + static_cast<float>(mSelected) * height,
@@ -95,7 +104,7 @@ void CandidateListView::drawSelf(RenderContext& context) {
   canvas.drawRoundRect(graphics::RoundRect::MakeRectRadius(selectedRect, 4.0f), selectedPaint);
 
   graphics::Paint text;
-  text.color = graphics::Color::MakeRGBA8(235, 239, 245, 255);
+  text.color = mTextColor;
   for (size_t index = 0; index < mCandidates.size(); ++index) {
     const float baseline = box.getTop() + kPaddingY + static_cast<float>(index) * height +
       metrics.ascent;

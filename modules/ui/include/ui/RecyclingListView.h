@@ -189,6 +189,15 @@ public:
   /** Forces the next layout to re-measure visible rows (after model content changes that affect height). */
   void invalidateRowHeights();
 
+  /**
+   * Rebuilds the row offset table from the current height provider without changing the row model.
+   *
+   * A caller that animates a row height (an expandable section, for example) updates its provider's
+   * state and calls this once per frame; visible rows are re-synced and virtualization uses the new
+   * offsets immediately.
+   */
+  void refreshRowHeights();
+
   /** Rows above/below the viewport to build-and-measure ahead of scrolling. Default 1. */
   void setMeasurePrefetchRows(size_t rows);
   [[nodiscard]] size_t measurePrefetchRows() const noexcept { return mMeasurePrefetchRows; }

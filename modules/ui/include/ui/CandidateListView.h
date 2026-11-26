@@ -53,9 +53,14 @@ class CandidateListView final : public Layer {
   void drawSelf(RenderContext& context) override;
 
  private:
+  void applyTheme(const Theme& theme) override;
+
   std::shared_ptr<const Font> mFont;
   std::vector<std::string> mCandidates;
   size_t mSelected = 0;
+  Color mBackgroundColor = Color::MakeRGBA8(32, 36, 44, 238);
+  Color mSelectionColor = Color::MakeRGBA8(56, 104, 190, 255);
+  Color mTextColor = Color::MakeRGBA8(235, 239, 245, 255);
 };
 
 } // namespace coral::ui

@@ -444,8 +444,8 @@ void ScrollView::draw(RenderContext& context) {
   graphics::Paint thumb;
   thumb.color = mThumbColor;
   thumb.style = graphics::Paint::Style::kFill;
-  const Rect vertical = scrollbarThumbBounds();
-  const Rect horizontal = horizontalScrollbarThumbBounds();
+  const Rect vertical = mScrollbarVisible ? scrollbarThumbBounds() : Rect{};
+  const Rect horizontal = mScrollbarVisible ? horizontalScrollbarThumbBounds() : Rect{};
   if (mContent != nullptr && context.assemblingPlan() && context.planSink() != nullptr) {
     // ## The viewport's own paint travels as its own item, after the content
     //
@@ -605,6 +605,12 @@ bool ScrollView::hasRunningAnimation() const {
   return mScrollAnimation.active || mFlingVelocity != 0.0f || Layer::hasRunningAnimation();
 }
 
+
+void ScrollView::setScrollbarVisible(const bool visible) {
+  if (mScrollbarVisible == visible) return;
+  mScrollbarVisible = visible;
+  setNeedsPaint();
+}
 
 Rect ScrollView::scrollbarThumbBounds() const {
   if (mContentSize.height <= bounds().getHeight() || bounds().getHeight() <= 0.0f) return {};

@@ -133,6 +133,8 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
+#include <cstdlib>
 #include <functional>
 #include <memory>
 #include <string>
@@ -265,6 +267,9 @@ class SidebarRow final : public Layer {
     setAccessibleRole(AccessibilityRole::Button);
     setAccessibleName(mLabel);
     setAccessibleSelected(mSelected);
+    // The row is the clip for an expandable section: as its height animates to zero the label
+    // translates upward and is clipped, instead of being re-centred in a shrinking box.
+    setClip(true);
     mText = std::make_shared<TextLayer>(mLabel, std::move(font),
       mSelected ? selectedColor : color);
     addChild(mText);
@@ -295,9 +300,18 @@ class SidebarRow final : public Layer {
 
   void positionText() {
     if (mText == nullptr) return;
+    constexpr float kRowHeight = 26.0f;
+    constexpr float kTextHeight = 18.0f;
+    // Section headers are 32px; keep their text centred normally, but use the 26px row height as
+    // the animation baseline when a child row is collapsing.
+    const float baseHeight = std::max(kRowHeight, bounds().getHeight());
+    const float visibleHeight = std::min(baseHeight, std::max(0.0f, bounds().getHeight()));
     mText->setBounds(Rect::MakeXYWH(bounds().getLeft() + 8.0f + mIndent,
-      bounds().getTop() + (bounds().getHeight() - 18.0f) * 0.5f,
-      std::max(0.0f, bounds().getWidth() - 16.0f - mIndent), 18.0f));
+      bounds().getTop() + (baseHeight - kTextHeight) * 0.5f,
+      std::max(0.0f, bounds().getWidth() - 16.0f - mIndent), kTextHeight));
+    // Translate the label out through the top as the row collapses; the reverse makes an expand
+    // slide it back down. At a normal row/header height this is zero, so static rows are unchanged.
+    mText->setTranslation({ 0.0f, -(baseHeight - visibleHeight) });
     mText->layout();
   }
 
@@ -328,10 +342,37 @@ class SidebarRow final : public Layer {
 
 class SidebarScrollbar final : public Layer {
  public:
-  explicit SidebarScrollbar(std::shared_ptr<RecyclingListView> list)
-      : mList(std::move(list)) {
+  SidebarScrollbar(std::shared_ptr<RecyclingListView> list, const Theme& theme)
+      : mList(std::move(list)), mThumbColor(theme.controls.muted) {
     setAccessibleRole(AccessibilityRole::Generic);
     setAccessibleName("Section list scrollbar");
+  }
+
+  void applyTheme(const Theme& theme) override {
+    mThumbColor = theme.controls.muted;
+    setNeedsPaint();
+  }
+
+  void onFrame(const std::chrono::steady_clock::time_point now) override {
+    Layer::onFrame(now);
+    if (mList == nullptr) return;
+    const Rect thumb = mList->scrollbarThumbBounds();
+    if (thumb.getLeft() != mLastThumb.getLeft() || thumb.getTop() != mLastThumb.getTop() ||
+        thumb.getWidth() != mLastThumb.getWidth() ||
+        thumb.getHeight() != mLastThumb.getHeight()) {
+      mLastThumb = thumb;
+      setNeedsPaint();
+    }
+  }
+
+  void drawSelf(RenderContext& context) override {
+    if (mList == nullptr) return;
+    const Rect thumb = mList->scrollbarThumbBounds();
+    if (thumb.isEmpty()) return;
+    graphics::Paint paint;
+    paint.color = mThumbColor;
+    paint.style = graphics::Paint::Style::kFill;
+    context.canvas().drawRoundRect(graphics::RoundRect::MakeRectRadius(thumb, 2.0f), paint);
   }
 
   bool onPointerDown(const PointerEvent& event) override {
@@ -372,9 +413,222 @@ class SidebarScrollbar final : public Layer {
 
  private:
   std::shared_ptr<RecyclingListView> mList;
+  Color mThumbColor;
+  Rect mLastThumb;
   float mStartY = 0.0f;
   float mStartScroll = 0.0f;
   bool mDragging = false;
+};
+
+/**
+ * One column of the horizontal RecyclingListView demo: a section header plus a virtualized child
+ * list. The parent animates the column width; this layer keeps the list clipped and fades it with
+ * the same expansion value.
+ */
+class HorizontalSectionPanel final : public Layer {
+ public:
+  using RowSelected = std::function<void(const std::string&)>;
+
+  HorizontalSectionPanel(std::string title, std::vector<std::string> items, const Theme& theme,
+      std::function<void()> onHeader, RowSelected onRow)
+      : mTheme(theme) {
+    mHeader = std::make_shared<Button>(std::move(title), mTheme.body);
+    mHeader->setOnClick(std::move(onHeader));
+    addChild(mHeader);
+
+    mList = std::make_shared<RecyclingListView>(
+      [theme](const std::string& key, std::size_t, const RecyclingRowState& state) {
+        return std::make_shared<TextElement>(key, theme.body,
+          state.selected ? theme.accent : theme.text, key);
+      }, 26.0f);
+    const std::string initial = items.empty() ? std::string() : items.front();
+    mList->setRows(std::move(items));
+    mList->setSelectedKey(initial);
+    mList->setBackgroundColor(Color::MakeRGBA8(0, 0, 0, 0));
+    mList->setClip(true);
+    mList->setOnSelectedChanged([onRow = std::move(onRow)](const std::string& key) {
+      if (onRow) onRow(key);
+    });
+    mList->setVisible(false);
+    mList->setOpacity(0.0f);
+    addChild(mList);
+  }
+
+  void layout() override {
+    const float width = std::max(0.0f, bounds().getWidth() - 16.0f);
+    mHeader->setBounds(Rect::MakeXYWH(bounds().getLeft() + 8.0f, bounds().getTop() + 8.0f,
+      width, 30.0f));
+    mList->setBounds(Rect::MakeXYWH(bounds().getLeft() + 8.0f, bounds().getTop() + 44.0f,
+      width, std::max(0.0f, bounds().getHeight() - 52.0f)));
+    mHeader->layout();
+    mList->layout();
+    Layer::layout();
+  }
+
+  void setExpansion(const float expansion) {
+    const float clamped = std::clamp(expansion, 0.0f, 1.0f);
+    if (std::abs(clamped - mExpansion) < 0.001f) return;
+    mExpansion = clamped;
+    mList->setVisible(clamped > 0.01f);
+    mList->setOpacity(clamped);
+    setNeedsLayout();
+    setNeedsPaint();
+  }
+
+  void drawSelf(RenderContext& context) override {
+    auto& canvas = context.canvas();
+    graphics::Paint fill;
+    fill.color = mTheme.surface;
+    fill.style = graphics::Paint::Style::kFill;
+    canvas.drawRoundRect(graphics::RoundRect::MakeRectRadius(bounds(), 8.0f), fill);
+    graphics::Paint border;
+    border.color = mTheme.controls.border;
+    border.style = graphics::Paint::Style::kStroke;
+    border.strokeWidth = 1.0f;
+    canvas.drawRoundRect(graphics::RoundRect::MakeRectRadius(bounds(), 8.0f), border);
+  }
+
+ private:
+  Theme mTheme;
+  std::shared_ptr<Button> mHeader;
+  std::shared_ptr<RecyclingListView> mList;
+  float mExpansion = 0.0f;
+};
+
+/**
+ * The stand-alone RecyclingListView demo: four sections laid out horizontally. Selecting a header
+ * grows that column and shrinks the others; the child list is a real RecyclingListView clipped by the
+ * column and faded with the same progress, so rows appear while the column is still opening.
+ */
+class HorizontalSectionsDemo final : public Layer {
+ public:
+  using Notify = std::function<void(const std::string&, const std::string&)>;
+
+  HorizontalSectionsDemo(const Theme& theme, Notify notify)
+      : mNotify(std::move(notify)) {
+    struct Spec {
+      const char* title;
+      std::vector<std::string> items;
+    };
+    const std::vector<Spec> specs{
+      { "Inputs", { "Button", "SearchField", "TextInput", "Select" } },
+      { "Selection", { "Toggle", "CheckBox", "RadioGroup", "Slider" } },
+      { "Layout", { "Flex", "Grid", "SplitView", "DockView" } },
+      { "More", { "Menu", "Popup", "Toast", "Table" } },
+    };
+
+    mTitles.reserve(specs.size());
+    mWidths.assign(specs.size(), kCollapsedWidth);
+    mTargetWidths.assign(specs.size(), kCollapsedWidth);
+    for (std::size_t index = 0; index < specs.size(); ++index) {
+      mTitles.emplace_back(specs[index].title);
+      auto panel = std::make_shared<HorizontalSectionPanel>(specs[index].title,
+        specs[index].items, theme,
+        [this, index] { selectSection(index); },
+        [notify = mNotify](const std::string& key) {
+          if (notify) notify("RecyclingListView selected", key);
+        });
+      addChild(panel);
+      mPanels.push_back(std::move(panel));
+    }
+    mExpanded = 0;
+    mWidths[0] = kExpandedWidth;
+    mTargetWidths[0] = kExpandedWidth;
+    for (std::size_t index = 0; index < mPanels.size(); ++index) {
+      mPanels[index]->setExpansion(index == 0 ? 1.0f : 0.0f);
+    }
+    setBounds(Rect::MakeXYWH(0.0f, 0.0f, kTotalWidth, kPanelHeight));
+    layoutPanels();
+  }
+
+  void layout() override {
+    layoutPanels();
+    Layer::layout();
+  }
+
+  void onFrame(const std::chrono::steady_clock::time_point now) override {
+    Layer::onFrame(now);
+    if (!mAnimating) return;
+    if (mLastFrame == std::chrono::steady_clock::time_point{}) {
+      mLastFrame = now;
+      if (window() != nullptr) window()->requestFrame();
+      return;
+    }
+    const float dt = std::clamp(
+      std::chrono::duration<float>(now - mLastFrame).count(), 0.0f, 0.05f);
+    mLastFrame = now;
+    const float step = std::min(1.0f, dt * 10.0f);
+    bool moving = false;
+    for (std::size_t index = 0; index < mWidths.size(); ++index) {
+      const float target = mTargetWidths[index];
+      float& width = mWidths[index];
+      width += (target - width) * step;
+      if (std::abs(target - width) <= 0.5f) width = target;
+      else moving = true;
+    }
+    layoutPanels();
+    for (std::size_t index = 0; index < mPanels.size(); ++index) {
+      const float progress = (mWidths[index] - kCollapsedWidth) /
+        (kExpandedWidth - kCollapsedWidth);
+      mPanels[index]->setExpansion(std::clamp(progress, 0.0f, 1.0f));
+    }
+    if (moving) {
+      if (window() != nullptr) window()->requestFrame();
+    } else {
+      mAnimating = false;
+    }
+    setNeedsPaint();
+  }
+
+ private:
+  static constexpr float kCollapsedWidth = 118.0f;
+  static constexpr float kExpandedWidth = 240.0f;
+  static constexpr float kGap = 8.0f;
+  static constexpr float kPanelHeight = 230.0f;
+  static constexpr float kTotalWidth = kExpandedWidth + 3.0f * kCollapsedWidth + 3.0f * kGap;
+
+  void layoutPanels() {
+    // Layer bounds are absolute window coordinates; offset the columns by this demo's origin.
+    const float originX = bounds().getLeft();
+    const float originY = bounds().getTop();
+    float x = 0.0f;
+    for (std::size_t index = 0; index < mPanels.size(); ++index) {
+      mPanels[index]->setBounds(Rect::MakeXYWH(originX + x, originY,
+        mWidths[index], kPanelHeight));
+      mPanels[index]->layout();
+      x += mWidths[index] + kGap;
+    }
+  }
+
+  void selectSection(const std::size_t index) {
+    if (mExpanded == static_cast<int>(index)) {
+      mExpanded = -1;
+      std::fill(mTargetWidths.begin(), mTargetWidths.end(), kCollapsedWidth);
+      if (mNotify) mNotify("RecyclingListView section", mTitles[index] + " collapsed");
+    } else {
+      mExpanded = static_cast<int>(index);
+      for (std::size_t panel = 0; panel < mTargetWidths.size(); ++panel) {
+        mTargetWidths[panel] = panel == index ? kExpandedWidth : kCollapsedWidth;
+      }
+      if (mNotify) mNotify("RecyclingListView section", mTitles[index] + " expanded");
+    }
+    mAnimating = true;
+    mLastFrame = {};
+    // Keep the OnDemand frame loop alive without putting the whole demo in an offscreen opacity
+    // layer: a zero-distance translation has no visual effect but still counts as a running animation.
+    animateTranslation({ 0.0f, 0.0f }, std::chrono::milliseconds(420));
+    if (window() != nullptr) window()->requestFrame();
+    setNeedsLayout();
+  }
+
+  Notify mNotify;
+  std::vector<std::string> mTitles;
+  std::vector<std::shared_ptr<HorizontalSectionPanel>> mPanels;
+  std::vector<float> mWidths;
+  std::vector<float> mTargetWidths;
+  int mExpanded = 0;
+  bool mAnimating = false;
+  std::chrono::steady_clock::time_point mLastFrame{};
 };
 
 class SectionedGallery final : public Layer {
@@ -382,7 +636,8 @@ class SectionedGallery final : public Layer {
   SectionedGallery(const Theme& theme, const bool nativeDisabled,
       std::shared_ptr<TextInput>& inputField, const float width, const float height,
       const int initialSection, std::string initialControl)
-      : mTheme(theme), mNativeDisabled(nativeDisabled), mInputField(inputField) {
+      : mTheme(theme), mNativeDisabled(nativeDisabled),
+        mUseLightTheme(theme.background.red > 0.5f), mInputField(inputField) {
     setAccessibleRole(AccessibilityRole::Group);
     setAccessibleName("CoralUI control gallery");
     setBounds(Rect::MakeWH(width, height));
@@ -399,6 +654,9 @@ class SectionedGallery final : public Layer {
     mSidebar->addChild(mTitle);
     mSubtitle = std::make_shared<TextLayer>("Control gallery", mTheme.body, mTheme.textMuted);
     mSidebar->addChild(mSubtitle);
+    mThemeButton = std::make_shared<Button>(skinActionLabel(), mTheme.body);
+    mThemeButton->setOnClick([this] { toggleSkin(); });
+    mSidebar->addChild(mThemeButton);
 
     mPageTitle = std::make_shared<TextLayer>("", mTheme.title, mTheme.controls.foreground);
     mContent->addChild(mPageTitle);
@@ -412,6 +670,9 @@ class SectionedGallery final : public Layer {
 
     buildSections();
     mExpanded.assign(mSections.size(), true);
+    mExpansion.assign(mSections.size(), 1.0f);
+    mExpansionTarget.assign(mSections.size(), 1.0f);
+    mSectionItemCounts.assign(mSections.size(), 0);
     buildSidebar();
     const int safeSection = std::clamp(initialSection, 0,
       std::max(0, static_cast<int>(mSections.size()) - 1));
@@ -460,26 +721,12 @@ class SectionedGallery final : public Layer {
     mDivider->setBounds(Rect::MakeXYWH(sidebarWidth - 1.0f, 0.0f, 1.0f, height));
     mTitle->setBounds(Rect::MakeXYWH(18.0f, 14.0f, sidebarWidth - 36.0f, 30.0f));
     mSubtitle->setBounds(Rect::MakeXYWH(18.0f, 40.0f, sidebarWidth - 36.0f, 18.0f));
-    mNavList->setBounds(Rect::MakeXYWH(0.0f, 64.0f, sidebarWidth,
-      std::max(80.0f, height - 64.0f)));
+    mThemeButton->setBounds(Rect::MakeXYWH(18.0f, 64.0f, sidebarWidth - 36.0f, 30.0f));
+    mNavList->setBounds(Rect::MakeXYWH(0.0f, 102.0f, sidebarWidth,
+      std::max(80.0f, height - 102.0f)));
     mNavList->layout();
-    if (mNeedReveal) {
-      mNeedReveal = false;
-      const GallerySelection selection = mModel->selection.get();
-      std::string revealKey = "s:" + std::to_string(selection.section);
-      if (!selection.control.empty()) {
-        for (const auto& row: mNavRows) {
-          if (row.section == static_cast<std::size_t>(selection.section) &&
-              row.label == selection.control) {
-            revealKey = row.key;
-            break;
-          }
-        }
-      }
-      mNavList->scrollToKey(revealKey);
-    }
-    mScrollbar->setBounds(Rect::MakeXYWH(sidebarWidth - 12.0f, 64.0f, 12.0f,
-      std::max(80.0f, height - 64.0f)));
+    mScrollbar->setBounds(Rect::MakeXYWH(sidebarWidth - 12.0f, 102.0f, 12.0f,
+      std::max(80.0f, height - 102.0f)));
     mPageTitle->setBounds(Rect::MakeXYWH(sidebarWidth + 24.0f, 16.0f,
       std::max(200.0f, width - sidebarWidth - 48.0f), 30.0f));
     mPageDescription->setBounds(Rect::MakeXYWH(sidebarWidth + 24.0f, 46.0f,
@@ -515,6 +762,11 @@ class SectionedGallery final : public Layer {
   void applySelectionNow(const GallerySelection& selection);
   void showSection(std::size_t index, std::string control = {});
   ElementPtr rowElement(const std::string& key, const RecyclingRowState& state);
+  void toggleSkin();
+  void refreshTheme();
+  [[nodiscard]] std::string skinActionLabel() const;
+  [[nodiscard]] float rowExpansion(const NavRow& row) const;
+  void onFrame(std::chrono::steady_clock::time_point now) override;
 
   void buildInputs(Layer& body, const Theme& theme);
   void buildSelection(Layer& body, const Theme& theme);
@@ -529,10 +781,12 @@ class SectionedGallery final : public Layer {
 
   Theme mTheme;
   bool mNativeDisabled = false;
+  bool mUseLightTheme = false;
   std::shared_ptr<TextInput>& mInputField;
-  std::shared_ptr<Layer> mSidebar;
-  std::shared_ptr<Layer> mContent;
+  std::shared_ptr<ColorLayer> mSidebar;
+  std::shared_ptr<ColorLayer> mContent;
   std::shared_ptr<Layer> mBody;
+  std::shared_ptr<Button> mThemeButton;
   std::shared_ptr<GalleryViewModel> mModel = std::make_shared<GalleryViewModel>();
   coral::ui::mvvm::DataContext mContext;
   observer::Observation mSelectionObservation;
@@ -540,7 +794,7 @@ class SectionedGallery final : public Layer {
   std::shared_ptr<SidebarScrollbar> mScrollbar;
   std::unordered_map<std::string, std::shared_ptr<SidebarRow>> mRowLayers;
   std::vector<observer::Observation> mPageObservations;
-  std::shared_ptr<Layer> mDivider;
+  std::shared_ptr<ColorLayer> mDivider;
   std::shared_ptr<TextLayer> mTitle;
   std::shared_ptr<TextLayer> mSubtitle;
   std::shared_ptr<TextLayer> mPageTitle;
@@ -549,8 +803,15 @@ class SectionedGallery final : public Layer {
   std::vector<Section> mSections;
   std::vector<NavRow> mNavRows;
   std::vector<bool> mExpanded;
+  /** 0 collapsed, 1 expanded; animated by onFrame(). */
+  std::vector<float> mExpansion;
+  std::vector<float> mExpansionTarget;
+  std::vector<int> mSectionItemCounts;
+  bool mExpansionAnimating = false;
+  std::chrono::steady_clock::time_point mLastExpansionFrame{};
+  FramePolicy mExpansionPolicy = FramePolicy::OnDemand;
+  bool mExpansionPolicySaved = false;
   bool mUpdatingNav = false;
-  bool mNeedReveal = false;
   bool mNeedApplySelection = false;
   GallerySelection mPendingSelection;
 };
@@ -589,14 +850,32 @@ void SectionedGallery::buildSidebar() {
       return rowElement(key, state);
     }, 30.0f);
   mNavList->setBackgroundColor(mTheme.surface);
+  // The nav list scrolls its content; without an explicit clip a scrolled row would paint over the
+  // theme button and the gallery title above the viewport.
+  mNavList->setClip(true);
+  // The list's built-in thumb is drawn in a separate planned draw item; the sidebar draws its own
+  // themed thumb so it repaints as one layer while the section heights animate.
+  mNavList->setScrollbarVisible(false);
   mNavList->setBounceEnabled(true);
   mNavList->setAutoRowHeight(false);
-  mNavList->setRowHeightProvider([](const std::string& key, std::size_t) {
-    return key.rfind("s:", 0) == 0 ? 32.0f : 26.0f;
+  mNavList->setRowHeightProvider([this](const std::string& key, std::size_t) {
+    if (key.rfind("s:", 0) == 0) return 32.0f;
+    // Item keys are "i:<section>:<item>"; the height is the section's animated expansion.
+    const int section = std::atoi(key.c_str() + 2);
+    if (section < 0 || section >= static_cast<int>(mExpansion.size())) return 26.0f;
+    const int count = section < static_cast<int>(mSectionItemCounts.size())
+      ? mSectionItemCounts[static_cast<size_t>(section)] : 0;
+    const std::size_t second = key.find(':', 2);
+    const int item = second == std::string::npos ? 0 : std::atoi(key.c_str() + second + 1);
+    const int order = item;
+    const float p = count <= 1 ? mExpansion[static_cast<size_t>(section)]
+      : std::clamp(mExpansion[static_cast<size_t>(section)] * static_cast<float>(count + 1) -
+          static_cast<float>(order), 0.0f, 1.0f);
+    return 26.0f * p;
   });
   mNavList->setOnSelectedChanged([this](const std::string& key) { onNavSelected(key); });
   mSidebar->addChild(mNavList);
-  mScrollbar = std::make_shared<SidebarScrollbar>(mNavList);
+  mScrollbar = std::make_shared<SidebarScrollbar>(mNavList, mTheme);
   mSidebar->addChild(mScrollbar);
   rebuildNavRows({});
 }
@@ -628,9 +907,73 @@ ElementPtr SectionedGallery::rowElement(const std::string& key,
       layer->update(label, selected, row.header ? mTheme.controls.foreground : mTheme.textMuted,
         Color::MakeRGBA8(255, 255, 255, 255), indent);
     }
+    layer->setOpacity(row.header ? 1.0f : rowExpansion(row));
     return std::make_shared<LayerElement>(layer, key);
   }
   return nullptr;
+}
+
+std::string SectionedGallery::skinActionLabel() const {
+  return mUseLightTheme ? "Switch to dark" : "Switch to light";
+}
+
+float SectionedGallery::rowExpansion(const NavRow& row) const {
+  if (row.header || row.section < 0 ||
+      row.section >= static_cast<int>(mExpansion.size())) {
+    return 1.0f;
+  }
+  const int count = row.section < static_cast<int>(mSectionItemCounts.size())
+    ? mSectionItemCounts[static_cast<size_t>(row.section)] : 0;
+  if (count <= 1) return mExpansion[static_cast<size_t>(row.section)];
+  // Keep one stable per-row order in both directions. The old code flipped the order when the
+  // target changed, so reversing an in-flight animation made every row jump to a different height.
+  const int order = row.item;
+  const float p = mExpansion[static_cast<size_t>(row.section)] * static_cast<float>(count + 1) -
+    static_cast<float>(order);
+  return std::clamp(p, 0.0f, 1.0f);
+}
+
+void SectionedGallery::toggleSkin() {
+  mUseLightTheme = !mUseLightTheme;
+  Theme next = mUseLightTheme ? Theme::light() : Theme::dark();
+  // The skin only replaces colours; keep the fonts, spacing, radii, shadows and translator the
+  // embedding app installed.
+  next.spacing = mTheme.spacing;
+  next.fonts = mTheme.fonts;
+  next.radius = mTheme.radius;
+  next.shadow = mTheme.shadow;
+  next.focusRingWidth = mTheme.focusRingWidth;
+  next.body = mTheme.body;
+  next.title = mTheme.title;
+  next.translator = mTheme.translator;
+  next.lineBreakPolicy = mTheme.lineBreakPolicy;
+  mTheme = next;
+  if (window() != nullptr) window()->setTheme(mTheme);
+  refreshTheme();
+}
+
+void SectionedGallery::refreshTheme() {
+  if (mSidebar != nullptr) mSidebar->setColor(mTheme.surface);
+  if (mContent != nullptr) mContent->setColor(mTheme.background);
+  if (mDivider != nullptr) mDivider->setColor(mTheme.controls.border);
+  if (mTitle != nullptr) mTitle->setColor(mTheme.controls.foreground);
+  if (mSubtitle != nullptr) mSubtitle->setColor(mTheme.textMuted);
+  if (mPageTitle != nullptr) mPageTitle->setColor(mTheme.controls.foreground);
+  if (mPageDescription != nullptr) mPageDescription->setColor(mTheme.textMuted);
+  if (mPageControls != nullptr) mPageControls->setColor(mTheme.textMuted);
+  if (mThemeButton != nullptr) mThemeButton->setLabel(skinActionLabel());
+  if (mScrollbar != nullptr) mScrollbar->applyTheme(mTheme);
+  if (mNavList != nullptr) {
+    mNavList->setBackgroundColor(mTheme.surface);
+    // Sidebar rows cache their resolved colours, so drop the cache and let the row builder create
+    // them again against the new theme. setRowBuilder() re-syncs the mounted rows.
+    mRowLayers.clear();
+    mNavList->setRowBuilder([this](const std::string& key, std::size_t,
+        const RecyclingRowState& state) { return rowElement(key, state); });
+  }
+  applySelectionNow(mModel->selection.get());
+  setNeedsLayout();
+  setNeedsPaint();
 }
 
 void SectionedGallery::rebuildNavRows(const std::string& selectedKey) {
@@ -644,7 +987,6 @@ void SectionedGallery::rebuildNavRows(const std::string& selectedKey) {
     header.header = true;
     mNavRows.push_back(header);
     keys.push_back(header.key);
-    if (!mExpanded[section]) continue;
     std::vector<std::string> names;
     const std::string& controls = mSections[section].controls;
     std::size_t begin = 0;
@@ -654,6 +996,9 @@ void SectionedGallery::rebuildNavRows(const std::string& selectedKey) {
         ? std::string::npos : separator - begin));
       if (separator == std::string::npos) break;
       begin = separator + 3;
+    }
+    if (section < mSectionItemCounts.size()) {
+      mSectionItemCounts[section] = static_cast<int>(names.size());
     }
     for (std::size_t item = 0; item < names.size(); ++item) {
       NavRow row;
@@ -671,15 +1016,77 @@ void SectionedGallery::rebuildNavRows(const std::string& selectedKey) {
   mUpdatingNav = false;
 }
 
+void SectionedGallery::onFrame(const std::chrono::steady_clock::time_point now) {
+  Layer::onFrame(now);
+  if (!mExpansionAnimating) return;
+  if (mLastExpansionFrame == std::chrono::steady_clock::time_point{}) {
+    mLastExpansionFrame = now;
+    if (window() != nullptr) window()->requestFrame();
+    return;
+  }
+  const float dt = std::clamp(
+    std::chrono::duration<float>(now - mLastExpansionFrame).count(), 0.0f, 0.05f);
+  mLastExpansionFrame = now;
+  const float step = std::min(1.0f, dt * 9.0f);
+  bool moving = false;
+  for (size_t section = 0; section < mExpansion.size(); ++section) {
+    float& value = mExpansion[section];
+    const float target = mExpansionTarget[section];
+    value += (target - value) * step;
+    if (std::abs(target - value) <= 0.002f) value = target;
+    else moving = true;
+  }
+  for (const NavRow& row: mNavRows) {
+    if (row.header) continue;
+    if (auto layer = mNavList->rowLayer(row.key)) {
+      layer->setOpacity(rowExpansion(row));
+    }
+  }
+  mNavList->refreshRowHeights();
+  if (moving) {
+    if (window() != nullptr) window()->requestFrame();
+  } else {
+    mExpansionAnimating = false;
+    if (mExpansionPolicySaved && window() != nullptr) {
+      window()->setFramePolicy(mExpansionPolicy);
+    }
+    mExpansionPolicySaved = false;
+    // Rows stay in the model at zero height, so a later expand can grow them without rebuilding the
+    // list (and without losing the scroll position).
+  }
+  setNeedsPaint();
+}
+
 void SectionedGallery::onNavSelected(const std::string& key) {
   if (mUpdatingNav) return;
   for (const auto& row: mNavRows) {
     if (row.key != key) continue;
     if (row.header) {
-      mExpanded[row.section] = !mExpanded[row.section];
+      const bool expand = !mExpanded[row.section];
+      mExpanded[row.section] = expand;
+      mExpansionTarget[row.section] = expand ? 1.0f : 0.0f;
+      if (auto it = mRowLayers.find(key); it != mRowLayers.end() && it->second != nullptr) {
+        // The row model does not change while the height animates, so update the arrow text in place.
+        it->second->update(std::string(expand ? "[-]  " : "[+]  ") + row.label, true,
+          mTheme.controls.foreground, Color::MakeRGBA8(255, 255, 255, 255), 0.0f);
+      }
+      mExpansionAnimating = true;
+      mLastExpansionFrame = {};
+      // A real property animation keeps the window's frame clock running in OnDemand mode. Use a
+      // zero-distance translation rather than opacity: an opacity animation puts the list in an
+      // offscreen layer, which makes the scrollbar flicker while the rows change height.
+      mNavList->animateTranslation({ 0.0f, 0.0f }, std::chrono::milliseconds(450));
+      if (window() != nullptr) {
+        if (!mExpansionPolicySaved) {
+          mExpansionPolicy = window()->framePolicy();
+          mExpansionPolicySaved = true;
+        }
+        // The gallery normally runs OnDemand; an expansion needs successive frames until it lands.
+        window()->setFramePolicy(FramePolicy::Continuous);
+        window()->requestFrame();
+      }
       const GallerySelection next{ static_cast<int>(row.section), {} };
       const GallerySelection previous = mModel->selection.get();
-      mNeedReveal = true;
       mModel->selection.set(next);
       if (previous == next) queueSelection(next);
     } else {
@@ -693,6 +1100,7 @@ void SectionedGallery::queueSelection(const GallerySelection& selection) {
   mPendingSelection = selection;
   mNeedApplySelection = true;
   setNeedsLayout();
+  if (window() != nullptr) window()->requestFrame();
 }
 
 void SectionedGallery::applySelectionNow(const GallerySelection& selection) {
@@ -702,7 +1110,6 @@ void SectionedGallery::applySelectionNow(const GallerySelection& selection) {
   mNavList->setRows(values);
   mNavList->setSelectedKey({});
   mUpdatingNav = false;
-  mNeedReveal = true;
   showSection(static_cast<std::size_t>(selection.section), selection.control);
 }
 
@@ -723,8 +1130,8 @@ void SectionedGallery::showSection(const std::size_t index, std::string control)
     buildControl(*mBody, mTheme, selection.control);
   }
   mBody->setNeedsLayout();
-  mNeedReveal = true;
   setNeedsLayout();
+  if (window() != nullptr) window()->requestFrame();
 }
 
 void SectionedGallery::buildMore(Layer& body, const Theme& theme) {
@@ -1107,17 +1514,11 @@ void SectionedGallery::buildControl(Layer& body, const Theme& theme,
     outer->setContent(content);
     add(outer, Rect::MakeXYWH(44, 56, 420, 260));
   } else if (control == "RecyclingListView") {
-    auto list = std::make_shared<RecyclingListView>(
-      [theme](const std::string& key, std::size_t, const RecyclingRowState& state) {
-        return std::make_shared<TextElement>(key, theme.body,
-          state.selected ? theme.accent : theme.text, key);
-      }, 30.0f);
-    list->setRows({ "row-1", "row-2", "row-3", "row-4", "row-5", "row-6", "row-7", "row-8" });
-    list->setSelectedKey("row-2");
-    list->setOnSelectedChanged([notify](const std::string& key) {
-      notify("RecyclingListView selected", key);
-    });
-    add(list, Rect::MakeXYWH(44, 56, 360, 220));
+    auto demo = std::make_shared<HorizontalSectionsDemo>(theme,
+      [notify](const std::string& event, const std::string& value) {
+        notify(event, value);
+      });
+    add(demo, Rect::MakeXYWH(44, 56, 618, 230));
   } else if (control == "Menu") {
     auto button = std::make_shared<Button>("Open menu", theme.body);
     auto menu = std::make_shared<Menu>(theme.body);
@@ -1249,9 +1650,9 @@ void SectionedGallery::buildControl(Layer& body, const Theme& theme,
     for (const auto& [name, state, size]: std::vector<std::tuple<std::string, std::string, std::string>>{
            { "document.txt", "Ready", "12 KB" }, { "photo.png", "Uploading", "2.4 MB" },
            { "archive.zip", "Queued", "18 MB" }, { "notes.md", "Ready", "4 KB" } }) {
-      rows.push_back({ std::make_shared<TextLayer>(name, theme.body),
-        std::make_shared<TextLayer>(state, theme.body),
-        std::make_shared<TextLayer>(size, theme.body) });
+      rows.push_back({ std::make_shared<TextLayer>(name, theme.body, theme.controls.foreground),
+        std::make_shared<TextLayer>(state, theme.body, theme.controls.foreground),
+        std::make_shared<TextLayer>(size, theme.body, theme.controls.foreground) });
     }
     table->setRows(std::move(rows));
     table->setOnRowActivated([notify](int row) {
@@ -1294,7 +1695,7 @@ void SectionedGallery::buildControl(Layer& body, const Theme& theme,
     notify("Tooltip shown", "hover the control");
   } else if (control == "Popup") {
     auto popup = std::make_shared<Popup>(std::make_shared<TextLayer>(
-      "Popup content", theme.body));
+      "Popup content", theme.body, theme.controls.foreground));
     popup->showAt(Rect::MakeXYWH(kContentX + 44.0f, kBodyY + 72.0f, 220.0f, 80.0f));
     body.addChild(popup);
     notify("Popup shown", "floating panel");
@@ -1314,9 +1715,12 @@ void SectionedGallery::buildControl(Layer& body, const Theme& theme,
       Rect::MakeXYWH(44, 72, 560, 28));
   } else if (control == "TabBar") {
     auto tabs = std::make_shared<TabBar>(theme.body);
-    tabs->addTab("One", std::make_shared<TextLayer>("First tab", theme.body));
-    tabs->addTab("Two", std::make_shared<TextLayer>("Second tab", theme.body));
-    tabs->addTab("Three", std::make_shared<TextLayer>("Third tab", theme.body));
+    tabs->addTab("One", std::make_shared<TextLayer>("First tab", theme.body,
+      theme.controls.foreground));
+    tabs->addTab("Two", std::make_shared<TextLayer>("Second tab", theme.body,
+      theme.controls.foreground));
+    tabs->addTab("Three", std::make_shared<TextLayer>("Third tab", theme.body,
+      theme.controls.foreground));
     tabs->setActiveTab(0);
     tabs->setOnChanged([notify](int index) {
       notify("TabBar changed", std::to_string(index));
@@ -1358,8 +1762,10 @@ void SectionedGallery::buildControl(Layer& body, const Theme& theme,
     auto table = std::make_shared<Table>(std::vector<TableColumn>{ TableColumn{}, TableColumn{} });
     std::vector<std::vector<std::shared_ptr<Layer>>> rows;
     for (int row = 0; row < 3; ++row) {
-      rows.push_back({ std::make_shared<TextLayer>("Row " + std::to_string(row + 1), theme.body),
-        std::make_shared<TextLayer>("Value " + std::to_string(row + 1), theme.body) });
+      rows.push_back({ std::make_shared<TextLayer>("Row " + std::to_string(row + 1), theme.body,
+          theme.controls.foreground),
+        std::make_shared<TextLayer>("Value " + std::to_string(row + 1), theme.body,
+          theme.controls.foreground) });
     }
     table->setRows(std::move(rows));
     table->setSelectedRow(1);

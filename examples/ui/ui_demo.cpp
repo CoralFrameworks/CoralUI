@@ -496,8 +496,9 @@ int main(int argc, char** argv) {
   }
 
   std::shared_ptr<TextInput> inputField;
-  auto root = std::make_shared<ColorLayer>(acceptance
-    ? Color::MakeRGBA8(0, 0, 0, 0) : theme.background);
+  auto root = std::make_shared<Layer>();
+  if (acceptance) root->setBackgroundColor(Color::MakeRGBA8(0, 0, 0, 0));
+  else root->setBackgroundColorRole(ThemeColorRole::Background);
   auto page = std::make_shared<GalleryPage>(window.get(), fullSizeContentView);
   // The layer tree lays out at width()/uiScale() logical units on every platform.
   page->setBounds(Rect::MakeWH(static_cast<float>(window->width()) / windowScale,

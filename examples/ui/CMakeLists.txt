@@ -99,6 +99,13 @@ add_test(NAME example_ui_demo_light_headless
         --theme light --out "${CMAKE_CURRENT_BINARY_DIR}/ui_demo_light.png")
 set_tests_properties(example_ui_demo_light_headless PROPERTIES LABELS examples)
 
+# One synthetic click on the sidebar skin button: the gallery must replace the window theme,
+# rebuild the current page against it, and still render a valid frame.
+add_test(NAME example_ui_demo_theme_toggle_headless
+    COMMAND $<TARGET_FILE:ui_demo> --headless --frames 2 --width 960 --height 700
+        --click-x 100 --click-y 79 --out "${CMAKE_CURRENT_BINARY_DIR}/ui_demo_theme_toggle.png")
+set_tests_properties(example_ui_demo_theme_toggle_headless PROPERTIES LABELS examples)
+
 add_test(NAME example_ui_demo_lists_headless
     COMMAND $<TARGET_FILE:ui_demo> --headless --frames 2 --width 960 --height 700 --section 6)
 set_tests_properties(example_ui_demo_lists_headless PROPERTIES LABELS examples)

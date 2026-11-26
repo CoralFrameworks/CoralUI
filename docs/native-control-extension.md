@@ -111,7 +111,7 @@ same model as an `NSView` above the Metal content on macOS, and it has the same 
 - Win32 owns focus, keyboard, IME and its own UI Automation tree; CoralUI focus traversal and
   `AccessibilityNode` do not automatically include the child control;
 - the control uses the system theme; dark mode needs `SetWindowTheme`/DWM attributes and will not
-  match CoralUI theme tokens exactly;
+  match CoralUI theme tokens exactly. A CoralUI light/dark switch does not recolour a child HWND;
 - DPI changes reposition the child in `WindowWin32` using `mDpiScale`; fractional-scale and
   multi-monitor cases must be tested on a real desktop.
 

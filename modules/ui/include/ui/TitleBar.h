@@ -64,6 +64,9 @@ class TitleBar final : public Layer {
     return "titlebar";
   }
 
+ protected:
+  void applyTheme(const Theme& theme) override;
+
  private:
   std::shared_ptr<Flex> mBar;
   std::shared_ptr<TextLayer> mTitle;

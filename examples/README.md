@@ -103,14 +103,22 @@ out/examples/ui/ui_mvvm_demo --out out/ui_mvvm_demo.png --frames 1
 `--bookmark-smoke` (container-local bookmark smoke; both are macOS-only and report an error on other
 platforms), `--platform auto|cocoa|x11|wayland`,
 `--render-host same-thread|render-thread`, `--theme dark|light`, `--scale S`, `--focus-input`,
-`--section N` and `--frames N` (section 8 is the additional-controls page). The left gallery list is a `RecyclingListView` with expandable
-sections and selectable control rows; a row opens that control's standalone demo with an MVVM event/value readout, while its section
-header opens the group page. `--control NAME` opens a control demo directly. Section 6 (`Lists`)
+`--section N` and `--frames N` (section 8 is the additional-controls page). The left gallery list is a `RecyclingListView` with animated
+expandable section headers and selectable control rows; clicking a header grows/shrinks its rows
+through the same progress value that fades them. A row opens that control's standalone demo with an
+MVVM event/value readout, while its section header opens the group page. `--control NAME` opens a control demo directly. The
+standalone `RecyclingListView` demo arranges four sections horizontally: selecting a header animates the
+column widths and reveals that section's virtualized child list while the other lists collapse. Section 6 (`Lists`)
 contains an inner `ScrollView` to exercise nested wheel routing. `--frames 0` keeps a native window open until it is closed. On macOS the window opens
 at the requested point size (a 960x540 request is a 960x540-point window, 1920x1080 backing pixels on
 a Retina display) and presents through Metal. Windows and Linux size native windows in device
 pixels, so `ui_demo` scales `--width`/`--height` by the monitor DPI after creating the window: a
 960x700 request is a 960x700-logical window, backed by 1440x1050 pixels on a 150% display.
+
+The sidebar's **Switch to light / Switch to dark** button changes the whole gallery in place: the
+window theme is replaced, the sidebar and page chrome are recoloured, and the current page is rebuilt
+against the new tokens. Native platform controls (an `NSView`/child HWND) and the OS title bar keep
+the system theme; they are not part of the CoralUI colour tree.
 
 ## macOS signing
 
@@ -129,6 +137,7 @@ registered:
 | Test | What it proves |
 |---|---|
 | `example_ui_demo_light_headless` | the gallery renders with the light theme |
+| `example_ui_demo_theme_toggle_headless` | the sidebar skin button swaps the theme and rebuilds the current page |
 | `example_ui_demo_headless` | the sectioned gallery lays out and snapshots the Inputs page |
 | `example_ui_demo_lists_headless` | the Lists page renders the outer and nested ScrollViews |
 | `example_ui_demo_control_headless` | a standalone control demo renders with its accent frame |
