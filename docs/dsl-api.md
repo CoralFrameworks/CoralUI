@@ -11,10 +11,13 @@ must not require a caller to spell out a font, colour, or key for the common cas
 ### Theme
 
 - `dsl::ThemeScope`
+- `dsl::Density`
 - `dsl::theme()`
 
-`ThemeScope` is build-scoped and nests. Construct it inside the `ElementHost` build function. The
-scope is thread-local and is not a substitute for the window-owned `Theme`; overlays that outlive a
+`ThemeScope` is build-scoped and nests. Construct it inside the `ElementHost` build function. A
+`Density::Compact` scope owns a theme copy with the spacing scale at 75%; typography and colours are
+unchanged.
+The scope is thread-local and is not a substitute for the window-owned `Theme`; overlays that outlive a
 build keep their own theme copy.
 
 ### Design tokens

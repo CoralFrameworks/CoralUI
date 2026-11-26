@@ -29,16 +29,23 @@
 
 namespace coral::ui::dsl {
 
+/** A spacing density for a DSL build. Typography and colours are unchanged. */
+enum class Density {
+  Comfortable,
+  Compact,
+};
+
 /**
  * A build-scoped theme.
  *
  * The DSL reads the current theme from here; widgets that do not pass an explicit font or colour use
  * `theme.body`/`theme.title` and the theme's text roles. Scopes nest, and the previous theme is
- * restored on destruction.
+ * restored on destruction. A compact scope owns a copy with its spacing scale reduced.
  */
 class ThemeScope {
  public:
   explicit ThemeScope(const Theme& theme);
+  ThemeScope(const Theme& theme, Density density);
   ~ThemeScope();
 
   ThemeScope(const ThemeScope&) = delete;
@@ -46,6 +53,7 @@ class ThemeScope {
 
  private:
   const Theme* mPrevious = nullptr;
+  std::optional<Theme> mOwned;
 };
 
 /** The active theme, or the default dark theme outside a `ThemeScope`. */

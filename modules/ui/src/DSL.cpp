@@ -32,6 +32,21 @@ ThemeScope::ThemeScope(const Theme& theme) : mPrevious(gTheme) {
   gTheme = &theme;
 }
 
+ThemeScope::ThemeScope(const Theme& theme, const Density density) : mPrevious(gTheme) {
+  if (density == Density::Compact) {
+    mOwned = theme;
+    mOwned->spacing.xxs *= 0.75f;
+    mOwned->spacing.xs *= 0.75f;
+    mOwned->spacing.sm *= 0.75f;
+    mOwned->spacing.md *= 0.75f;
+    mOwned->spacing.lg *= 0.75f;
+    mOwned->spacing.xl *= 0.75f;
+    gTheme = &*mOwned;
+    return;
+  }
+  gTheme = &theme;
+}
+
 ThemeScope::~ThemeScope() {
   gTheme = mPrevious;
 }

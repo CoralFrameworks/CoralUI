@@ -139,3 +139,18 @@ TEST(DslApi, TypographyRolesUseThemeFacesAndTextRoles) {
   EXPECT_EQ(body->color(), theme.text);
   EXPECT_EQ(label->color(), theme.controls.foreground);
 }
+
+TEST(DslApi, CompactDensityScalesSpacingButNotTypography) {
+  Theme theme = Theme::dark();
+  theme.spacing.md = 20.0f;
+  dsl::ThemeScope comfortable(theme);
+  const dsl::Tokens before = dsl::tokens();
+  {
+    dsl::ThemeScope compact(theme, dsl::Density::Compact);
+    const dsl::Tokens after = dsl::tokens();
+    EXPECT_FLOAT_EQ(after.spacing.md, 15.0f);
+    EXPECT_EQ(after.body, before.body);
+    EXPECT_EQ(after.text, before.text);
+  }
+  EXPECT_FLOAT_EQ(dsl::tokens().spacing.md, 20.0f);
+}
