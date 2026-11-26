@@ -160,7 +160,7 @@ presented GPU frame, so a macOS or Windows run can be verified without a screens
 not include platform-native children (`NSView`/child HWND); the Native gallery page labels that block
 as live native only.
 
-The four programs have different jobs and are intentionally kept separate:
+The five programs have different jobs and are intentionally kept separate:
 
 - `ui_demo` is the macOS bundle/acceptance app and the cross-platform control gallery. It owns the
   `.app`, Info.plist, signing/entitlement options, `--platform`/`--render-host`/`--theme` flags,
@@ -170,6 +170,8 @@ The four programs have different jobs and are intentionally kept separate:
   `ForEach`, a `Component`, an `ElementRegistry` type, an `ElementSpec` parse, and one labelled escape
   hatch page. `--dump-tree` prints the layers the element tree produced.
 - `ui_mvvm_demo` is the DataContext/Element/Reconciler reference page.
+- `ui_dsl_bench` is the DSL build/reconcile/layout/paint and Element-popup baseline; it reports
+  timings rather than acting as a strict CI timing gate.
 - `ui_dsl_gallery` is the variadic/theme-scoped DSL port of the declarative gallery
   (`docs/declarative-dsl.md`); it adds Waveform and DSL pages after the Escape hatch, including a
   custom retained `WaveformLayer` hosted through `dsl::Canvas`.

@@ -38,6 +38,12 @@ add_executable(ui_dsl_gallery ui_dsl_gallery.cpp)
 target_link_libraries(ui_dsl_gallery PRIVATE ui minilog)
 target_compile_definitions(ui_dsl_gallery PRIVATE CORAL_ASSETS_DIR="${CORALUI_EXAMPLE_ASSETS}")
 
+# The DSL benchmark is a baseline, not a timing gate: it reports the cost of a rebuild/layout/paint
+# cycle and an Element-content popup. The CTest invocation keeps the path exercised in CI without
+# turning a shared-runner scheduling hiccup into a failure.
+add_executable(ui_dsl_bench ui_dsl_bench.cpp)
+target_link_libraries(ui_dsl_bench PRIVATE ui minilog)
+
 # On macOS the interactive demo is a real application bundle: Finder launch, Dock identity, a bundle
 # id and version. The headless checks still invoke the executable inside the bundle, so `ctest` needs
 # no separate target.
@@ -163,6 +169,10 @@ add_test(NAME example_ui_declarative_gallery_section${section}_headless
             --out "${CMAKE_CURRENT_BINARY_DIR}/ui_dsl_gallery_${section}.png")
     set_tests_properties(example_ui_dsl_gallery_section${section}_headless PROPERTIES LABELS examples)
   endforeach ()
+  add_test(NAME example_ui_dsl_bench
+      COMMAND $<TARGET_FILE:ui_dsl_bench> --iterations 20 --rows 120)
+  set_tests_properties(example_ui_dsl_bench PROPERTIES LABELS examples TIMEOUT 120)
+
   add_test(NAME example_ui_dsl_gallery_self_check
       COMMAND $<TARGET_FILE:ui_dsl_gallery> --headless --self-check
           --out "${CMAKE_CURRENT_BINARY_DIR}/ui_dsl_gallery_self_check.png")

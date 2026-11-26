@@ -144,3 +144,18 @@ theme-scoped forms.
 - No replacement for `Component`/`ElementRegistry` extension points.
 - No stable promise for the experimental forwarders.
 - No automatic accessibility metadata for custom `Canvas` content.
+## Performance baseline
+
+`ui_dsl_bench` measures the two costs a DSL page pays most often:
+
+```sh
+out/examples/ui/Release/ui_dsl_bench --iterations 100 --rows 160
+```
+
+It reports:
+
+- Element build + reconcile + layout + paint per refresh
+- `PopupElement` open/close per iteration
+
+This is a baseline, not a CI timing gate: shared runners are too noisy for a hard budget. The CTest
+entry runs a small iteration count so the path stays built and exercised.
