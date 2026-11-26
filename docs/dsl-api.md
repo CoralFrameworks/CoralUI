@@ -63,6 +63,9 @@ should be a `Component` whose build returns ordinary DSL nodes.
 
 ### Overlays
 
+`DSLOverlay.h` is the stable companion header for `dsl::Overlay`; include it explicitly when the
+overlay service is used outside the umbrella header.
+
 - `dsl::Overlay`
 - `dsl::DialogButton`
 
