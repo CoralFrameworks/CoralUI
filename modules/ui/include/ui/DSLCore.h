@@ -67,6 +67,7 @@ struct Tokens {
   Color text;
   Color textMuted;
   Color accent;
+  ControlColors controls;
   std::shared_ptr<const graphics::Font> body;
   std::shared_ptr<const graphics::Font> title;
 };
@@ -75,7 +76,7 @@ struct Tokens {
   const Theme& current = theme();
   return Tokens{ current.spacing, current.radius, current.fonts, current.background,
     current.surface, current.surfaceRaised, current.text, current.textMuted, current.accent,
-    current.body, current.title };
+    current.controls, current.body, current.title };
 }
 
 struct StackOptions {
@@ -179,6 +180,26 @@ template <class... Children>
 
 [[nodiscard]] inline ElementPtr Caption(std::string text, std::string key = {}) {
   return Text(std::move(text), TextOptions{ theme().body, theme().textMuted, std::move(key) });
+}
+
+/** The large display role. It uses the theme's title face until the theme carries a display face. */
+[[nodiscard]] inline ElementPtr Display(std::string text, std::string key = {}) {
+  return Text(std::move(text), TextOptions{ theme().title, theme().text, std::move(key) });
+}
+
+/** A section heading. */
+[[nodiscard]] inline ElementPtr Heading(std::string text, std::string key = {}) {
+  return Text(std::move(text), TextOptions{ theme().title, theme().text, std::move(key) });
+}
+
+/** Body copy. */
+[[nodiscard]] inline ElementPtr Body(std::string text, std::string key = {}) {
+  return Text(std::move(text), TextOptions{ theme().body, theme().text, std::move(key) });
+}
+
+/** A control or form label. */
+[[nodiscard]] inline ElementPtr Label(std::string text, std::string key = {}) {
+  return Text(std::move(text), TextOptions{ theme().body, theme().controls.foreground, std::move(key) });
 }
 
 [[nodiscard]] inline ElementPtr Button(std::string label, std::function<void()> onClick = {},

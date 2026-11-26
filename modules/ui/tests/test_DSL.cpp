@@ -121,3 +121,21 @@ TEST(DslApi, PanelUsesDesignTokensWithoutElementProps) {
   EXPECT_FLOAT_EQ(stack->gap(), 5.0f);
   EXPECT_FLOAT_EQ(stack->padding().left, 15.0f);
 }
+
+TEST(DslApi, TypographyRolesUseThemeFacesAndTextRoles) {
+  Theme theme = Theme::dark();
+  theme.body = nullptr;
+  theme.title = nullptr;
+  dsl::ThemeScope scope(theme);
+  const auto display = std::dynamic_pointer_cast<const TextElement>(dsl::Display("Title"));
+  const auto body = std::dynamic_pointer_cast<const TextElement>(dsl::Body("Body"));
+  const auto label = std::dynamic_pointer_cast<const TextElement>(dsl::Label("Label"));
+  ASSERT_NE(display, nullptr);
+  ASSERT_NE(body, nullptr);
+  ASSERT_NE(label, nullptr);
+  EXPECT_EQ(display->font(), theme.title);
+  EXPECT_EQ(body->font(), theme.body);
+  EXPECT_EQ(display->color(), theme.text);
+  EXPECT_EQ(body->color(), theme.text);
+  EXPECT_EQ(label->color(), theme.controls.foreground);
+}

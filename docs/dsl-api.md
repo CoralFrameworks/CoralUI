@@ -22,7 +22,8 @@ build keep their own theme copy.
 - `dsl::Tokens`
 - `dsl::tokens()`
 
-`tokens()` snapshots the active theme's spacing, radius, font sizes, colours and font handles. `Page`,
+`tokens()` snapshots the active theme's spacing, radius, font sizes, colours, control-state colours,
+and font handles. `Page`,
 `Card`, and `Section` use `spacing.xs/sm/md/lg/xl` for their default padding and gaps; a component
 must not hard-code those values.
 
@@ -38,10 +39,16 @@ lists.
 ### Typography
 
 - `dsl::Text`
+- `dsl::Display`
+- `dsl::Heading`
 - `dsl::Title`
+- `dsl::Body`
+- `dsl::Label`
 - `dsl::Caption`
 
-`TextOptions` is for an explicit font/colour/key. `Title` and `Caption` read the active theme.
+`TextOptions` is for an explicit font/colour/key. The role helpers read the active theme; `Display`
+and `Heading` currently use the title face, while `Body`, `Label`, and `Caption` use the body face.
+The theme's font-size scale is exposed through Tokens, pending dedicated faces on Theme.
 
 ### Default-styled controls
 
