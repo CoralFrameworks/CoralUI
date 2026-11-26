@@ -3382,3 +3382,29 @@ TEST(UiWindow, SplitButtonMenuIsFloatingAndDoesNotShiftThePage) {
   EXPECT_FLOAT_EQ(split->bounds().getWidth(), before.getWidth());
 
 }
+
+TEST(UiWindow, DslOverlayAcceptsElementContent) {
+  Window::Options windowOptions;
+  windowOptions.width = 360;
+  windowOptions.height = 240;
+  windowOptions.headless = true;
+  windowOptions.frameLimit = 0;
+  auto window = Window::create(windowOptions);
+  if (window == nullptr) GTEST_SKIP() << "no GPU device is available for the headless surface";
+  window->setRoot(std::make_shared<ColorLayer>(Color::MakeRGBA8(20, 24, 30, 255)));
+
+  dsl::Overlay overlays(*window, Theme::dark());
+  OverlayOptions anchored;
+  anchored.anchor = Rect::MakeXYWH(20.0f, 100.0f, 160.0f, 24.0f);
+  const uint64_t popup = overlays.PopupElement(dsl::Text("element popup"), anchored);
+  ASSERT_NE(popup, 0u);
+  EXPECT_TRUE(window->hasOverlay());
+  EXPECT_TRUE(overlays.close(popup));
+
+  const uint64_t dialog = overlays.DialogElement("Element dialog", "body", dsl::Text("content"), {
+    dsl::DialogButton{ "OK", {} },
+  });
+  ASSERT_NE(dialog, 0u);
+  EXPECT_TRUE(window->hasOverlay());
+  EXPECT_TRUE(overlays.close(dialog));
+}

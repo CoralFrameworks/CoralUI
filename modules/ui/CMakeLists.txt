@@ -52,6 +52,7 @@ set(PUBLIC_HDRS
     include/ui/ElementSpec.h
     include/ui/Component.h
     include/ui/Element.h
+    include/ui/ElementContentLayer.h
     include/ui/ElementHost.h
     include/ui/FrameStatsOverlay.h
     include/ui/Reconciler.h
@@ -231,6 +232,7 @@ set(SRCS
     src/ClipboardMime.cpp
     src/Command.cpp
     src/CrashReporter.cpp
+    src/ElementContentLayer.cpp
     src/ElementRegistry.cpp
     src/ElementSpec.cpp
     src/Component.cpp

@@ -17,6 +17,7 @@
 #ifndef CORAL_UI_DSLOVERLAY_H
 #define CORAL_UI_DSLOVERLAY_H
 
+#include <ui/Element.h>
 #include <ui/Overlay.h>
 #include <ui/OverlayHost.h>
 #include <ui/Theme.h>
@@ -59,7 +60,10 @@ class Overlay {
   uint64_t Tooltip(std::string text, Point anchor);
   uint64_t Dialog(std::string title, std::string message = {},
     std::shared_ptr<Layer> content = {}, std::vector<DialogButton> buttons = {});
+  uint64_t DialogElement(std::string title, std::string message, ElementPtr content,
+    std::vector<DialogButton> buttons);
   uint64_t Popup(std::shared_ptr<Layer> content, OverlayOptions options = {});
+  uint64_t PopupElement(ElementPtr content, OverlayOptions options = {});
   uint64_t Menu(std::vector<std::string> items, Point anchor,
     std::function<void(int)> onSelected = {});
 

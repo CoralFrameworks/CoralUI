@@ -107,8 +107,9 @@ overlay service is used outside the umbrella header.
 - `dsl::Overlay`
 - `dsl::DialogButton`
 
-`dsl::Overlay` is a thin lifecycle facade over `OverlayHost`. Dialog/Popup content is currently a
-retained `Layer`; an Element-content overload is a P3 item.
+`dsl::Overlay` is a thin lifecycle facade over `OverlayHost`. `Dialog`/`Popup` accept a retained
+`Layer`; `DialogElement`/`PopupElement` accept an `ElementPtr` and host it through the public
+`ElementContentLayer` bridge. The bridge owns a Reconciler and forwards measure/layout to its root.
 
 ## Experimental forwarders
 

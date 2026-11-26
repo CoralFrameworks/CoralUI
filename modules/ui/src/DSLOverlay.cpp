@@ -17,6 +17,7 @@
 #include <ui/DSLOverlay.h>
 
 #include <ui/Dialog.h>
+#include <ui/ElementContentLayer.h>
 #include <ui/Element.h>
 #include <ui/Menu.h>
 #include <ui/Popup.h>
@@ -89,6 +90,17 @@ uint64_t Overlay::Dialog(std::string title, std::string message,
   return id;
 }
 
+uint64_t Overlay::DialogElement(std::string title, std::string message, ElementPtr content,
+    std::vector<DialogButton> buttons) {
+  std::shared_ptr<Layer> layer;
+  if (content != nullptr) layer = std::make_shared<ElementContentLayer>(std::move(content));
+  return Dialog(std::move(title), std::move(message), std::move(layer), std::move(buttons));
+}
+
+uint64_t Overlay::PopupElement(ElementPtr content, OverlayOptions options) {
+  if (content == nullptr) return 0;
+  return Popup(std::make_shared<ElementContentLayer>(std::move(content)), std::move(options));
+}
 uint64_t Overlay::Popup(std::shared_ptr<Layer> content, OverlayOptions options) {
   if (content == nullptr) return 0;
   auto popup = std::make_shared<coral::ui::Popup>(std::move(content));
