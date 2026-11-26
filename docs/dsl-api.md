@@ -89,11 +89,15 @@ keys are still required when the order can change.
 
 ### Custom content and escape hatches
 
-- `dsl::Canvas(layer, minHeight, key)` for a retained `Layer`
+- `dsl::Canvas(layer, CanvasOptions)` for a retained `Layer`
+- `dsl::Component(build, key)` for a reusable DSL build function
 - `dsl::Layer` for a widget that has no semantic wrapper yet
 
-`Canvas` preserves the layer instance across rebuilds. A custom control that needs a DSL subtree
-should be a `Component` whose build returns ordinary DSL nodes.
+`Canvas` preserves the layer instance across rebuilds and accepts min width/height plus grow/shrink
+options. A custom control made of DSL nodes uses `Component`; a control that needs
+onMount/onUpdate/onUnmount, providers, or the error boundary should be a `coral::ui::Component`
+mounted through `ComponentHost` or `ChildComponent`, where the owning context supplies the
+invalidation route.
 
 ### Overlays
 

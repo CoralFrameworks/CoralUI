@@ -16,6 +16,9 @@
 
 #include <ui/DSLCore.h>
 #include <ui/DSLStyle.h>
+#include <ui/ColorLayer.h>
+#include <ui/Reconciler.h>
+#include <ui/TextLayer.h>
 #include <ui/Element.h>
 #include <ui/Theme.h>
 
@@ -186,4 +189,29 @@ TEST(DslApi, ButtonStyleNameIsAppliedThroughProps) {
   ASSERT_FALSE(props->children().empty());
   EXPECT_EQ(props->children().front()->kind(), ElementKind::Button);
   EXPECT_EQ(props->children().front()->key(), "run");
+}
+
+namespace {
+} // namespace
+
+TEST(DslApi, ComponentIsTheCustomControlExtensionPoint) {
+  Reconciler reconciler;
+  const auto root = reconciler.mount(dsl::Component([] { return dsl::Text("probe"); }, "probe"));
+  const auto text = std::dynamic_pointer_cast<TextLayer>(root);
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->text(), "probe");
+}
+
+TEST(DslApi, CanvasOptionsDescribeTheHostedLayerLayout) {
+  auto layer = std::make_shared<ColorLayer>(Color::MakeRGBA8(1, 2, 3, 255));
+  const ElementPtr element = dsl::Canvas(std::move(layer),
+    dsl::CanvasOptions{ .minWidth = 20.0f, .minHeight = 30.0f, .grow = false, .shrink = false,
+      .key = "custom" });
+  const auto props = std::dynamic_pointer_cast<const PropsElement>(element);
+  ASSERT_NE(props, nullptr);
+  EXPECT_FLOAT_EQ(props->props().layout.minWidth, 20.0f);
+  EXPECT_FLOAT_EQ(props->props().layout.minHeight, 30.0f);
+  EXPECT_FLOAT_EQ(props->props().layout.grow, 0.0f);
+  EXPECT_FLOAT_EQ(props->props().layout.shrink, 0.0f);
+  EXPECT_EQ(props->key(), "custom");
 }

@@ -17,6 +17,7 @@
 #ifndef CORAL_UI_DSLCORE_H
 #define CORAL_UI_DSLCORE_H
 
+#include <ui/Component.h>
 #include <ui/Element.h>
 #include <ui/Theme.h>
 
@@ -319,14 +320,42 @@ template <class... Children>
   return components::WithProps(std::make_shared<ColorElement>(color, key + ".color"), props,
     std::move(key));
 }
+struct CanvasOptions {
+  float minWidth = 0.0f;
+  float minHeight = 0.0f;
+  bool grow = true;
+  bool shrink = true;
+  std::string key;
+};
+
 /** Hosts a retained Layer in a DSL tree; use for custom drawing surfaces. */
+[[nodiscard]] inline ElementPtr Canvas(std::shared_ptr<Layer> layer, CanvasOptions options) {
+  ElementProps props;
+  if (options.minWidth > 0.0f) props.layout.minWidth = options.minWidth;
+  if (options.minHeight > 0.0f) props.layout.minHeight = options.minHeight;
+  props.layout.grow = options.grow ? 1.0f : 0.0f;
+  props.layout.shrink = options.shrink ? 1.0f : 0.0f;
+  return components::WithProps(components::Layer(std::move(layer)), props,
+    options.key.empty() ? "dsl.canvas" : std::move(options.key));
+}
+
 [[nodiscard]] inline ElementPtr Canvas(std::shared_ptr<Layer> layer, const float minHeight = 0.0f,
     std::string key = {}) {
-  ElementProps props;
-  if (minHeight > 0.0f) props.layout.minHeight = minHeight;
-  props.layout.grow = 1.0f;
-  props.layout.shrink = 1.0f;
-  return components::WithProps(components::Layer(std::move(layer)), props, std::move(key));
+  return Canvas(std::move(layer),
+    CanvasOptions{ .minHeight = minHeight, .key = std::move(key) });
+}
+
+/**
+ * A pure component: a build function that returns a DSL subtree.
+ *
+ * This is the stable custom-control entry point for reusable UI made of DSL nodes. A control that
+ * needs onMount/onUpdate/onUnmount, providers or an error boundary should be a
+ * coral::ui::Component mounted through ComponentHost or ChildComponent, where the owning context
+ * supplies the invalidation route.
+ */
+[[nodiscard]] inline ElementPtr Component(std::function<ElementPtr()> build,
+    std::string key = {}) {
+  return components::Component(std::move(build), std::move(key));
 }
 
 /**
