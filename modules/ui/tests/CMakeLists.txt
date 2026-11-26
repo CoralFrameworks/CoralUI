@@ -8,6 +8,7 @@ add_executable(test_ui
     test_Host.cpp
     test_MvvmBinding.cpp
     test_Reconciler.cpp
+    test_DSL.cpp
 test_Retained.cpp
     test_ElementSpec.cpp
     test_NumberFormat.cpp

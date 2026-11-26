@@ -136,3 +136,7 @@ out/examples/ui/Release/ui_dsl_gallery --headless --frames 2 --out dsl.png
 
 It exercises theme defaults, variadic `Row`/`Column`, high-level `Page`/`Card`/`Section`, and a
 custom `WaveformLayer` hosted through `dsl::Canvas`.
+
+## API contract
+
+The stable-core and experimental-forwarder split is recorded in [dsl-api.md](dsl-api.md).
