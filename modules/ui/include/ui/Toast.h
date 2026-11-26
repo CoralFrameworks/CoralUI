@@ -39,7 +39,7 @@ struct Theme;
  * toast after it passes and invokes the dismissal callback. Without a deadline the toast stays until
  * `hide` is called.
  */
-class Toast final : public Layer {
+class Toast final : public Layer, public std::enable_shared_from_this<Toast> {
  public:
   Toast(std::string text, std::shared_ptr<const Font> font);
 

@@ -384,6 +384,17 @@ struct WindowImpl final : detail::WindowHost {
     markFrameNeeded();
   }
 
+  /** The page reconciler owns the root's element children; the overlay host is not one of them. */
+  void ensureOverlaysAttached() {
+    if (root == nullptr || overlays == nullptr || overlays->parent() == root.get()) return;
+    if (Layer* oldParent = overlays->parent(); oldParent != nullptr) {
+      oldParent->removeChild(overlays);
+    }
+    root->addChild(overlays);
+    overlays->setBounds(root->bounds());
+    overlays->setNeedsLayout();
+  }
+
   uint64_t pushOverlay(std::shared_ptr<Layer> layer, OverlayOptions options) {
     if (layer == nullptr || root == nullptr) return 0;
     if (overlays == nullptr) {
@@ -692,6 +703,7 @@ struct WindowImpl final : detail::WindowHost {
 
   void dispatchPointer(const PointerEvent& event, const int phase) override {
     markFrameNeeded();
+    ensureOverlaysAttached();
     PointerEvent logical = event;
     logical.position = { event.position.x / uiScale, event.position.y / uiScale };
     // An internal drag owns the pointer: moves update the target, release drops, a new press
@@ -1627,6 +1639,7 @@ struct WindowImpl final : detail::WindowHost {
     }
 
     const auto updateStart = std::chrono::steady_clock::now();
+    ensureOverlaysAttached();
     if (root != nullptr) {
       // Animations sample the frame's expected present time, not the wall clock at which the UI
       // thread happened to wake: a late vblank then advances the animation once rather than

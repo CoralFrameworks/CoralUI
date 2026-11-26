@@ -46,6 +46,8 @@
 #include <ui/FrameStatsOverlay.h>
 #include <ui/HotReload.h>
 #include <ui/ProcessStats.h>
+#include <ui/DSL.h>
+#include <ui/DSLOverlay.h>
 #include <ui/Grid.h>
 #include <ui/IconButton.h>
 #include <ui/Layer.h>

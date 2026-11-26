@@ -640,6 +640,20 @@ public:
   }
 
   /**
+   * A floating layer is painted and hit-tested in its own bounds but is skipped by the parent's
+   * layout. Menus and popups use this because they position themselves in window coordinates.
+   */
+  void setFloating(const bool floating) noexcept {
+    if (mFloating == floating) return;
+    mFloating = floating;
+    setNeedsLayout();
+  }
+
+  [[nodiscard]] bool floating() const noexcept {
+    return mFloating;
+  }
+
+  /**
    * Applies a theme to this subtree.
    *
    * The pointer is shared so a window can replace its theme without invalidating nodes that are
@@ -1378,6 +1392,7 @@ private:
   std::string mStyleName;
   float mFocusRingWidth = 1.5f;
   LayoutParams mLayoutParams;
+  bool mFloating = false;
   TransitionSpec mTransition;
   std::vector<Animation> mAnimations;
   BoundsAnimation mBoundsAnimation;

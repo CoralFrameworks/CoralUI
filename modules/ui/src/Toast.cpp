@@ -92,6 +92,10 @@ void Toast::onFrame(const std::chrono::steady_clock::time_point now) {
     return;
   }
   if (now >= *mDeadline) {
+    // The dismissal callback normally removes the OverlayHost entry, which can drop the last
+    // external reference to this Toast while onFrame is still running. Keep it alive for the rest
+    // of the callback, then let the entry release it.
+    const auto keepAlive = weak_from_this().lock();
     hide();
     if (mOnDismissed) {
       mOnDismissed();

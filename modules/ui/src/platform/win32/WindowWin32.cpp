@@ -104,8 +104,9 @@ Key keyFromVirtualKey(const WPARAM key, const LPARAM keyData) {
     case VK_ESCAPE:
       return Key::Escape;
     case VK_RETURN:
-      // The keypad Enter arrives as VK_RETURN without the extended flag.
-      return extended ? Key::Enter : Key::NumpadEnter;
+      // Both the main Return and the keypad Enter submit. Mapping the main key to NumpadEnter
+      // silently broke every editor that handles Key::Enter, notably TagInput on Windows.
+      return Key::Enter;
     case VK_SPACE:
       return Key::Space;
     case VK_TAB:

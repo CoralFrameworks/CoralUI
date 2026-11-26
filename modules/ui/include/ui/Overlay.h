@@ -37,6 +37,8 @@ struct OverlayOptions {
   bool drawScrim = true;
   bool dismissOnOutsideClick = true;
   bool dismissOnEscape = true;
+  /** Non-interactive surfaces (toasts, passive previews) let pointer events reach the page below. */
+  bool passThroughPointer = false;
   /** When set, the surface is placed next to this rectangle; otherwise it is filled/centred. */
   Rect anchor{};
   Placement preferred = Placement::Center;
@@ -55,7 +57,9 @@ struct OverlayOptions {
  * The host itself is added by `Window::pushOverlay` and covers the page, so it is hit-testable while
  * it has entries. A click that misses every entry dismisses the topmost dismissible one (light
  * dismiss) and is consumed; a click that misses a non-dismissible modal is consumed too, which is what
- * makes the page behind it non-interactive.
+ * makes the page behind it non-interactive. Entries marked `passThroughPointer` (toasts and other
+ * passive surfaces) leave the host hit-testable only inside the entry, so the page below still gets
+ * its normal pointer events.
  */
 class OverlayLayer final : public Layer {
  public:
@@ -95,6 +99,7 @@ class OverlayLayer final : public Layer {
   void drawSelf(RenderContext& context) override;
   bool onPointerDown(const PointerEvent& event) override;
   bool onKeyDown(const KeyEvent& event) override;
+  void onFrame(std::chrono::steady_clock::time_point now) override;
   [[nodiscard]] bool focusable() const override {
     return false;
   }
@@ -110,8 +115,11 @@ class OverlayLayer final : public Layer {
     if (mChanged) mChanged();
   }
   void updateFocusScope();
+  void updateInputMode();
 
   std::vector<Entry> mEntries;
+  std::vector<std::shared_ptr<Layer>> mPendingRemoval;
+  bool mInFrame = false;
   uint64_t mNextId = 1;
   std::function<void()> mChanged;
   Color mScrim = Color::MakeRGBA8(0, 0, 0, 140);

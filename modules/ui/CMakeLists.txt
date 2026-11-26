@@ -8,6 +8,8 @@ set(PUBLIC_HDRS
     include/ui/Animation.h
     include/ui/Curve.h
     include/ui/DateFormat.h
+    include/ui/DSL.h
+    include/ui/DSLOverlay.h
     include/ui/DateField.h
     include/ui/DateTimeField.h
     include/ui/DateRangeField.h
@@ -208,6 +210,8 @@ set(SRCS
     src/Animation.cpp
     src/Curve.cpp
     src/DateFormat.cpp
+    src/DSL.cpp
+    src/DSLOverlay.cpp
     src/DateField.cpp
     src/DateTimeField.cpp
     src/DateRangeField.cpp

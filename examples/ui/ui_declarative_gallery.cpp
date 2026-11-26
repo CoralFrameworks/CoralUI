@@ -209,6 +209,23 @@ class GalleryApp {
     dumpLayer(*mHost->root(), 0, count);
   }
 
+
+  void showToast() {
+    auto toast = std::make_shared<Toast>("Saved to the library", mFonts.body);
+    toast->showFor("Saved to the library", std::chrono::milliseconds(1800));
+    OverlayOptions options;
+    options.modal = false;
+    options.dismissOnOutsideClick = false;
+    options.passThroughPointer = true;
+    const Rect area = mWindow.bounds();
+    options.anchor = Rect::MakeXYWH(area.getLeft() + 24.0f, area.getBottom() - 96.0f,
+      std::max(0.0f, area.getWidth() - 48.0f), 32.0f);
+    options.preferred = Placement::Center;
+    const uint64_t id = mOverlayHost->show(components::Layer(toast, "gallery.toast"), options);
+    toast->setOnDismissed([this, id] {
+      if (mOverlayHost != nullptr) mOverlayHost->dismiss(id);
+    });
+  }
   [[nodiscard]] bool selfCheck() {
     if (mHost == nullptr || !mHost->mounted()) return fail("the host is not mounted");
     const std::shared_ptr<Layer> footerLayer = mFooterRef->layer();
@@ -226,6 +243,15 @@ class GalleryApp {
       }
       if (footer->text().find(kPages[page].title) == std::string::npos) {
         return fail("the footer text did not follow the selected page");
+      }
+    }
+
+    scrollContent(240.0f);
+    setPage(0);
+    mWindow.pump();
+    if (const auto layer = mContentScrollRef->layer()) {
+      if (const auto scroll = std::dynamic_pointer_cast<ScrollView>(layer); scroll->scrollY() != 0.0f) {
+        return fail("switching pages did not reset the content scroll offset");
       }
     }
 
@@ -251,7 +277,7 @@ class GalleryApp {
     setPage(4);
     mWindow.pump();
     change([](GalleryState& state) {
-      while (state.tasks.size() < 12) {
+      while (state.tasks.size() < 30) {
         state.tasks.push_back("Task " + std::to_string(state.tasks.size() + 1));
       }
       state.lastEvent = "list stress";
@@ -260,6 +286,26 @@ class GalleryApp {
     // The model is updated; one frame lays the new page out so the list viewport has real bounds.
     mWindow.requestFrame();
     if (!mWindow.renderFrame()) return fail("the list frame was not rendered");
+    std::vector<TextLayer*> summaryLabels;
+    const auto collectSummary = [&](const auto& self, Layer* layer) -> void {
+      if (layer == nullptr) return;
+      if (auto* text = dynamic_cast<TextLayer*>(layer);
+          text != nullptr && text->text().find(".  ") != std::string::npos) {
+        summaryLabels.push_back(text);
+      }
+      for (const auto& child: layer->children()) self(self, child.get());
+    };
+    collectSummary(collectSummary, mHost->root().get());
+    TextLayer* firstSummary = nullptr;
+    TextLayer* secondSummary = nullptr;
+    for (TextLayer* text: summaryLabels) {
+      if (text->text().rfind("1.", 0) == 0) firstSummary = text;
+      if (text->text().rfind("2.", 0) == 0) secondSummary = text;
+    }
+    if (firstSummary != nullptr && secondSummary != nullptr &&
+        secondSummary->bounds().getTop() - firstSummary->bounds().getTop() < 12.0f) {
+      return fail("the Plain ForEach rows overlapped after Add task");
+    }
     const auto recycleList = std::dynamic_pointer_cast<RecyclingListView>(
       mRecyclingListRef->layer());
     if (recycleList == nullptr) return fail("the recycling list LayerRef was not filled in");
@@ -351,6 +397,11 @@ private:
 
   void setPage(const int page) {
     const int clamped = std::clamp(page, 0, kPageCount - 1);
+    if (const auto layer = mContentScrollRef->layer()) {
+      if (const auto scroll = std::dynamic_pointer_cast<ScrollView>(layer)) {
+        scroll->setScrollOffset(0.0f, 0.0f);
+      }
+    }
     change([clamped](GalleryState& state) {
       state.page = clamped;
       state.lastEvent = std::string("page ->") + kPages[clamped].title;
@@ -403,7 +454,9 @@ private:
     props.bounds = Rect::MakeWH(width, height);
     props.background = color;
     props.cornerRadius = radius;
-    props.clip = true;
+    // Small demo swatches avoid a rounded clip mask: at fractional DPI scales the mask path
+    // can clip the whole recording instead of just the corners.
+    props.clip = false;
     props.layout.minWidth = width;
     props.layout.minHeight = height;
     return components::WithProps(
@@ -582,15 +635,7 @@ private:
     actions.push_back(components::Button("Toggle theme", mFonts.body, [this] { toggleTheme(); },
       "ov.hero.theme"));
     actions.push_back(components::Button("Show toast", mFonts.body, [this] {
-      auto toast = std::make_shared<Toast>("Saved to the library", mFonts.body);
-      toast->showFor("Saved to the library", std::chrono::milliseconds(1800));
-      OverlayOptions options;
-      options.modal = false;
-      options.dismissOnOutsideClick = false;
-      const uint64_t id = mOverlayHost->show(components::Layer(toast, "gallery.toast"), options);
-      toast->setOnDismissed([this, id] {
-        if (mOverlayHost != nullptr) mOverlayHost->dismiss(id);
-      });
+      showToast();
       change([](GalleryState& next) { next.lastEvent = "Toast shown"; });
     }, "ov.hero.toast"));
     actions.push_back(components::CheckBox("Show detail", mFonts.body, state.detail,
@@ -695,7 +740,7 @@ private:
       dockPanel("lay.dock.center", "center", theme.controls.track),
       dockPanel("lay.dock.left", "left", theme.controls.background),
       dockPanel("lay.dock.right", "right", theme.controls.background),
-      ElementPtr{}, 104.0f, 104.0f, 0.0f, "lay.dock.dock");
+      ElementPtr{}, 72.0f, 72.0f, 0.0f, "lay.dock.dock");
     ElementProps dockProps;
     dockProps.layout.basis = 170.0f;
     dockProps.layout.shrink = 0.0f;
@@ -719,14 +764,14 @@ private:
     for (int index = 0; index < 3; ++index) {
       ElementProps props;
       props.bounds = Rect::MakeWH(72.0f, 44.0f);
-      props.background = index == 0 ? theme.controls.track : theme.accent;
+      Color fill = index == 0 ? theme.controls.track : theme.accent;
+      props.background = fill;
       props.cornerRadius = looks[index].radius;
       props.opacity = looks[index].opacity;
-      props.clip = true;
+      props.clip = false;
       if (looks[index].shadow) props.shadow = theme.shadow.sm;
       styled.push_back(components::WithProps(
-        std::make_shared<ColorElement>(props.background.value_or(theme.accent),
-          "lay.props." + std::to_string(index) + ".color"), props,
+        std::make_shared<ColorElement>(fill, "lay.props." + std::to_string(index) + ".color"), props,
         "lay.props." + std::to_string(index)));
     }
     propsBody.push_back(row("lay.props.row", std::move(styled), 14.0f));
@@ -783,10 +828,21 @@ private:
     }, "lay.struct.tabs"));
     ElementProps splitProps;
     splitProps.layout.minHeight = 120.0f;
+    const auto splitPane = [this, &theme](std::string key, std::string title, const Color background) {
+      std::vector<ElementPtr> children;
+      children.push_back(label(std::move(title), mFonts.small, theme.text, key + ".label"));
+      auto pane = std::make_shared<StackElement>(Axis::Column, std::move(children), key + ".stack",
+        0.0f, Insets{}.all(12.0f), Align::Stretch);
+      ElementProps props;
+      props.background = background;
+      props.layout.widthPercent = 1.0f;
+      props.layout.heightPercent = 1.0f;
+      return components::WithProps(std::move(pane), props, key);
+    };
     structuredBody.push_back(components::WithProps(components::SplitView(Axis::Row, 0.4f,
-      swatch(theme.accent, 80.0f, 80.0f, 6.0f, "lay.struct.left"),
-      swatch(theme.controls.border, 80.0f, 80.0f, 6.0f, "lay.struct.right"), {}, "lay.struct.split"),
-      splitProps, "lay.struct.split.wrap"));
+      splitPane("lay.struct.left", "left pane", theme.accent),
+      splitPane("lay.struct.right", "right pane", theme.surfaceRaised),
+      {}, "lay.struct.split"), splitProps, "lay.struct.split.wrap"));
     structuredBody.push_back(components::Toolbar(mFonts.body, {
       ToolbarItem{ components::Link("Open", mFonts.small, {}, "lay.struct.open"), false, false, {},
         {}, "open" },
@@ -1374,6 +1430,7 @@ int main(int argc, char** argv) {
   bool headless = false;
   bool selfCheck = false;
   bool dumpTree = false;
+  bool toast = false;
   int frames = -1;
   int width = 1180;
   int height = 780;
@@ -1403,6 +1460,8 @@ int main(int argc, char** argv) {
       themeName = next();
     } else if (argument == "--self-check") {
       selfCheck = true;
+    } else if (argument == "--toast") {
+      toast = true;
     } else if (argument == "--dump-tree") {
       dumpTree = true;
     } else if (argument == "--help") {
@@ -1450,6 +1509,7 @@ int main(int argc, char** argv) {
   GalleryApp app(*window, fonts, makeStarIcon());
   app.configure(section, themeName != "light");
   app.mount();
+  if (toast) app.showToast();
   if (scroll >= 0.0f) app.scrollContent(scroll);
 
   if (selfCheck) {

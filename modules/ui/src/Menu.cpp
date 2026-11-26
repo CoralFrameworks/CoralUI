@@ -38,6 +38,7 @@ constexpr float kItemGutter = 24.0f;
 
 Menu::Menu(std::shared_ptr<const graphics::Font> font) : mFont(std::move(font)) {
   setAccessibleRole(AccessibilityRole::Menu);
+  setFloating(true);
   setVisible(false);
 }
 

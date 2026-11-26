@@ -27,6 +27,9 @@ OverlayLayer::OverlayLayer() {
   setVisible(false);
   setHitTestable(true);
   setZIndex(10000);
+  LayoutParams params;
+  params.position = Position::Absolute;
+  setLayoutParams(params);
 }
 
 OverlayLayer::~OverlayLayer() = default;
@@ -39,6 +42,7 @@ uint64_t OverlayLayer::show(std::shared_ptr<Layer> layer, OverlayOptions options
   entry.layer = std::move(layer);
   entry.options = options;
   mEntries.push_back(std::move(entry));
+  updateInputMode();
   setVisible(true);
   updateFocusScope();
   setNeedsLayout();
@@ -52,10 +56,15 @@ bool OverlayLayer::dismiss(const uint64_t id) {
     [id](const Entry& entry) { return entry.id == id; });
   if (position == mEntries.end()) return false;
   if (position->layer != nullptr) {
-    removeChild(position->layer);
     position->layer->setVisible(false);
+    if (mInFrame) {
+      mPendingRemoval.push_back(position->layer);
+    } else {
+      removeChild(position->layer);
+    }
   }
   mEntries.erase(position);
+  updateInputMode();
   setVisible(!mEntries.empty());
   updateFocusScope();
   setNeedsLayout();
@@ -82,11 +91,16 @@ void OverlayLayer::dismissAll() {
   if (mEntries.empty()) return;
   for (Entry& entry: mEntries) {
     if (entry.layer != nullptr) {
-      removeChild(entry.layer);
       entry.layer->setVisible(false);
+      if (mInFrame) {
+        mPendingRemoval.push_back(entry.layer);
+      } else {
+        removeChild(entry.layer);
+      }
     }
   }
   mEntries.clear();
+  updateInputMode();
   setVisible(false);
   updateFocusScope();
   setNeedsLayout();
@@ -105,6 +119,27 @@ uint64_t OverlayLayer::topId() const noexcept {
 
 bool OverlayLayer::topIsModal() const noexcept {
   return !mEntries.empty() && mEntries.back().options.modal;
+}
+
+void OverlayLayer::onFrame(const std::chrono::steady_clock::time_point now) {
+  mInFrame = true;
+  Layer::onFrame(now);
+  mInFrame = false;
+  for (const auto& layer: mPendingRemoval) {
+    removeChild(layer);
+  }
+  mPendingRemoval.clear();
+}
+
+void OverlayLayer::updateInputMode() {
+  bool passThrough = !mEntries.empty();
+  for (const Entry& entry: mEntries) {
+    if (!entry.options.passThroughPointer) {
+      passThrough = false;
+      break;
+    }
+  }
+  setHitTestable(!passThrough);
 }
 
 void OverlayLayer::updateFocusScope() {
