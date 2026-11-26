@@ -62,14 +62,20 @@ ElementPtr buildPage(const int rows, const int tick) {
 int main(int argc, char** argv) {
   int iterations = 100;
   int rows = 160;
+  bool json = false;
+  double maxAverageMs = 0.0;
   for (int index = 1; index < argc; ++index) {
     const std::string argument = argv[index];
     if (argument == "--iterations" && index + 1 < argc) {
       iterations = std::max(1, std::atoi(argv[++index]));
     } else if (argument == "--rows" && index + 1 < argc) {
       rows = std::max(1, std::atoi(argv[++index]));
+    } else if (argument == "--json") {
+      json = true;
+    } else if (argument == "--max-avg-ms" && index + 1 < argc) {
+      maxAverageMs = std::max(0.0, std::atof(argv[++index]));
     } else if (argument == "--help") {
-      std::printf("usage: ui_dsl_bench [--iterations N] [--rows N]\n");
+      std::printf("usage: ui_dsl_bench [--iterations N] [--rows N] [--json] [--max-avg-ms N]\n");
       return 0;
     }
   }
@@ -115,10 +121,21 @@ int main(int argc, char** argv) {
   const auto overlayEnd = std::chrono::steady_clock::now();
   const double overlayMs = std::chrono::duration<double, std::milli>(overlayEnd - overlayStart).count();
 
-  std::printf("dsl-bench rows=%d iterations=%d\n", rows, iterations);
-  std::printf("  rebuild+layout+paint total=%.2fms avg=%.3fms\n", buildMs,
-    buildMs / static_cast<double>(iterations));
-  std::printf("  popup Element open+close total=%.2fms avg=%.3fms\n", overlayMs,
-    overlayMs / static_cast<double>(iterations));
-  return buildMs > 0.0 && overlayMs > 0.0 ? 0 : 1;
+  const double rebuildAverage = buildMs / static_cast<double>(iterations);
+  const double overlayAverage = overlayMs / static_cast<double>(iterations);
+  if (json) {
+    std::printf("{\"rows\":%d,\"iterations\":%d,\"rebuild_total_ms\":%.3f,"
+      "\"rebuild_avg_ms\":%.3f,\"overlay_total_ms\":%.3f,\"overlay_avg_ms\":%.3f}\n",
+      rows, iterations, buildMs, rebuildAverage, overlayMs, overlayAverage);
+  } else {
+    std::printf("dsl-bench rows=%d iterations=%d\n", rows, iterations);
+    std::printf("  rebuild+layout+paint total=%.2fms avg=%.3fms\n", buildMs, rebuildAverage);
+    std::printf("  popup Element open+close total=%.2fms avg=%.3fms\n", overlayMs, overlayAverage);
+  }
+  if (buildMs <= 0.0 || overlayMs <= 0.0) return 1;
+  if (maxAverageMs > 0.0 && (rebuildAverage > maxAverageMs || overlayAverage > maxAverageMs)) {
+    std::fprintf(stderr, "ui_dsl_bench: average exceeded the %.3fms budget\n", maxAverageMs);
+    return 2;
+  }
+  return 0;
 }

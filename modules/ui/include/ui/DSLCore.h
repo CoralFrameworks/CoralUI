@@ -30,6 +30,9 @@
 
 namespace coral::ui::dsl {
 
+/** The stable-core API revision. Additive changes keep the major value; removals require a bump. */
+inline constexpr int kApiVersion = 1;
+
 /** A spacing density for a DSL build. Typography and colours are unchanged. */
 enum class Density {
   Comfortable,

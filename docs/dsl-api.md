@@ -130,6 +130,20 @@ The component-signature overloads of `Button`, `FormField`, and `SectionHeader` 
 existing gallery can keep its explicit fonts during the transition. New code should use the
 theme-scoped forms.
 
+## Compatibility policy
+
+`dsl::kApiVersion` is the stable-core revision. The policy is additive within a major value:
+
+- new functions, options fields and overloads are allowed;
+- removing a stable name or changing its meaning requires a major bump and a migration note;
+- deprecated names stay available for one minor cycle;
+- `using components::...` forwarders are explicitly outside this promise and may move or change
+  signature as controls get typed wrappers.
+
+The self-contained header checks (`dsl_header_core/style/overlay/element_content.cpp`) compile each
+stable companion header without the umbrella, so a missing include or accidental experimental
+dependency fails the suite.
+
 ## Rules for adding a stable name
 
 1. It must have a theme-aware default.
