@@ -1510,6 +1510,7 @@ int main(int argc, char** argv) {
   bool selfCheck = false;
   bool dumpTree = false;
   bool toast = false;
+  float uiScale = 0.0f;
   int frames = -1;
   int width = 1180;
   int height = 780;
@@ -1541,6 +1542,8 @@ int main(int argc, char** argv) {
       selfCheck = true;
     } else if (argument == "--toast") {
       toast = true;
+    } else if (argument == "--scale") {
+      uiScale = static_cast<float>(std::atof(next().c_str()));
     } else if (argument == "--dump-tree") {
       dumpTree = true;
     } else if (argument == "--help") {
@@ -1573,6 +1576,7 @@ int main(int argc, char** argv) {
   }
 
   Window::Options options;
+  options.uiScale = uiScale;
   options.width = width;
   options.height = height;
   options.headless = headless;

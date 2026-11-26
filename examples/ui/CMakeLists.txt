@@ -166,7 +166,20 @@ add_test(NAME example_ui_declarative_gallery_section${section}_headless
   add_test(NAME example_ui_dsl_gallery_self_check
       COMMAND $<TARGET_FILE:ui_dsl_gallery> --headless --self-check
           --out "${CMAKE_CURRENT_BINARY_DIR}/ui_dsl_gallery_self_check.png")
-  set_tests_properties(example_ui_dsl_gallery_self_check PROPERTIES LABELS examples)
+  set_tests_properties(example_ui_dsl_gallery_self_check PROPERTIES LABELS examples)  # Fractional-DPI smoke: these exercise the same Layout and custom Waveform pages at the scales
+  # where composed masks and layer bounds have historically diverged from the 1.0 case.
+  foreach (scale 1.25 1.5 2.0)
+    string(REPLACE "." "_" scale_tag "${scale}")
+    add_test(NAME example_ui_dsl_gallery_dpi_${scale_tag}_layout
+        COMMAND $<TARGET_FILE:ui_dsl_gallery> --headless --frames 2 --section 1
+            --scale ${scale}
+            --out "${CMAKE_CURRENT_BINARY_DIR}/ui_dsl_gallery_dpi_${scale_tag}_layout.png")
+    set_tests_properties(example_ui_dsl_gallery_dpi_${scale_tag}_layout PROPERTIES LABELS examples)
+  endforeach ()
+  add_test(NAME example_ui_dsl_gallery_dpi_1_5_waveform
+      COMMAND $<TARGET_FILE:ui_dsl_gallery> --headless --frames 2 --section 7 --scale 1.5
+          --out "${CMAKE_CURRENT_BINARY_DIR}/ui_dsl_gallery_dpi_1_5_waveform.png")
+  set_tests_properties(example_ui_dsl_gallery_dpi_1_5_waveform PROPERTIES LABELS examples)
   add_test(NAME example_ui_declarative_gallery_light_headless
       COMMAND $<TARGET_FILE:ui_declarative_gallery> --headless --frames 2 --theme light
           --out "${CMAKE_CURRENT_BINARY_DIR}/ui_declarative_gallery_light.png")
