@@ -116,6 +116,15 @@
 #include <ui/macos/NativeSearchField.h>
 #include <ui/macos/NativeStepper.h>
 #include <ui/macos/NativeSwitch.h>
+#elif defined(_WIN32)
+#include <ui/win32/NativeButton.h>
+#include <ui/win32/NativeDatePicker.h>
+#include <ui/win32/NativePopUpButton.h>
+#include <ui/win32/NativeProgressIndicator.h>
+#include <ui/win32/NativeSearchField.h>
+#include <ui/win32/NativeSlider.h>
+#include <ui/win32/NativeStepper.h>
+#include <ui/win32/NativeSwitch.h>
 #endif
 
 #include <graphics/Bitmap.h>
@@ -562,8 +571,13 @@ void SectionedGallery::buildSections() {
       [this](Layer& body, const Theme& theme) { buildLayout(body, theme); } },
     { "Lists", "Scrollable lists, including a nested ScrollView.", "ScrollView / List rows / Nested ScrollView",
       [this](Layer& body, const Theme& theme) { buildLists(body, theme); } },
+#if defined(_WIN32)
+    { "Native Windows", "Win32 controls hosted as native views.", "NativeButton / NativeSwitch / NativeSearchField / NativeStepper / NativeProgressIndicator / NativePopUpButton / NativeSlider / NativeDatePicker",
+      [this](Layer& body, const Theme& theme) { buildNative(body, theme); } },
+#else
     { "Native macOS", "AppKit controls hosted as native views.", "NativeButton / NativeSwitch / NativeSearchField / NativeStepper / NativeProgressIndicator / NativePopUpButton",
       [this](Layer& body, const Theme& theme) { buildNative(body, theme); } },
+#endif
     { "More", "Additional framework controls.", "IconButton / ToggleButton / NumberField / SegmentedControl / ColorInput / ColorButton / ColorPicker / Avatar / Icon / Breadcrumb / Chip / TagInput / Toast / Skeleton / StatusBar / TabBar / SplitView / ListView / TreeView / Table / TableView / RichText / TimePicker / CandidateListView / RecyclingListView / Menu / Tooltip / Popup / Dialog / MenuBar / NativeAlert / FileDialog / DatePickerPanel",
       [this](Layer& body, const Theme& theme) { buildMore(body, theme); } },
   };
@@ -763,7 +777,11 @@ void SectionedGallery::buildControl(Layer& body, const Theme& theme,
     addControl(body, layer, rect);
   };
   auto nativeFallback = [&](const std::string& name) {
+#if defined(_WIN32)
+    text(name + " is shown as a live Win32 control in a window.", 44.0f, 72.0f, theme.textMuted);
+#else
     text(name + " is shown as a live NSView in a window.", 44.0f, 72.0f, theme.textMuted);
+#endif
   };
   (void)nativeFallback;
 
@@ -1392,6 +1410,65 @@ void SectionedGallery::buildControl(Layer& body, const Theme& theme,
     }
     text("Native controls are live NSViews; headless snapshots show their frame only.",
       44.0f, 120.0f, theme.textMuted);
+#elif defined(_WIN32)
+    const auto configure = [this](const auto& native) {
+      if (native == nullptr) return;
+      if (mNativeDisabled) native->setEnabled(false);
+    };
+    if (control == "NativeButton") {
+      auto native = win32::NativeButton::create("Native",
+        [notify] { notify("NativeButton clicked", "native"); });
+      configure(native);
+      if (native != nullptr) add(native, Rect::MakeXYWH(44, 72, 120, 28));
+    } else if (control == "NativeSwitch") {
+      auto native = win32::NativeSwitch::create("On", true,
+        [notify](bool on) { notify("NativeSwitch changed", on ? "on" : "off"); });
+      configure(native);
+      if (native != nullptr) add(native, Rect::MakeXYWH(44, 72, 100, 28));
+    } else if (control == "NativeSearchField") {
+      auto native = win32::NativeSearchField::create("Search",
+        [notify](std::string_view text) { notify("NativeSearchField changed", std::string(text)); });
+      configure(native);
+      if (native != nullptr) add(native, Rect::MakeXYWH(44, 72, 220, 28));
+    } else if (control == "NativeStepper") {
+      auto native = win32::NativeStepper::create(0.0, 10.0, 4.0,
+        [notify](double value) { notify("NativeStepper changed", std::to_string(value)); });
+      configure(native);
+      if (native != nullptr) add(native, Rect::MakeXYWH(44, 72, 90, 28));
+    } else if (control == "NativeProgressIndicator") {
+      auto native = win32::NativeProgressIndicator::create(false);
+      configure(native);
+      if (native != nullptr) {
+        native->setValue(0.65);
+        add(native, Rect::MakeXYWH(44, 72, 160, 20));
+      }
+    } else if (control == "NativePopUpButton") {
+      auto native = win32::NativePopUpButton::create({ "One", "Two" }, 0,
+        [notify](int index, std::string_view text) {
+          notify("NativePopUpButton changed", std::to_string(index) + " · " + std::string(text));
+        });
+      configure(native);
+      if (native != nullptr) add(native, Rect::MakeXYWH(44, 72, 120, 28));
+    } else if (control == "NativeSlider") {
+      auto native = win32::NativeSlider::create(0.0, 100.0, 35.0,
+        [notify](double value) { notify("NativeSlider changed", std::to_string(value)); });
+      configure(native);
+      if (native != nullptr) add(native, Rect::MakeXYWH(44, 72, 180, 28));
+    } else if (control == "NativeDatePicker") {
+      auto native = win32::NativeDatePicker::create(
+        std::chrono::year_month_day{ std::chrono::year{ 2026 }, std::chrono::month{ 11 },
+          std::chrono::day{ 26 } },
+        [notify](std::chrono::year_month_day date) {
+          notify("NativeDatePicker changed",
+            std::to_string(static_cast<int>(date.year())) + "-" +
+              std::to_string(static_cast<unsigned>(date.month())) + "-" +
+              std::to_string(static_cast<unsigned>(date.day())));
+        });
+      configure(native);
+      if (native != nullptr) add(native, Rect::MakeXYWH(44, 72, 140, 28));
+    }
+    text("Native controls are live Win32 controls; headless snapshots show their frame only.",
+      44.0f, 120.0f, theme.textMuted);
 #else
     nativeFallback(control);
 #endif
@@ -1694,6 +1771,85 @@ void SectionedGallery::buildNative(Layer& body, const Theme& theme) {
   body.addChild(row2);
   addLabel(body, theme, "Native controls are live NSViews; headless snapshots show their bounds only.",
     20.0f, 132.0f, 620.0f);
+#elif defined(_WIN32)
+  addLabel(body, theme, "Native Win32 controls", 20.0f, 8.0f);
+  const auto notify = [this](const std::string& event, const std::string& value) {
+    mModel->event.set(event);
+    mModel->value.set(value);
+  };
+  const auto configure = [this](const auto& control) {
+    if (control == nullptr) return;
+    if (mNativeDisabled) control->setEnabled(false);
+  };
+  auto row = std::make_shared<Flex>(Axis::Row);
+  row->setGap(12.0f);
+  row->setCrossAlign(Align::Center);
+  row->setBounds(Rect::MakeXYWH(kContentX + 20.0f, kBodyY + 36.0f, 620.0f, 30.0f));
+  auto nativeProgress = win32::NativeProgressIndicator::create(false);
+  if (nativeProgress != nullptr) {
+    nativeProgress->setValue(0.65);
+    configure(nativeProgress);
+    row->addChild(nativeProgress);
+  }
+  auto nativeStepper = win32::NativeStepper::create(0.0, 10.0, 4.0, [](double) {});
+  if (nativeStepper != nullptr) {
+    configure(nativeStepper);
+    row->addChild(nativeStepper);
+  }
+  auto nativeButton = win32::NativeButton::create("Native",
+    [notify] { notify("NativeButton clicked", "native"); });
+  if (nativeButton != nullptr) {
+    configure(nativeButton);
+    row->addChild(nativeButton);
+  }
+  auto nativeSwitch = win32::NativeSwitch::create("On", true,
+    [notify](bool on) { notify("NativeSwitch changed", on ? "on" : "off"); });
+  if (nativeSwitch != nullptr) {
+    configure(nativeSwitch);
+    row->addChild(nativeSwitch);
+  }
+  body.addChild(row);
+
+  auto row2 = std::make_shared<Flex>(Axis::Row);
+  row2->setGap(12.0f);
+  row2->setCrossAlign(Align::Center);
+  row2->setBounds(Rect::MakeXYWH(kContentX + 20.0f, kBodyY + 82.0f, 620.0f, 30.0f));
+  auto nativeSearch = win32::NativeSearchField::create("Search",
+    [notify](std::string_view text) { notify("NativeSearchField changed", std::string(text)); });
+  if (nativeSearch != nullptr) {
+    configure(nativeSearch);
+    row2->addChild(nativeSearch);
+  }
+  auto nativePopup = win32::NativePopUpButton::create({ "One", "Two" }, 0,
+    [notify](int index, std::string_view text) {
+      notify("NativePopUpButton changed", std::to_string(index) + " · " + std::string(text));
+    });
+  if (nativePopup != nullptr) {
+    configure(nativePopup);
+    row2->addChild(nativePopup);
+  }
+  auto nativeDate = win32::NativeDatePicker::create(
+    std::chrono::year_month_day{ std::chrono::year{ 2026 }, std::chrono::month{ 11 },
+      std::chrono::day{ 26 } });
+  if (nativeDate != nullptr) {
+    configure(nativeDate);
+    row2->addChild(nativeDate);
+  }
+  body.addChild(row2);
+
+  auto row3 = std::make_shared<Flex>(Axis::Row);
+  row3->setGap(12.0f);
+  row3->setCrossAlign(Align::Center);
+  row3->setBounds(Rect::MakeXYWH(kContentX + 20.0f, kBodyY + 128.0f, 620.0f, 30.0f));
+  auto nativeSlider = win32::NativeSlider::create(0.0, 100.0, 35.0,
+    [notify](double value) { notify("NativeSlider changed", std::to_string(value)); });
+  if (nativeSlider != nullptr) {
+    configure(nativeSlider);
+    row3->addChild(nativeSlider);
+  }
+  body.addChild(row3);
+  addLabel(body, theme, "Native controls are live HWNDs; headless snapshots show their bounds only.",
+    20.0f, 178.0f, 620.0f);
 #else
   addLabel(body, theme, "Native AppKit controls are available on macOS only.", 20.0f, 20.0f);
 #endif

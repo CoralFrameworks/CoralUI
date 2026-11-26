@@ -34,6 +34,25 @@
 #include <ui/WindowRestoration.h>
 #include <memory>
 
+#if defined(_WIN32)
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <commctrl.h>
+
+#include <ui/win32/NativeButton.h>
+#include <ui/win32/NativeDatePicker.h>
+#include <ui/win32/NativePopUpButton.h>
+#include <ui/win32/NativeProgressIndicator.h>
+#include <ui/win32/NativeSearchField.h>
+#include <ui/win32/NativeSlider.h>
+#include <ui/win32/NativeStepper.h>
+#include <ui/win32/NativeSwitch.h>
+
+#include <chrono>
+#include <string>
+#endif
+
 int main() {
 #if defined(__APPLE__)
   (void)setenv("CORAL_UI_FRAME_PLAN_WINDOW", "1", 1);
@@ -90,6 +109,51 @@ int main() {
   focusable->setBounds(coral::ui::Rect::MakeLTRB(8.0f, 8.0f, 80.0f, 40.0f));
   focusable->setRepaintBoundary(true);
   root->addChild(focusable);
+#if defined(_WIN32)
+  int nativeButtonClicks = 0;
+  std::string nativeSearchText;
+  int nativeSwitchChanges = 0;
+  bool nativeSwitchOn = false;
+  auto nativeButton = coral::ui::win32::NativeButton::create("Native",
+    [&] { ++nativeButtonClicks; });
+  auto nativeSwitch = coral::ui::win32::NativeSwitch::create("On", true,
+    [&](const bool on) { ++nativeSwitchChanges; nativeSwitchOn = on; });
+  auto nativeProgress = coral::ui::win32::NativeProgressIndicator::create(false);
+  auto nativeSearch = coral::ui::win32::NativeSearchField::create("Search",
+    [&](std::string_view text) { nativeSearchText = text; });
+  auto nativePopup = coral::ui::win32::NativePopUpButton::create({ "Alpha", "Beta" }, 1);
+  auto nativeSlider = coral::ui::win32::NativeSlider::create(0.0, 100.0, 35.0);
+  auto nativeStepper = coral::ui::win32::NativeStepper::create(0.0, 10.0, 4.0);
+  auto nativeDate = coral::ui::win32::NativeDatePicker::create(
+    std::chrono::year_month_day{ std::chrono::year{ 2026 }, std::chrono::month{ 11 },
+      std::chrono::day{ 26 } });
+  if (!nativeButton || !nativeSwitch || !nativeProgress || !nativeSearch || !nativePopup ||
+      !nativeSlider || !nativeStepper || !nativeDate) {
+    std::fprintf(stderr, "FAIL: a Win32 native control wrapper could not be created\n");
+    return 1;
+  }
+  nativeButton->setBounds(coral::ui::Rect::MakeXYWH(120.0f, 8.0f, 100.0f, 28.0f));
+  nativeSwitch->setBounds(coral::ui::Rect::MakeXYWH(230.0f, 8.0f, 80.0f, 28.0f));
+  nativeProgress->setBounds(coral::ui::Rect::MakeXYWH(8.0f, 44.0f, 160.0f, 20.0f));
+  nativeProgress->setValue(0.65);
+  nativeSearch->setBounds(coral::ui::Rect::MakeXYWH(8.0f, 72.0f, 180.0f, 28.0f));
+  nativePopup->setBounds(coral::ui::Rect::MakeXYWH(200.0f, 72.0f, 110.0f, 28.0f));
+  nativeSlider->setBounds(coral::ui::Rect::MakeXYWH(8.0f, 108.0f, 160.0f, 28.0f));
+  nativeSlider->setValue(42.0);
+  nativeStepper->setBounds(coral::ui::Rect::MakeXYWH(176.0f, 108.0f, 50.0f, 28.0f));
+  nativeStepper->setValue(7.0);
+  nativeDate->setBounds(coral::ui::Rect::MakeXYWH(234.0f, 108.0f, 80.0f, 28.0f));
+  for (const auto& native: { std::static_pointer_cast<coral::ui::Layer>(nativeButton),
+      std::static_pointer_cast<coral::ui::Layer>(nativeSwitch),
+      std::static_pointer_cast<coral::ui::Layer>(nativeProgress),
+      std::static_pointer_cast<coral::ui::Layer>(nativeSearch),
+      std::static_pointer_cast<coral::ui::Layer>(nativePopup),
+      std::static_pointer_cast<coral::ui::Layer>(nativeSlider),
+      std::static_pointer_cast<coral::ui::Layer>(nativeStepper),
+      std::static_pointer_cast<coral::ui::Layer>(nativeDate) }) {
+    root->addChild(native);
+  }
+#endif
   window->setRoot(root);
   window->focusLayer(focusable.get());
   if (!window->renderFrame()) {
@@ -101,6 +165,73 @@ int main() {
     std::fprintf(stderr, "FAIL: the native frame loop did not count the first frame\n");
     return 1;
   }
+
+#if defined(_WIN32)
+  const HWND nativeHost = static_cast<HWND>(window->nativeWindowHandle());
+  const auto childOf = [](const auto& control) {
+    return static_cast<HWND>(control->nativeView());
+  };
+  const HWND nativeButtonHandle = childOf(nativeButton);
+  const HWND nativeSwitchHandle = childOf(nativeSwitch);
+  const HWND nativeProgressHandle = childOf(nativeProgress);
+  const HWND nativeSearchHandle = childOf(nativeSearch);
+  const HWND nativeSliderHandle = childOf(nativeSlider);
+  const HWND nativeStepperHandle = childOf(nativeStepper);
+  for (const HWND child: { nativeButtonHandle, nativeSwitchHandle, nativeProgressHandle,
+      nativeSearchHandle, childOf(nativePopup), nativeSliderHandle, nativeStepperHandle,
+      childOf(nativeDate) }) {
+    if (child == nullptr || !::IsWindow(child) || ::GetParent(child) != nativeHost ||
+        !::IsWindowVisible(child)) {
+      std::fprintf(stderr, "FAIL: a Win32 native control was not attached to the window\n");
+      return 1;
+    }
+  }
+
+  ::SendMessageW(nativeButtonHandle, BM_CLICK, 0, 0);
+  if (nativeButtonClicks != 1) {
+    std::fprintf(stderr, "FAIL: the native button did not deliver BN_CLICKED\n");
+    return 1;
+  }
+  ::SendMessageW(nativeSwitchHandle, BM_CLICK, 0, 0);
+  if (nativeSwitchChanges != 1 || nativeSwitchOn) {
+    std::fprintf(stderr, "FAIL: the native switch did not deliver its toggle\n");
+    return 1;
+  }
+  if (::SendMessageW(nativeProgressHandle, PBM_GETPOS, 0, 0) != 65) {
+    std::fprintf(stderr, "FAIL: the native progress bar did not keep its value\n");
+    return 1;
+  }
+  if (::SendMessageW(nativeSliderHandle, TBM_GETPOS, 0, 0) != 42) {
+    std::fprintf(stderr, "FAIL: the native slider did not keep its value\n");
+    return 1;
+  }
+  if (::SendMessageW(nativeStepperHandle, UDM_GETPOS32, 0, 0) != 7) {
+    std::fprintf(stderr, "FAIL: the native stepper did not keep its value\n");
+    return 1;
+  }
+  if (nativePopup->selectedIndex() != 1 || nativePopup->itemTitle(1) != "Beta") {
+    std::fprintf(stderr, "FAIL: the native combo box did not keep its selection\n");
+    return 1;
+  }
+  nativeSearch->setText("coral");
+  if (nativeSearch->text() != "coral") {
+    std::fprintf(stderr, "FAIL: the native search field did not keep its text\n");
+    return 1;
+  }
+  ::SendMessageW(nativeHost, WM_COMMAND,
+    MAKEWPARAM(::GetDlgCtrlID(nativeSearchHandle), EN_CHANGE),
+    reinterpret_cast<LPARAM>(nativeSearchHandle));
+  if (nativeSearchText != "coral") {
+    std::fprintf(stderr, "FAIL: the native search field did not deliver EN_CHANGE\n");
+    return 1;
+  }
+  const auto expectedDate = std::chrono::year_month_day{ std::chrono::year{ 2026 },
+    std::chrono::month{ 11 }, std::chrono::day{ 26 } };
+  if (nativeDate->date() != expectedDate) {
+    std::fprintf(stderr, "FAIL: the native date picker did not keep its date\n");
+    return 1;
+  }
+#endif
 
   // A clean native window replays the retained recording instead of re-recording the whole tree.
   // Only the Cocoa backend currently opts into retained frames; the other native backends have

@@ -35,6 +35,7 @@
 #include <cstdlib>
 #include <cmath>
 #include <string>
+#include <unordered_map>
 #include <utility>
 
 namespace coral::ui::detail {
@@ -540,6 +541,59 @@ public:
     mMinHeight = std::max(0, height);
   }
 
+  // ================================================================================================
+  // NativeViewLayer host
+  // ================================================================================================
+  // A native control is a real child HWND. The layer tree only supplies its logical rectangle and
+  // visibility: the child paints itself through USER32 and always sits above the GPU content, the
+  // same airspace model as an NSView above the Cocoa/Metal view. The `ui/win32` wrapper owns the
+  // HWND; this backend only positions, shows, hides and detaches it.
+  void setNativeViewBounds(void* nativeView, const Rect bounds, const bool visible) override {
+    HWND child = static_cast<HWND>(nativeView);
+    if (child == nullptr || !::IsWindow(child) || mHwnd == nullptr) return;
+
+    if (::GetParent(child) != mHwnd) {
+      const LONG_PTR style = ::GetWindowLongPtrW(child, GWL_STYLE);
+      if ((style & WS_CHILD) == 0) {
+        ::SetWindowLongPtrW(child, GWL_STYLE, (style | WS_CHILD) & ~WS_POPUP);
+      }
+      ::SetParent(child, mHwnd);
+      mNativeViews.erase(child);
+    }
+
+    const int x = static_cast<int>(std::lround(bounds.getLeft() * mDpiScale));
+    const int y = static_cast<int>(std::lround(bounds.getTop() * mDpiScale));
+    const int width = std::max(1, static_cast<int>(std::lround(bounds.getWidth() * mDpiScale)));
+    const int height = std::max(1, static_cast<int>(std::lround(bounds.getHeight() * mDpiScale)));
+    const RECT target{ x, y, x + width, y + height };
+
+    NativeViewState& state = mNativeViews[child];
+    if (state.epoch == mNativeViewEpoch && state.visible == visible &&
+        state.bounds.left == target.left && state.bounds.top == target.top &&
+        state.bounds.right == target.right && state.bounds.bottom == target.bottom) {
+      return;
+    }
+    state.bounds = target;
+    state.visible = visible;
+    state.epoch = mNativeViewEpoch;
+    ::SetWindowPos(child, HWND_TOP, x, y, width, height,
+      SWP_NOACTIVATE | SWP_NOOWNERZORDER |
+        (visible ? SWP_SHOWWINDOW : SWP_HIDEWINDOW));
+  }
+
+  // The layer borrows the HWND; its owner (the `ui/win32` wrapper) destroys it. Win32 only hides and
+  // detaches the child here so a wrapper that outlives the window can still tear it down, and a
+  // headless window (whose platform has no native-view hook) does not leak a desktop child.
+  void removeNativeView(void* nativeView) override {
+    HWND child = static_cast<HWND>(nativeView);
+    if (child == nullptr) return;
+    mNativeViews.erase(child);
+    if (::IsWindow(child)) {
+      ::ShowWindow(child, SW_HIDE);
+      ::SetParent(child, ::GetDesktopWindow());
+    }
+  }
+
   void setMaximized(bool maximized) override {
     if (mHwnd != nullptr) ShowWindow(mHwnd, maximized ? SW_MAXIMIZE : SW_RESTORE);
   }
@@ -922,6 +976,10 @@ private:
     case WM_DPICHANGED: {
         const UINT dpi = HIWORD(wParam);
         platform->mDpiScale = dpi > 0 ? static_cast<float>(dpi) / 96.0f : 1.0f;
+        // Native child frames are cached in device pixels; force the next sync to reposition them at
+        // the new scale even when the logical rectangle did not change.
+        ++platform->mNativeViewEpoch;
+        platform->mNativeViews.clear();
         const auto* suggested = reinterpret_cast<const RECT*>(lParam);
         if (suggested != nullptr) {
           SetWindowPos(hwnd, nullptr, suggested->left, suggested->top,
@@ -1214,6 +1272,13 @@ private:
   LONG_PTR mRestoreStyle = 0;
   RECT mRestoreRect{};
   float mDpiScale = 1.0f;
+  struct NativeViewState {
+    RECT bounds{};
+    bool visible = false;
+    UINT epoch = 0;
+  };
+  std::unordered_map<HWND, NativeViewState> mNativeViews;
+  UINT mNativeViewEpoch = 1;
   std::string mDiagnostics;
 };
 

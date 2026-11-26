@@ -22,6 +22,7 @@
 #include <ui/HotReload.h>
 #include <ui/ProcessStats.h>
 #include <ui/Motion.h>
+#include <ui/NativeAlert.h>
 #include <ui/ThemeFile.h>
 #include <ui/ThemeHotReload.h>
 #include <ui/NumberFormat.h>
@@ -65,6 +66,14 @@
 namespace {
 
 using namespace coral::ui;
+
+#if defined(_WIN32)
+// Catches a regression where the Win32 TaskDialog backend stops being linked and the -1 fallback
+// silently takes over again.
+TEST(UiNativeAlert, TheWin32BackendAdvertisesNativeAlerts) {
+  EXPECT_TRUE(supportsNativeAlerts());
+}
+#endif
 
 TEST(UiWindow, AHeadlessWindowRendersItsRootAndSnapshots) {
   Window::Options options;

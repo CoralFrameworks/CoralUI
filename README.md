@@ -63,6 +63,8 @@ third_party/        the shared libz / libyuv / libgtest submodules
 | Clipboard | Multi-MIME, files, PNG | Multi-MIME, PRIMARY, INCR | Per-MIME, PRIMARY | Multi-MIME, HTML, PNG, file URLs |
 | Drag and drop | OLE | XDND | Not yet | `NSDraggingSource` / destination |
 | File dialogs | Native | Portal, `zenity`/`kdialog` | Portal | `NSOpenPanel`/`NSSavePanel` |
+| Native alerts | `TaskDialog` | In-window `Dialog` | In-window `Dialog` | `NSAlert` |
+| Native control hosting | `NativeViewLayer` child HWND | Not yet | Not yet | `NativeViewLayer` NSView |
 | Native chrome | Custom | Custom | Custom / server-side | Toolbar, sidebar/outline, titlebar accessory, native menus |
 | Accessibility | UI Automation | AT-SPI | AT-SPI | `NSAccessibility` tree, actions, text, grid, hit test |
 

@@ -1,8 +1,7 @@
 # Cross-platform controls
 
 These controls live in the core `coral::ui` namespace and are custom-drawn on every platform. A
-platform-native control belongs in `coral::ui::macos` (or a future `win32`/`linux` extension), never in
-this list.
+platform-native control belongs in `coral::ui::macos` or `coral::ui::win32`, never in this list.
 
 ## Gallery
 

@@ -46,9 +46,10 @@ struct NativeAlertOptions {
 /**
  * Shows a platform-native alert and waits for a button.
  *
- * macOS uses `NSAlert`, attached as a sheet when the active parent window is available. Other
- * platforms currently return -1 (`supportsNativeAlerts()` is false); they keep their in-window
- * `Dialog` for now.
+ * macOS uses `NSAlert`, attached as a sheet when the active parent window is available. Windows uses
+ * `TaskDialogIndirect` (with a `MessageBoxW` fallback for a host without the common-controls v6
+ * manifest). Other platforms currently return -1 (`supportsNativeAlerts()` is false); they keep
+ * their in-window `Dialog` for now.
  *
  * @return the zero-based button index, or -1 when the platform has no native alert, the call is not
  *         on the UI thread, or the alert was dismissed without a button.

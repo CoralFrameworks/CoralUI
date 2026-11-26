@@ -82,7 +82,7 @@ out/examples/ui/ui_demo --headless --frames 2 --out out/ui_demo.png
 out/examples/ui/ui_demo.app/Contents/MacOS/ui_demo --headless --frames 2 --out out/ui_demo.png
 open out/examples/ui/ui_demo.app
 out/examples/ui/ui_demo.app/Contents/MacOS/ui_demo --frames 0 --width 960 --height 700
-# Pick a gallery section at launch (0 Inputs, 1 Selection, ... 6 Lists, 7 Native macOS, 8 More)
+# Pick a gallery section at launch (0 Inputs, 1 Selection, ... 6 Lists, 7 Native, 8 More)
 out/examples/ui/ui_demo.app/Contents/MacOS/ui_demo --frames 0 --section 6
 # Open one control's standalone demo (section is inferred from the control row)
 out/examples/ui/ui_demo.app/Contents/MacOS/ui_demo --frames 0 --control SplitButton
@@ -132,12 +132,14 @@ registered:
 | `example_ui_demo_headless` | the sectioned gallery lays out and snapshots the Inputs page |
 | `example_ui_demo_lists_headless` | the Lists page renders the outer and nested ScrollViews |
 | `example_ui_demo_control_headless` | a standalone control demo renders with its accent frame |
-| `example_ui_demo_native_headless` | the Native macOS page renders its fallback text offscreen |
+| `example_ui_demo_native_headless` | the Native page renders its fallback text offscreen (native children are not in the GPU frame) |
 | `example_ui_demo_more_headless` | the More page renders additional framework controls |
 | `example_ui_mvvm_headless` | the Element/Reconciler page mounts, patches from a Command and renders |
 
 The native window path is the manual check; `ui_demo --frames N --out frame.png` also snapshots the
-presented frame, so a macOS or Windows run can be verified without a screenshot.
+presented GPU frame, so a macOS or Windows run can be verified without a screenshot. A snapshot does
+not include platform-native children (`NSView`/child HWND); the Native gallery page labels that block
+as live native only.
 
 The two programs have different jobs and are intentionally kept separate:
 

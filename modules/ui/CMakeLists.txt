@@ -24,6 +24,15 @@ set(PUBLIC_HDRS
     include/ui/macos/NativeStepper.h
     include/ui/macos/NativeDatePicker.h
     include/ui/macos/NativeSegmentedControl.h
+    include/ui/win32/NativeButton.h
+    include/ui/win32/NativeSwitch.h
+    include/ui/win32/NativeSearchField.h
+    include/ui/win32/NativePopUpButton.h
+    include/ui/win32/NativeProgressIndicator.h
+    include/ui/win32/NativeSlider.h
+    include/ui/win32/NativeStepper.h
+    include/ui/win32/NativeDatePicker.h
+    include/ui/win32/NativeControlSize.h
     include/ui/Binding.h
     include/ui/Button.h
     include/ui/Divider.h
@@ -377,19 +386,33 @@ target_link_libraries(${TARGET} PRIVATE $<BUILD_INTERFACE:minilog>)
 
 if (WIN32)
   # psapi/dbghelp: process counters and the minidump writer behind `ui/CrashReporter.h`.
+  # comctl32: TaskDialogIndirect behind `ui/NativeAlert.h`.
   target_link_libraries(${TARGET} PRIVATE user32 imm32 ole32 shell32 comdlg32 advapi32 psapi dbghelp
-      uiautomationcore)
+      uiautomationcore comctl32)
   target_sources(${TARGET} PRIVATE src/platform/win32/WindowWin32.cpp
       src/Win32DragOut.cpp)
   target_sources(${TARGET} PRIVATE src/platform/win32/DropTargetWin32.cpp
-      src/platform/win32/UiaProvider.cpp)
+      src/platform/win32/UiaProvider.cpp
+      src/platform/win32/NativeAlertWin32.cpp
+      src/platform/win32/NativeControlWin32.cpp
+      src/platform/win32/NativeButtonWin32.cpp
+      src/platform/win32/NativeSwitchWin32.cpp
+      src/platform/win32/NativeSearchFieldWin32.cpp
+      src/platform/win32/NativePopUpButtonWin32.cpp
+      src/platform/win32/NativeProgressIndicatorWin32.cpp
+      src/platform/win32/NativeSliderWin32.cpp
+      src/platform/win32/NativeStepperWin32.cpp
+      src/platform/win32/NativeDatePickerWin32.cpp)
   set(CLIPBOARD_PLATFORM_SOURCE src/platform/win32/ClipboardWin32.cpp)
   set(FILEDIALOG_PLATFORM_SOURCE src/platform/win32/FileDialogWin32.cpp)
 endif ()
 
 if (NOT APPLE OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
   target_sources(${TARGET} PRIVATE src/platform/SystemImageFallback.cpp)
-  target_sources(${TARGET} PRIVATE src/platform/NativeAlertFallback.cpp)
+  if (NOT WIN32)
+    # Windows has a real TaskDialog backend; the other non-Apple platforms fall back to -1.
+    target_sources(${TARGET} PRIVATE src/platform/NativeAlertFallback.cpp)
+  endif ()
   target_sources(${TARGET} PRIVATE src/platform/SpellCheckFallback.cpp)
   target_sources(${TARGET} PRIVATE src/platform/SecurityScopedBookmarkFallback.cpp)
   target_sources(${TARGET} PRIVATE src/platform/InputSourceFallback.cpp)
@@ -795,11 +818,16 @@ foreach (_target shaderc_util glslang SPIRV SPIRV-Tools SPIRV-Tools-opt)
 endforeach ()
 
 # Platform-native control extensions are installed only on their platform. The cross-platform
-# headers stay under include/ui; macOS interop lives under include/ui/macos.
+# headers stay under include/ui; macOS and Win32 interop live under include/ui/macos and
+# include/ui/win32.
 install(DIRECTORY ${PUBLIC_HDR_DIR}/${TARGET} DESTINATION include
-    PATTERN "macos" EXCLUDE)
+    PATTERN "macos" EXCLUDE
+    PATTERN "win32" EXCLUDE)
 if (APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   install(DIRECTORY ${PUBLIC_HDR_DIR}/${TARGET}/macos DESTINATION include/ui)
+endif ()
+if (WIN32)
+  install(DIRECTORY ${PUBLIC_HDR_DIR}/${TARGET}/win32 DESTINATION include/ui)
 endif ()
 
 # Translation catalogues belong to the SDK, not to the demo: `loadCatalogDirectory()` takes a

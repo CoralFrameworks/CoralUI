@@ -80,6 +80,11 @@ separate `modules/mvvm` library; `modules/ui` is the toolkit.
 - Drag and drop: Windows OLE, X11 XDND, macOS `NSDraggingSource`/`NSDraggingDestination`.
 - File dialogs: Win32 `IFileOpenDialog`/`IFileSaveDialog`; Linux xdg-desktop-portal with
   `zenity`/`kdialog` fallback.
+- Native alerts: Windows `TaskDialogIndirect` with a `MessageBoxW` fallback; macOS `NSAlert`,
+  attached as a sheet when the parent window is available.
+- Native control hosting: `NativeViewLayer` hosts a platform child view at a layer's absolute
+  bounds; Windows wrappers live under `ui/win32` (child HWNDs) and macOS wrappers under
+  `ui/macos` (`NSView`). The hosted control is an airspace overlay, not part of the GPU frame.
 - IME: Win32 IMM32, Linux IBus/XIM and Wayland `text-input` v1/v3, including surrounding-text and
   delete-surrounding support; macOS `NSTextInputClient` with marked text and candidate anchoring.
 - System appearance: dark/light, contrast and reduced-motion preferences where the platform
@@ -124,6 +129,8 @@ separate `modules/mvvm` library; `modules/ui` is the toolkit.
 | Clipboard | Multi-MIME, files, PNG | Multi-MIME, PRIMARY, INCR | Per-MIME, PRIMARY | Multi-MIME, HTML, PNG, file URLs |
 | Drag and drop | OLE | XDND | Not yet | `NSDraggingSource` / destination |
 | File dialogs | Native | Portal, `zenity`/`kdialog` | Portal | `NSOpenPanel`/`NSSavePanel` |
+| Native alerts | `TaskDialog` | In-window `Dialog` | In-window `Dialog` | `NSAlert` |
+| Native control hosting | `NativeViewLayer` child HWND | Not yet | Not yet | `NativeViewLayer` NSView |
 | Accessibility | UI Automation | AT-SPI | AT-SPI | `NSAccessibility` tree, actions, text, grid, hit test |
 | Maximize/minimize | Yes | Yes | Yes | Yes (zoom/miniaturize) |
 | Always-on-top | Yes | X11 only | No | Yes |
