@@ -159,3 +159,18 @@ It reports:
 
 This is a baseline, not a CI timing gate: shared runners are too noisy for a hard budget. The CTest
 entry runs a small iteration count so the path stays built and exercised.
+## Golden coverage
+
+`UiGolden.TheExtraScenesMatchTheirGoldenImages` includes two DSL scenes:
+
+- `modules/ui/tests/dsl_panel.png` at 1.0 scale
+- `modules/ui/tests/dsl_panel_dpi15.png` at 1.5 scale
+
+Regenerate them with:
+
+```sh
+CORAL_UPDATE_GOLDEN=1 test_ui --gtest_filter=UiGolden.TheExtraScenesMatchTheirGoldenImages
+```
+
+The scene covers `dsl::Panel`, `dsl::Column`, `dsl::Swatch` and a text role through the full
+Element -> Reconciler -> GPU path at two scales.
