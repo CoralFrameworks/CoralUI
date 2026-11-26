@@ -51,6 +51,33 @@ class ThemeScope {
 /** The active theme, or the default dark theme outside a `ThemeScope`. */
 [[nodiscard]] const Theme& theme();
 
+/**
+ * A value snapshot of the design tokens the DSL uses during a build.
+ *
+ * The snapshot is intentional: a build must not observe a theme half-way through a control. Read it
+ * once at the start of a component and pass the values down.
+ */
+struct Tokens {
+  Spacing spacing;
+  Radius radius;
+  FontSizes fontSizes;
+  Color background;
+  Color surface;
+  Color surfaceRaised;
+  Color text;
+  Color textMuted;
+  Color accent;
+  std::shared_ptr<const graphics::Font> body;
+  std::shared_ptr<const graphics::Font> title;
+};
+
+[[nodiscard]] inline Tokens tokens() {
+  const Theme& current = theme();
+  return Tokens{ current.spacing, current.radius, current.fonts, current.background,
+    current.surface, current.surfaceRaised, current.text, current.textMuted, current.accent,
+    current.body, current.title };
+}
+
 struct StackOptions {
   float gap = 0.0f;
   Insets padding{};
@@ -177,22 +204,25 @@ template <class... Children>
 
 template <class... Children>
 [[nodiscard]] ElementPtr Card(std::string title, Children&&... children) {
-  auto content = Column(StackOptions{ .gap = 8.0f, .padding = Insets{}.all(4.0f) },
+  const Tokens t = tokens();
+  auto content = Column(StackOptions{ .gap = t.spacing.sm, .padding = Insets{}.all(t.spacing.xs) },
     std::forward<Children>(children)...);
   return components::Card(std::move(title), theme().title, std::move(content), {}, {});
 }
 
 template <class... Children>
 [[nodiscard]] ElementPtr Section(std::string title, Children&&... children) {
-  auto body = Column(StackOptions{ .gap = 8.0f }, std::forward<Children>(children)...);
-  auto header = components::SectionHeader(std::move(title), theme().title, {}, {}, {});
-  return Column(StackOptions{ .gap = 8.0f }, std::move(header), std::move(body));
+  const Tokens t = tokens();
+  auto body = Column(StackOptions{ .gap = t.spacing.sm }, std::forward<Children>(children)...);
+  auto header = components::SectionHeader(std::move(title), t.title, {}, {}, {});
+  return Column(StackOptions{ .gap = t.spacing.sm }, std::move(header), std::move(body));
 }
 
 template <class... Children>
 [[nodiscard]] ElementPtr Page(std::string title, Children&&... children) {
-  auto body = Column(StackOptions{ .gap = 12.0f }, std::forward<Children>(children)...);
-  auto page = Column(StackOptions{ .gap = 16.0f, .padding = Insets{}.all(24.0f) },
+  const Tokens t = tokens();
+  auto body = Column(StackOptions{ .gap = t.spacing.md }, std::forward<Children>(children)...);
+  auto page = Column(StackOptions{ .gap = t.spacing.lg, .padding = Insets{}.all(t.spacing.xl) },
     Title(std::move(title)), std::move(body));
   ElementProps props;
   props.layout.grow = 1.0f;

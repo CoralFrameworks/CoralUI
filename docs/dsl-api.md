@@ -17,6 +17,15 @@ must not require a caller to spell out a font, colour, or key for the common cas
 scope is thread-local and is not a substitute for the window-owned `Theme`; overlays that outlive a
 build keep their own theme copy.
 
+### Design tokens
+
+- `dsl::Tokens`
+- `dsl::tokens()`
+
+`tokens()` snapshots the active theme's spacing, radius, font sizes, colours and font handles. `Page`,
+`Card`, and `Section` use `spacing.xs/sm/md/lg/xl` for their default padding and gaps; a component
+must not hard-code those values.
+
 ### Layout
 
 - `dsl::Column`, `dsl::Row`, `dsl::Grid`

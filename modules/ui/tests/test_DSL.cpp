@@ -91,3 +91,15 @@ TEST(DslApi, StableCoreComposesWithoutComponentSignatures) {
 }
 
 } // namespace
+
+TEST(DslApi, DesignTokensFollowTheActiveTheme) {
+  Theme theme = Theme::dark();
+  theme.spacing.md = 17.0f;
+  theme.radius.lg = 9.0f;
+  dsl::ThemeScope scope(theme);
+  const dsl::Tokens tokens = dsl::tokens();
+  EXPECT_FLOAT_EQ(tokens.spacing.md, 17.0f);
+  EXPECT_FLOAT_EQ(tokens.radius.lg, 9.0f);
+  EXPECT_EQ(tokens.text, theme.text);
+  EXPECT_EQ(tokens.body, theme.body);
+}
