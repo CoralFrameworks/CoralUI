@@ -65,7 +65,12 @@ jobs:
 
       - name: Build and test
         shell: cmd
-        run: scripts\build-windows.cmd -Tests
+        run: |
+          scripts\build-windows.cmd -Tests > windows-build.log 2>&1
+          if errorlevel 1 (
+            type windows-build.log
+            exit /b 1
+          )
 
       - name: Upload test output
         if: failure()
@@ -73,6 +78,7 @@ jobs:
         with:
           name: windows-build
           path: |
+            windows-build.log
             out/windows/**/*.log
             out/windows/**/*.png
           if-no-files-found: ignore

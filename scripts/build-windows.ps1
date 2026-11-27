@@ -205,7 +205,7 @@ Write-Step 'Building'
 $build = @($CMakePath, '--build', $BuildPath, '--config', $Configuration) + $parallel
 if ($Tests) {
     $build += @('--target', 'test_ui', 'ui_native_smoke', 'ui_multimonitor_smoke',
-        'crash_windows_smoke', 'ui_demo', 'ui_mvvm_demo', 'ui_dsl_gallery', 'ui_dsl_bench')
+        'crash_windows_smoke', 'ui_demo', 'ui_mvvm_demo', 'ui_declarative_gallery', 'ui_dsl_gallery', 'ui_dsl_bench')
 }
 Invoke-Native -Arguments $build
 
