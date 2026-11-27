@@ -2016,6 +2016,7 @@ TEST(UiRetained, TheFrameStatisticsBelongToTheirWindow) {
 }
 
 TEST(UiRetained, AThreadedWindowWithAnOverlayPaintsWhatTheSameThreadPathPaints) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   // Three features meet here and nowhere else: the plan lends the boundary lists, the render thread takes
   // them through the packet, and the overlay has to end up above them. Each has its own test; the
   // combination is where the packet's list order and the overlay's "last item" rule actually interact.

@@ -1361,6 +1361,7 @@ TEST(UiWindow, ARasterWindowRendersWithoutADevice) {
 }
 
 TEST(UiWindow, AThreadedHeadlessWindowRendersThroughItsRenderHost) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   Window::Options options;
   options.headless = true;
   options.width = 16;
@@ -2281,6 +2282,7 @@ TEST(UiApplication, ClosedWindowIsAliveDuringItsCallback) {
 }
 
 TEST(UiApplication, ThreeThreadedWindowsShareOneHost) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   auto application = Application::create();
   Window::Options options;
   options.headless = true;
@@ -2322,6 +2324,7 @@ TEST(UiApplication, ThreeThreadedWindowsShareOneHost) {
 }
 
 TEST(UiApplication, ThreeWindowsKeepIndependentScaleAndTheme) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   auto application = Application::create();
   const float scales[3] = { 1.0f, 1.5f, 2.0f };
   std::vector<std::shared_ptr<Window>> windows;
@@ -2514,6 +2517,7 @@ TEST(UiWindow, AThreadedWaylandWindowIsRejectedWithAReason) {
 #endif
 
 TEST(UiWindow, AnApplicationSharesOneRenderHostBetweenThreadedWindows) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   auto application = Application::create();
   Window::Options options;
   options.headless = true;
