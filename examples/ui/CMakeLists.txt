@@ -31,6 +31,19 @@ add_executable(ui_declarative_gallery ui_declarative_gallery.cpp)
 target_link_libraries(ui_declarative_gallery PRIVATE ui minilog)
 target_compile_definitions(ui_declarative_gallery PRIVATE CORAL_ASSETS_DIR="${CORALUI_EXAMPLE_ASSETS}")
 
+# The DSL gallery is the full declarative catalogue ported to the variadic/theme façade over the
+# same Element/Reconciler pipeline. It adds Waveform and DSL pages after the Escape hatch, including
+# a retained custom control hosted through `dsl::Canvas`.
+add_executable(ui_dsl_gallery ui_dsl_gallery.cpp)
+target_link_libraries(ui_dsl_gallery PRIVATE ui minilog)
+target_compile_definitions(ui_dsl_gallery PRIVATE CORAL_ASSETS_DIR="${CORALUI_EXAMPLE_ASSETS}")
+
+# The DSL benchmark is a baseline, not a timing gate: it reports the cost of a rebuild/layout/paint
+# cycle and an Element-content popup. The CTest invocation keeps the path exercised in CI without
+# turning a shared-runner scheduling hiccup into a failure.
+add_executable(ui_dsl_bench ui_dsl_bench.cpp)
+target_link_libraries(ui_dsl_bench PRIVATE ui minilog)
+
 # On macOS the interactive demo is a real application bundle: Finder launch, Dock identity, a bundle
 # id and version. The headless checks still invoke the executable inside the bundle, so `ctest` needs
 # no separate target.
@@ -142,13 +155,41 @@ if (EXISTS "${CORALUI_EXAMPLE_ASSETS}/fonts/NotoSansSC-Regular.otf")
   # page fails only its own test. The self-check additionally drives every page and asserts that the
   # footer layer identity survives a rebuild.
   foreach (section RANGE 0 6)
-    add_test(NAME example_ui_declarative_gallery_section${section}_headless
+
+add_test(NAME example_ui_declarative_gallery_section${section}_headless
         COMMAND $<TARGET_FILE:ui_declarative_gallery> --headless --frames 2
             --section ${section}
             --out "${CMAKE_CURRENT_BINARY_DIR}/ui_declarative_gallery_${section}.png")
     set_tests_properties(example_ui_declarative_gallery_section${section}_headless
         PROPERTIES LABELS examples)
   endforeach ()
+  foreach (section RANGE 0 8)
+    add_test(NAME example_ui_dsl_gallery_section${section}_headless
+        COMMAND $<TARGET_FILE:ui_dsl_gallery> --headless --frames 2 --section ${section}
+            --out "${CMAKE_CURRENT_BINARY_DIR}/ui_dsl_gallery_${section}.png")
+    set_tests_properties(example_ui_dsl_gallery_section${section}_headless PROPERTIES LABELS examples)
+  endforeach ()
+  add_test(NAME example_ui_dsl_bench
+      COMMAND $<TARGET_FILE:ui_dsl_bench> --iterations 20 --rows 120)
+  set_tests_properties(example_ui_dsl_bench PROPERTIES LABELS examples TIMEOUT 120)
+
+  add_test(NAME example_ui_dsl_gallery_self_check
+      COMMAND $<TARGET_FILE:ui_dsl_gallery> --headless --self-check
+          --out "${CMAKE_CURRENT_BINARY_DIR}/ui_dsl_gallery_self_check.png")
+  set_tests_properties(example_ui_dsl_gallery_self_check PROPERTIES LABELS examples)  # Fractional-DPI smoke: these exercise the same Layout and custom Waveform pages at the scales
+  # where composed masks and layer bounds have historically diverged from the 1.0 case.
+  foreach (scale 1.25 1.5 2.0)
+    string(REPLACE "." "_" scale_tag "${scale}")
+    add_test(NAME example_ui_dsl_gallery_dpi_${scale_tag}_layout
+        COMMAND $<TARGET_FILE:ui_dsl_gallery> --headless --frames 2 --section 1
+            --scale ${scale}
+            --out "${CMAKE_CURRENT_BINARY_DIR}/ui_dsl_gallery_dpi_${scale_tag}_layout.png")
+    set_tests_properties(example_ui_dsl_gallery_dpi_${scale_tag}_layout PROPERTIES LABELS examples)
+  endforeach ()
+  add_test(NAME example_ui_dsl_gallery_dpi_1_5_waveform
+      COMMAND $<TARGET_FILE:ui_dsl_gallery> --headless --frames 2 --section 7 --scale 1.5
+          --out "${CMAKE_CURRENT_BINARY_DIR}/ui_dsl_gallery_dpi_1_5_waveform.png")
+  set_tests_properties(example_ui_dsl_gallery_dpi_1_5_waveform PROPERTIES LABELS examples)
   add_test(NAME example_ui_declarative_gallery_light_headless
       COMMAND $<TARGET_FILE:ui_declarative_gallery> --headless --frames 2 --theme light
           --out "${CMAKE_CURRENT_BINARY_DIR}/ui_declarative_gallery_light.png")

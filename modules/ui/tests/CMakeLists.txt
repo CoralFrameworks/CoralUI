@@ -8,7 +8,13 @@ add_executable(test_ui
     test_Host.cpp
     test_MvvmBinding.cpp
     test_Reconciler.cpp
-test_Retained.cpp
+    test_DSL.cpp
+    dsl_header_core.cpp
+    dsl_header_experimental.cpp
+    dsl_header_style.cpp
+    dsl_header_overlay.cpp
+    dsl_header_element_content.cpp
+    test_Retained.cpp
     test_ElementSpec.cpp
     test_NumberFormat.cpp
     test_DateFormat.cpp

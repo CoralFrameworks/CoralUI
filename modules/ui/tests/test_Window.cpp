@@ -28,6 +28,12 @@
 #include <ui/Element.h>
 #include <ui/NumberFormat.h>
 #include <ui/OverlayHost.h>
+#include <ui/DSL.h>
+#include <ui/DSLOverlay.h>
+#include <ui/Toast.h>
+#include <ui/SplitButton.h>
+#include <ui/Menu.h>
+#include <ui/Reconciler.h>
 #include <ui/DateFormat.h>
 #include <ui/Translation.h>
 #include <ui/RenderContext.h>
@@ -50,6 +56,8 @@
 
 #include <gtest/gtest.h>
 
+#include "TestSupport.h"
+
 #if defined(_WIN32)
 #include <windows.h>
 #endif
@@ -68,6 +76,7 @@
 namespace {
 
 using namespace coral::ui;
+namespace dsx = coral::ui::dsl::experimental;
 
 #if defined(_WIN32)
 // Catches a regression where the Win32 TaskDialog backend stops being linked and the -1 fallback
@@ -159,6 +168,7 @@ TEST(UiWindow, OpacityAndTranslationCompositeIntoTheFrame) {
 }
 
 TEST(UiWindow, RoundedClipCutsTheCornerFromTheFrame) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   Window::Options options;
   options.headless = true;
   options.width = 100;
@@ -383,6 +393,7 @@ TEST(UiWindow, FrameTimingsAreRecorded) {
 }
 
 TEST(UiWindow, AHeadlessWindowReportsItsRendererCapabilities) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   Window::Options options;
   options.headless = true;
   options.width = 64;
@@ -645,6 +656,7 @@ TEST(UiWindow, ASizedOpacityGroupKeepsItsDevicePosition) {
 }
 
 TEST(UiWindow, ARoundedClipMaskCoversTheLayerRegionNotTheWholeTarget) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   Window::Options options;
   options.headless = true;
   options.width = 64;
@@ -677,6 +689,7 @@ TEST(UiWindow, ARoundedClipMaskCoversTheLayerRegionNotTheWholeTarget) {
 }
 
 TEST(UiWindow, ACleanFrameReplaysTheRetainedRecording) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   Window::Options options;
   options.headless = true;
   options.width = 64;
@@ -750,6 +763,7 @@ TEST(UiWindow, ADamageRectUpdatesOnlyTheDirtyPixels) {
 }
 
 TEST(UiWindow, ALeafRecordingIsReusedUntilTheLayerIsDirty) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   Window::Options options;
   options.headless = true;
   options.width = 1024;
@@ -1347,6 +1361,7 @@ TEST(UiWindow, ARasterWindowRendersWithoutADevice) {
 }
 
 TEST(UiWindow, AThreadedHeadlessWindowRendersThroughItsRenderHost) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   Window::Options options;
   options.headless = true;
   options.width = 16;
@@ -1756,6 +1771,7 @@ TEST(UiWindow, FrameStatsOverlayKeepsAFrameTimeHistory) {
 
 TEST(UiWindow, CatalogDirectoryLoadsTheFallbackChain) {
   using namespace coral::ui;
+namespace dsx = coral::ui::dsl::experimental;
   namespace fs = std::filesystem;
   const std::string directory = (fs::current_path() /
     ("coral-i18n-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())))
@@ -1804,6 +1820,7 @@ TEST(UiWindow, CatalogDirectoryLoadsTheFallbackChain) {
 
 TEST(UiWindow, TranslationsLayerAndInterpolate) {
   using namespace coral::ui;
+namespace dsx = coral::ui::dsl::experimental;
   Translator translator(Locale::parse("zh-CN"));
   std::string error;
   // Base catalog, then the locale catalog on top: a key the locale does not translate keeps the base.
@@ -1835,6 +1852,7 @@ TEST(UiWindow, TranslationsLayerAndInterpolate) {
 
 TEST(UiWindow, LocaleDrivesNumberAndDateFormats) {
   using namespace coral::ui;
+namespace dsx = coral::ui::dsl::experimental;
   const auto formatNumberIn = [](const char* tag, const double value) {
     return formatNumber(value, numberFormatForLocale(Locale::parse(tag)));
   };
@@ -1860,6 +1878,7 @@ TEST(UiWindow, LocaleDrivesNumberAndDateFormats) {
 
 TEST(UiWindow, TranslationCatalogAndPluralRules) {
   using namespace coral::ui;
+namespace dsx = coral::ui::dsl::experimental;
   Translator translator(Locale::parse("en-US"));
   std::string error;
   ASSERT_TRUE(translator.load(
@@ -1908,6 +1927,7 @@ TEST(UiWindow, TranslationCatalogAndPluralRules) {
 }
 
 TEST(UiWindow, AChildChangePatchesOneSegmentPerLevel) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   const float previousLimit = Layer::recordingCacheAreaLimit();
   const std::size_t previousBudget = Layer::recordingCacheBudgetBytes();
   struct RestoreCacheSettings {
@@ -1970,6 +1990,7 @@ TEST(UiWindow, AChildChangePatchesOneSegmentPerLevel) {
 }
 
 TEST(UiWindow, RecordingsStayWithinTheMemoryBudget) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   const float previousLimit = Layer::recordingCacheAreaLimit();
   const std::size_t previousBudget = Layer::recordingCacheBudgetBytes();
   struct RestoreCacheSettings {
@@ -2261,6 +2282,7 @@ TEST(UiApplication, ClosedWindowIsAliveDuringItsCallback) {
 }
 
 TEST(UiApplication, ThreeThreadedWindowsShareOneHost) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   auto application = Application::create();
   Window::Options options;
   options.headless = true;
@@ -2302,6 +2324,7 @@ TEST(UiApplication, ThreeThreadedWindowsShareOneHost) {
 }
 
 TEST(UiApplication, ThreeWindowsKeepIndependentScaleAndTheme) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   auto application = Application::create();
   const float scales[3] = { 1.0f, 1.5f, 2.0f };
   std::vector<std::shared_ptr<Window>> windows;
@@ -2494,6 +2517,7 @@ TEST(UiWindow, AThreadedWaylandWindowIsRejectedWithAReason) {
 #endif
 
 TEST(UiWindow, AnApplicationSharesOneRenderHostBetweenThreadedWindows) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   auto application = Application::create();
   Window::Options options;
   options.headless = true;
@@ -3154,4 +3178,251 @@ TEST(UiWindow, OverlayHostMountsAndDismissesAnElement) {
   EXPECT_TRUE(host.dismiss(id));
   EXPECT_FALSE(window->hasOverlay());
   EXPECT_EQ(host.size(), 0u);
+}
+
+TEST(UiWindow, DslOverlayBuildsAndClosesTransientSurfaces) {
+  Window::Options options;
+  options.width = 320;
+  options.height = 200;
+  options.headless = true;
+  options.frameLimit = 0;
+  auto window = Window::create(options);
+  if (window == nullptr) GTEST_SKIP() << "no GPU device is available for the headless surface";
+  window->setRoot(std::make_shared<ColorLayer>(Color::MakeRGBA8(20, 24, 30, 255)));
+
+  dsl::Overlay overlays(*window, Theme::dark());
+  const uint64_t toast = overlays.Toast("saved", std::chrono::milliseconds(10));
+  ASSERT_NE(toast, 0u);
+  EXPECT_TRUE(window->hasOverlay());
+  EXPECT_EQ(overlays.openCount(), 1u);
+  EXPECT_TRUE(overlays.close(toast));
+  EXPECT_FALSE(window->hasOverlay());
+
+  const uint64_t dialog = overlays.Dialog("Delete build", "This cannot be undone", {}, {
+    dsl::DialogButton{ "Cancel", {} },
+    dsl::DialogButton{ "Delete", {} },
+  });
+  ASSERT_NE(dialog, 0u);
+  EXPECT_TRUE(window->hasOverlay());
+  EXPECT_EQ(overlays.openCount(), 1u);
+  overlays.closeAll();
+  EXPECT_FALSE(window->hasOverlay());
+  EXPECT_EQ(overlays.openCount(), 0u);
+
+  const uint64_t tooltip = overlays.Tooltip("hint", Point{ 12.0f, 14.0f });
+  ASSERT_NE(tooltip, 0u);
+  EXPECT_TRUE(overlays.close(tooltip));
+
+  OverlayOptions anchored;
+  anchored.anchor = Rect::MakeXYWH(20.0f, 20.0f, 4.0f, 4.0f);
+  const uint64_t popup = overlays.Popup(
+    std::make_shared<ColorLayer>(Color::MakeRGBA8(80, 90, 100, 255)), anchored);
+  ASSERT_NE(popup, 0u);
+  EXPECT_TRUE(overlays.close(popup));
+
+  const uint64_t menu = overlays.Menu({ "One", "Two" }, Point{ 30.0f, 30.0f }, {});
+  ASSERT_NE(menu, 0u);
+  EXPECT_TRUE(overlays.close(menu));
+  EXPECT_FALSE(window->hasOverlay());
+}
+
+TEST(UiWindow, ToastDismissRemovesTheOverlayEntry) {
+  Window::Options options;
+  options.width = 320;
+  options.height = 200;
+  options.headless = true;
+  options.frameLimit = 0;
+  auto window = Window::create(options);
+  if (window == nullptr) GTEST_SKIP() << "no GPU device is available for the headless surface";
+  auto page = std::make_shared<ColorLayer>(Color::MakeRGBA8(20, 24, 30, 255));
+  window->setRoot(page);
+
+  OverlayHost host(*window);
+  auto toast = std::make_shared<Toast>("saved", nullptr);
+  toast->showFor("saved", std::chrono::milliseconds(1));
+  OverlayOptions overlayOptions;
+  overlayOptions.anchor = Rect::MakeXYWH(0.0f, 150.0f, 320.0f, 32.0f);
+  overlayOptions.preferred = Placement::Center;
+  overlayOptions.passThroughPointer = true;
+  const uint64_t id = host.show(dsx::Layer(toast, "toast-test"), overlayOptions);
+  ASSERT_NE(id, 0u);
+  EXPECT_EQ(window->root()->hitTest(Point{ 10.0f, 10.0f }), page.get());
+  toast->setOnDismissed([&host, id] { host.dismiss(id); });
+  EXPECT_TRUE(toast->visible());
+  EXPECT_TRUE(toast->hasRunningAnimation());
+  EXPECT_TRUE(window->root()->hasRunningAnimation());
+  window->requestFrame();
+  window->renderFrame();
+  EXPECT_LT(toast->bounds().getHeight(), 100.0f);
+  for (int frame = 0; frame < 20 && window->hasOverlay(); ++frame) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    window->requestFrame();
+    window->renderFrame();
+  }
+  EXPECT_FALSE(window->hasOverlay());
+  EXPECT_EQ(host.size(), 0u);
+}
+
+TEST(UiWindow, OverlaySurvivesAPageRebuild) {
+  Window::Options windowOptions;
+  windowOptions.width = 320;
+  windowOptions.height = 200;
+  windowOptions.headless = true;
+  windowOptions.frameLimit = 0;
+  auto window = Window::create(windowOptions);
+  if (window == nullptr) GTEST_SKIP() << "no GPU device is available for the headless surface";
+
+  Reconciler reconciler;
+  window->setRoot(reconciler.mount(dsl::Column(dsl::StackOptions{ .key = "page" },
+    dsl::Text("first"))));
+
+  OverlayHost host(*window);
+  auto toast = std::make_shared<Toast>("saved", nullptr);
+  toast->showFor("saved", std::chrono::seconds(10));
+  OverlayOptions overlayOptions;
+  overlayOptions.anchor = Rect::MakeXYWH(0.0f, 150.0f, 320.0f, 32.0f);
+  overlayOptions.passThroughPointer = true;
+  const uint64_t id = host.show(dsx::Layer(toast, "toast-rebuild"), overlayOptions);
+  ASSERT_NE(id, 0u);
+
+  reconciler.update(dsl::Column(dsl::StackOptions{ .key = "page" },
+    dsl::Text("second")));
+  window->requestFrame();
+  window->renderFrame();
+
+  EXPECT_TRUE(window->hasOverlay());
+  EXPECT_NE(toast->parent(), nullptr);
+  EXPECT_TRUE(toast->visible());
+}
+
+TEST(UiWindow, OverlayDoesNotTakePageLayoutSpace) {
+  Window::Options windowOptions;
+  windowOptions.width = 320;
+  windowOptions.height = 200;
+  windowOptions.headless = true;
+  windowOptions.frameLimit = 0;
+  auto window = Window::create(windowOptions);
+  if (window == nullptr) GTEST_SKIP() << "no GPU device is available for the headless surface";
+
+  Reconciler reconciler;
+  auto root = reconciler.mount(dsl::Row(dsl::StackOptions{ .key = "root" },
+    dsl::Swatch(Color::MakeRGBA8(200, 80, 40, 255), 100.0f, 50.0f, 0.0f, "left"),
+    dsl::Swatch(Color::MakeRGBA8(40, 120, 200, 255), 100.0f, 50.0f, 0.0f, "right")));
+  window->setRoot(root);
+
+  OverlayHost host(*window);
+  auto toast = std::make_shared<Toast>("saved", nullptr);
+  toast->showFor("saved", std::chrono::seconds(10));
+  OverlayOptions overlayOptions;
+  overlayOptions.anchor = Rect::MakeXYWH(0.0f, 150.0f, 320.0f, 32.0f);
+  overlayOptions.passThroughPointer = true;
+  ASSERT_NE(host.show(dsx::Layer(toast, "toast-layout"), overlayOptions), 0u);
+
+  window->requestFrame();
+  window->renderFrame();
+
+  const auto flex = std::dynamic_pointer_cast<Flex>(root);
+  ASSERT_NE(flex, nullptr);
+  ASSERT_GE(flex->children().size(), 2u);
+  EXPECT_FLOAT_EQ(flex->children()[0]->bounds().getWidth(), 100.0f);
+  EXPECT_FLOAT_EQ(flex->children()[1]->bounds().getWidth(), 100.0f);
+}
+
+TEST(UiWindow, TwoToastsDismissWithoutCrash) {
+  Window::Options windowOptions;
+  windowOptions.width = 320;
+  windowOptions.height = 200;
+  windowOptions.headless = true;
+  windowOptions.frameLimit = 0;
+  auto window = Window::create(windowOptions);
+  if (window == nullptr) GTEST_SKIP() << "no GPU device is available for the headless surface";
+  window->setRoot(std::make_shared<ColorLayer>(Color::MakeRGBA8(20, 24, 30, 255)));
+
+  OverlayHost host(*window);
+  auto first = std::make_shared<Toast>("one", nullptr);
+  first->showFor("one", std::chrono::milliseconds(1));
+  const uint64_t firstId = host.show(dsx::Layer(first, "toast-one"));
+  first->setOnDismissed([&host, firstId] { host.dismiss(firstId); });
+  auto second = std::make_shared<Toast>("two", nullptr);
+  second->showFor("two", std::chrono::milliseconds(1));
+  const uint64_t secondId = host.show(dsx::Layer(second, "toast-two"));
+  second->setOnDismissed([&host, secondId] { host.dismiss(secondId); });
+  ASSERT_NE(firstId, 0u);
+  ASSERT_NE(secondId, 0u);
+
+  for (int frame = 0; frame < 20 && window->hasOverlay(); ++frame) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    window->requestFrame();
+    window->renderFrame();
+  }
+  EXPECT_FALSE(window->hasOverlay());
+  EXPECT_EQ(host.size(), 0u);
+}
+
+TEST(UiWindow, SplitButtonMenuIsFloatingAndDoesNotShiftThePage) {
+  Window::Options windowOptions;
+  windowOptions.width = 480;
+  windowOptions.height = 240;
+  windowOptions.headless = true;
+  windowOptions.frameLimit = 0;
+  auto window = Window::create(windowOptions);
+  if (window == nullptr) GTEST_SKIP() << "no GPU device is available for the headless surface";
+
+  Reconciler reconciler;
+  auto root = reconciler.mount(dsl::Column(dsl::StackOptions{ .key = "page" },
+    dsx::SplitButton("Run", nullptr, { "Run all", "Debug" }, {}, {}, "run")));
+  window->setRoot(root);
+  window->requestFrame();
+  window->renderFrame();
+
+  const auto page = std::dynamic_pointer_cast<Flex>(root);
+  ASSERT_NE(page, nullptr);
+  ASSERT_FALSE(page->children().empty());
+  const auto split = std::dynamic_pointer_cast<SplitButton>(page->children().front());
+  ASSERT_NE(split, nullptr);
+  const Rect before = split->bounds();
+  const Rect button = split->boundsInWindow();
+
+  PointerEvent press;
+  press.position = Point{ button.getRight() - 4.0f, button.getTop() + button.getHeight() * 0.5f };
+  press.button = PointerButton::Primary;
+  window->pointerDown(press);
+  window->pointerUp(press);
+  window->requestFrame();
+  window->renderFrame();
+
+  ASSERT_GE(page->children().size(), 2u);
+  const auto menu = std::dynamic_pointer_cast<Menu>(page->children().back());
+  ASSERT_NE(menu, nullptr);
+  EXPECT_TRUE(menu->floating());
+  EXPECT_TRUE(menu->visible());
+  EXPECT_FLOAT_EQ(split->bounds().getLeft(), before.getLeft());
+  EXPECT_FLOAT_EQ(split->bounds().getWidth(), before.getWidth());
+
+}
+
+TEST(UiWindow, DslOverlayAcceptsElementContent) {
+  Window::Options windowOptions;
+  windowOptions.width = 360;
+  windowOptions.height = 240;
+  windowOptions.headless = true;
+  windowOptions.frameLimit = 0;
+  auto window = Window::create(windowOptions);
+  if (window == nullptr) GTEST_SKIP() << "no GPU device is available for the headless surface";
+  window->setRoot(std::make_shared<ColorLayer>(Color::MakeRGBA8(20, 24, 30, 255)));
+
+  dsl::Overlay overlays(*window, Theme::dark());
+  OverlayOptions anchored;
+  anchored.anchor = Rect::MakeXYWH(20.0f, 100.0f, 160.0f, 24.0f);
+  const uint64_t popup = overlays.PopupElement(dsl::Text("element popup"), anchored);
+  ASSERT_NE(popup, 0u);
+  EXPECT_TRUE(window->hasOverlay());
+  EXPECT_TRUE(overlays.close(popup));
+
+  const uint64_t dialog = overlays.DialogElement("Element dialog", "body", dsl::Text("content"), {
+    dsl::DialogButton{ "OK", {} },
+  });
+  ASSERT_NE(dialog, 0u);
+  EXPECT_TRUE(window->hasOverlay());
+  EXPECT_TRUE(overlays.close(dialog));
 }

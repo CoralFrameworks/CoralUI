@@ -47,6 +47,8 @@
 #include <ui/TimeRangeField.h>
 #include <ui/TimePicker.h>
 #include <ui/TreeView.h>
+#include <ui/DSL.h>
+#include <ui/Theme.h>
 #include <ui/Toolbar.h>
 #include <ui/Chip.h>
 #include <ui/MultiSelect.h>
@@ -1841,4 +1843,27 @@ TEST(UiReconciler, TreeViewRebuildsAndSelectsByPath) {
   EXPECT_EQ(reconciler.root().get(), static_cast<Layer*>(expanded.get()));
   EXPECT_EQ(expanded->label(1), "three");
   EXPECT_EQ(expanded->selected(), 1);
+}
+
+TEST(UiReconciler, DslUsesThemeDefaultsAndHostsCustomLayers) {
+  const auto font = testFont();
+  if (font == nullptr) GTEST_SKIP() << "the UI test font is not available";
+  Theme theme = Theme::dark();
+  theme.body = font;
+  theme.title = font;
+  dsl::ThemeScope scope(theme);
+
+  const auto custom = std::make_shared<ColorLayer>(Color::MakeRGBA8(10, 20, 30, 255));
+  Reconciler reconciler;
+  const auto root = std::dynamic_pointer_cast<Flex>(reconciler.mount(
+    dsl::Column({ .gap = 4.0f }, dsl::Text("hello"), dsl::Canvas(custom, 40.0f))));
+  ASSERT_NE(root, nullptr);
+  ASSERT_EQ(root->children().size(), 2u);
+  EXPECT_FLOAT_EQ(root->gap(), 4.0f);
+
+  const auto text = std::dynamic_pointer_cast<TextLayer>(root->children()[0]);
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->font(), font);
+  EXPECT_EQ(text->color(), theme.text);
+  EXPECT_EQ(root->children()[1], custom);
 }

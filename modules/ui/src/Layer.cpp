@@ -1800,6 +1800,9 @@ void Layer::setNeedsLayout() {
     // Every ancestor up to the root learns that a pass is needed, otherwise the traversal that looks
     // for dirty children is never started and the boundary would stay dirty forever.
     ancestor->mSubtreeNeedsLayout = true;
+    // A layout boundary stops arrangement propagation, but its parent may still measure it. A Card
+    // or Grid row whose content grew must not keep the old measured height.
+    ancestor->invalidateMeasureCache();
     if (stopped) continue;
     if (current->isLayoutBoundary()) {
       stopped = true;

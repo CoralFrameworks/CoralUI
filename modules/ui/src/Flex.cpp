@@ -258,7 +258,7 @@ Size Flex::measure(const Size& available) {
   uint32_t lines = 0;
 
   for (const std::shared_ptr<Layer>& child: children()) {
-    if (!child->visible()) {
+    if (!child->visible() || child->floating()) {
       continue;
     }
     const LayoutParams& params = child->layoutParams();
@@ -373,7 +373,7 @@ void Flex::layout() {
   std::vector<FlexItem> items;
   std::vector<std::shared_ptr<Layer>> absolute;
   for (const std::shared_ptr<Layer>& child: children()) {
-    if (!child->visible()) {
+    if (!child->visible() || child->floating()) {
       continue;
     }
     const LayoutParams& params = child->layoutParams();

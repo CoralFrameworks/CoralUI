@@ -31,6 +31,7 @@ constexpr float kAnchorGap = 4.0f;
 } // namespace
 
 Popup::Popup(std::shared_ptr<Layer> content) {
+  setFloating(true);
   setVisible(false);
   setZIndex(900);
   setContent(std::move(content));

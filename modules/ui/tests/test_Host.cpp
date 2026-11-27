@@ -26,6 +26,8 @@
 
 #include <gtest/gtest.h>
 
+#include "TestSupport.h"
+
 #include <atomic>
 #include <chrono>
 #include <thread>
@@ -144,6 +146,8 @@ TEST(UiHost, ANullContextRecorderStillReportsARecordingCanvas) {
 }
 
 TEST(UiHost, AThreadedHostSubmitsAndSnapshotsOnItsOwnThread) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
+  CORAL_REQUIRE_RECORDING_BACKEND();
   host::ThreadedRenderHost::Options options;
   options.width = 16;
   options.height = 16;
@@ -190,6 +194,8 @@ TEST(UiHost, AThreadedHostSubmitsAndSnapshotsOnItsOwnThread) {
 }
 
 TEST(UiHost, AReplacedPacketSettlesAsDroppedInsteadOfHanging) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
+  CORAL_REQUIRE_RECORDING_BACKEND();
   host::ThreadedRenderHost::Options options;
   options.width = 8;
   options.height = 8;
@@ -298,6 +304,8 @@ TEST(UiHost, PreviewSchedulerRecoversVisiblePreviewsInPriorityOrder) {
 }
 
 TEST(UiHost, PreviewSchedulerRunsOnTheRenderThread) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
+  CORAL_REQUIRE_RECORDING_BACKEND();
   host::ThreadedRenderHost::Options options;
   options.width = 8;
   options.height = 8;
@@ -321,6 +329,8 @@ TEST(UiHost, PreviewSchedulerRunsOnTheRenderThread) {
 }
 
 TEST(UiHost, OneHostSharesItsDeviceAcrossTargets) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
+  CORAL_REQUIRE_RECORDING_BACKEND();
   host::ThreadedRenderHost host;
   host::ThreadedRenderHost::Options first;
   first.width = 16;
@@ -441,6 +451,8 @@ TEST(UiHost, AStalledPreviewDoesNotStarveTheOthers) {
 }
 
 TEST(UiHost, AThreadedHostPresentsAFrameFromLentBoundaryLists) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
+  CORAL_REQUIRE_RECORDING_BACKEND();
   // M4's contract: a packet can carry the lists a plan-built frame lends, and the render thread submits
   // them in paint order after the content -- the same picture, without the UI thread flattening them.
   host::ThreadedRenderHost::Options options;

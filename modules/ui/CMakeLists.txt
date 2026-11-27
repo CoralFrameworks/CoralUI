@@ -8,6 +8,11 @@ set(PUBLIC_HDRS
     include/ui/Animation.h
     include/ui/Curve.h
     include/ui/DateFormat.h
+    include/ui/DSL.h
+    include/ui/DSLExperimental.h
+    include/ui/DSLStyle.h
+    include/ui/DSLCore.h
+    include/ui/DSLOverlay.h
     include/ui/DateField.h
     include/ui/DateTimeField.h
     include/ui/DateRangeField.h
@@ -48,6 +53,7 @@ set(PUBLIC_HDRS
     include/ui/ElementSpec.h
     include/ui/Component.h
     include/ui/Element.h
+    include/ui/ElementContentLayer.h
     include/ui/ElementHost.h
     include/ui/FrameStatsOverlay.h
     include/ui/Reconciler.h
@@ -208,6 +214,9 @@ set(SRCS
     src/Animation.cpp
     src/Curve.cpp
     src/DateFormat.cpp
+    src/DSL.cpp
+    src/DSLStyle.cpp
+    src/DSLOverlay.cpp
     src/DateField.cpp
     src/DateTimeField.cpp
     src/DateRangeField.cpp
@@ -224,6 +233,7 @@ set(SRCS
     src/ClipboardMime.cpp
     src/Command.cpp
     src/CrashReporter.cpp
+    src/ElementContentLayer.cpp
     src/ElementRegistry.cpp
     src/ElementSpec.cpp
     src/Component.cpp

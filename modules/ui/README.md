@@ -29,6 +29,7 @@ separate `modules/mvvm` library; `modules/ui` is the toolkit.
 
 - Immutable `Element` tree with keyed `Reconciler` patching, `Component` state and context,
   lifecycle hooks, `ElementHost` binding, `State<T>` and `LayerRef`.
+- `ui/dsl` is the variadic, theme-scoped façade (`Column`, `Row`, `Page`, `Card`, `Section`, `Canvas`, `Overlay`), now a production candidate with a stable `DSLCore.h` and `dsl::experimental` forwarders; see `docs/declarative-dsl.md` and `docs/dsl-api.md`.
 - `OverlayHost` owns transient Dialog/Popup/Toast/Tooltip/Menu subtrees above the page through
   `Window::pushOverlay` (stacking, light dismiss, Escape, focus restore).
 - `ElementRegistry` builds subtrees from a flat `type#key prop=value` specification

@@ -27,7 +27,22 @@ std::unique_ptr<WindowPlatform> createWindowPlatform(const Window::Options& opti
     return createRasterPlatform(options, sharedDevice, diagnostics);
   }
   if (options.headless) {
-    return createHeadlessPlatform(options, sharedDevice, diagnostics);
+    std::string headlessDiagnostics;
+    if (auto headless = createHeadlessPlatform(options, sharedDevice, &headlessDiagnostics)) {
+      return headless;
+    }
+    // CI and other display-less machines may have no Vulkan loader and no OpenGL 4.1 context. A
+    // headless Auto window can still exercise the full UI/layer tree through the CPU raster sink;
+    // fall back only when the requested GPU surface could not be created.
+    if (auto raster = createRasterPlatform(options, sharedDevice, diagnostics)) {
+      if (diagnostics != nullptr) {
+        *diagnostics = headlessDiagnostics.empty()
+          ? "using the raster fallback for a headless window" : headlessDiagnostics + "; using raster";
+      }
+      return raster;
+    }
+    if (diagnostics != nullptr && !headlessDiagnostics.empty()) *diagnostics = headlessDiagnostics;
+    return nullptr;
   }
 
 #if defined(_WIN32)

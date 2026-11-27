@@ -76,12 +76,12 @@ jobs:
       - name: Build
         run: >
           cmake --build build -j 4
-          --target test_ui ui_native_smoke ui_native_ax_smoke ui_demo ui_mvvm_demo
+          --target test_ui ui_native_smoke ui_native_ax_smoke ui_demo ui_mvvm_demo ui_dsl_gallery ui_dsl_bench
 
       - name: Test
         run: >
           ctest --test-dir build --output-on-failure
-          -R "^(test_ui|test_ui_shared_device|ui_native_smoke|ui_native_ax_smoke|example_ui_demo_headless|example_ui_mvvm_headless)$"
+          -R "^(test_ui|test_ui_shared_device|ui_native_smoke|ui_native_ax_smoke|example_ui_demo_headless|example_ui_mvvm_headless|example_ui_dsl_gallery.*|example_ui_dsl_bench)$"
 
       - name: Runner diagnostics
         if: failure()

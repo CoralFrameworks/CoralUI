@@ -1492,3 +1492,21 @@ TEST(UiLayout, ARightToLeftScrollViewInvertsTheHorizontalWheel) {
   ASSERT_TRUE(scroll->onScroll(event));
   EXPECT_FLOAT_EQ(scroll->scrollX(), 110.0f);
 }
+
+TEST(UiLayout, AChildLayoutBoundaryInvalidatesAncestorMeasureCache) {
+  auto inner = std::make_shared<Flex>(Axis::Column);
+  auto first = std::make_shared<ColorLayer>(Color::MakeRGBA8(10, 20, 30, 255));
+  first->setBounds(Rect::MakeWH(10.0f, 10.0f));
+  inner->addChild(first);
+
+  auto outer = std::make_shared<Flex>(Axis::Column);
+  outer->addChild(inner);
+
+  const Size before = outer->measureCached({ 100.0f, 100.0f });
+  auto second = std::make_shared<ColorLayer>(Color::MakeRGBA8(40, 50, 60, 255));
+  second->setBounds(Rect::MakeWH(10.0f, 10.0f));
+  inner->addChild(second);
+  const Size after = outer->measureCached({ 100.0f, 100.0f });
+
+  EXPECT_GT(after.height, before.height) << "a boundary's parent must remeasure when its content grows";
+}
