@@ -56,6 +56,8 @@
 
 #include <gtest/gtest.h>
 
+#include "TestSupport.h"
+
 #if defined(_WIN32)
 #include <windows.h>
 #endif
@@ -166,6 +168,7 @@ TEST(UiWindow, OpacityAndTranslationCompositeIntoTheFrame) {
 }
 
 TEST(UiWindow, RoundedClipCutsTheCornerFromTheFrame) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   Window::Options options;
   options.headless = true;
   options.width = 100;
@@ -390,6 +393,7 @@ TEST(UiWindow, FrameTimingsAreRecorded) {
 }
 
 TEST(UiWindow, AHeadlessWindowReportsItsRendererCapabilities) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   Window::Options options;
   options.headless = true;
   options.width = 64;
@@ -652,6 +656,7 @@ TEST(UiWindow, ASizedOpacityGroupKeepsItsDevicePosition) {
 }
 
 TEST(UiWindow, ARoundedClipMaskCoversTheLayerRegionNotTheWholeTarget) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   Window::Options options;
   options.headless = true;
   options.width = 64;
@@ -684,6 +689,7 @@ TEST(UiWindow, ARoundedClipMaskCoversTheLayerRegionNotTheWholeTarget) {
 }
 
 TEST(UiWindow, ACleanFrameReplaysTheRetainedRecording) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   Window::Options options;
   options.headless = true;
   options.width = 64;
@@ -757,6 +763,7 @@ TEST(UiWindow, ADamageRectUpdatesOnlyTheDirtyPixels) {
 }
 
 TEST(UiWindow, ALeafRecordingIsReusedUntilTheLayerIsDirty) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   Window::Options options;
   options.headless = true;
   options.width = 1024;
@@ -1919,6 +1926,7 @@ namespace dsx = coral::ui::dsl::experimental;
 }
 
 TEST(UiWindow, AChildChangePatchesOneSegmentPerLevel) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   const float previousLimit = Layer::recordingCacheAreaLimit();
   const std::size_t previousBudget = Layer::recordingCacheBudgetBytes();
   struct RestoreCacheSettings {
@@ -1981,6 +1989,7 @@ TEST(UiWindow, AChildChangePatchesOneSegmentPerLevel) {
 }
 
 TEST(UiWindow, RecordingsStayWithinTheMemoryBudget) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   const float previousLimit = Layer::recordingCacheAreaLimit();
   const std::size_t previousBudget = Layer::recordingCacheBudgetBytes();
   struct RestoreCacheSettings {

@@ -64,6 +64,8 @@
 
 #include <gtest/gtest.h>
 
+#include "TestSupport.h"
+
 using namespace coral::ui;
 
 TEST(UiRetained, WritingIdenticalLayoutParamsDoesNotDirtyLayout) {
@@ -159,6 +161,7 @@ TEST(UiRetained, ReinsertingAChildRestoresItsWindow) {
 }
 
 TEST(UiRetained, FrameStatisticsReportWhatTheFrameActuallyRedid) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   Window::Options options;
   options.headless = true;
   options.width = 64;
@@ -467,6 +470,7 @@ TEST(UiRetained, LayoutDoesNotAskForIntrinsicSizeUnlessFitContent) {
 }
 
 TEST(UiRetained, ARepaintBoundaryOwnsItsRecording) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   Window::Options options;
   options.headless = true;
   options.width = 64;
@@ -520,6 +524,7 @@ TEST(UiRetained, ARepaintBoundaryOwnsItsRecording) {
 }
 
 TEST(UiRetained, WithoutABoundaryTheRootStillCachesTheWholeTree) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   Window::Options options;
   options.headless = true;
   options.width = 64;
@@ -959,6 +964,7 @@ TEST(UiRetained, FrameworkStringsComeFromTheTranslator) {
 }
 
 TEST(UiRetained, ADirtyBoundaryRepaintsItsWholeRectangle) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   const auto ratioAfterTouching = [](const bool boundary) {
     Window::Options options;
     options.headless = true;
@@ -1452,6 +1458,7 @@ TEST(UiRetained, ScrollViewMeasuresItsContentOncePerLayoutPass) {
 }
 
 TEST(UiRetained, ABoundaryLendsItsRecordedLists) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   Window::Options options;
   options.headless = true;
   options.width = 64;
@@ -1499,6 +1506,7 @@ TEST(UiRetained, ABoundaryLendsItsRecordedLists) {
 }
 
 TEST(UiRetained, AFramePlanListsTheBoundariesInPaintOrder) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   Window::Options options;
   options.headless = true;
   options.width = 96;
@@ -1550,6 +1558,7 @@ TEST(UiRetained, AFramePlanListsTheBoundariesInPaintOrder) {
 }
 
 TEST(UiRetained, APlanModeFrameSkipsBoundariesAndCollectsThem) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   Window::Options options;
   options.headless = true;
   options.width = 96;
@@ -1599,6 +1608,7 @@ TEST(UiRetained, APlanModeFrameSkipsBoundariesAndCollectsThem) {
 }
 
 TEST(UiRetained, TheFramePlanPathsPaintsTheSamePixels) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   Window::Options options;
   options.headless = true;
   options.width = 96;
@@ -1720,6 +1730,7 @@ TEST(UiRetained, RecordingIntoAListPutsTheSubtreeAtItsOwnOrigin) {
 }
 
 TEST(UiRetained, ACompositedViewportScrollsToTheSamePixelsAsTheLegacyPath) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   // A scroll viewport in a plan-mode frame lends its content at a fixed origin with the scroll offset as a
   // translation. The picture must not change when it does: same scroll, both paths, same pixels.
   auto build = [] {
@@ -1782,6 +1793,7 @@ TEST(UiRetained, ACompositedViewportScrollsToTheSamePixelsAsTheLegacyPath) {
 }
 
 TEST(UiRetained, APlanModeFramePaintsTheOverlayAboveEveryBoundary) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   // The overlay is a second tree above the page, and a plan-mode frame submits the boundary lists after the
   // page content. If the overlay were flattened into the content list it would be painted *under* every
   // boundary, which is a popup covered by the panel it hangs over.
@@ -1846,6 +1858,7 @@ TEST(UiRetained, APlanModeFramePaintsTheOverlayAboveEveryBoundary) {
 }
 
 TEST(UiRetained, TheFramePlanIsOnUnlessItIsTurnedOff) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   // The switch is process-wide, so this also pins the scoped helper: leaving a forced-off scope must put
   // the default back, or every later test would run a different frame path.
   EXPECT_EQ(Window::framePlanOverride(), -1) << "a previous test left the switch forced";
@@ -1890,6 +1903,7 @@ TEST(UiRetained, TheFramePlanIsOnUnlessItIsTurnedOff) {
 }
 
 TEST(UiRetained, TheFrameStatisticsSayHowManyListsTheDeviceReceived) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   // `presentItems` / `compositeItems` / `lentListBytes` are the three metrics the project document promised
   // and did not have: how many lists reached the device, how many composite items the frame was assembled
   // from, and how much of it was borrowed rather than copied.
@@ -1944,6 +1958,7 @@ TEST(UiRetained, TheFrameStatisticsSayHowManyListsTheDeviceReceived) {
 }
 
 TEST(UiRetained, TheFrameStatisticsBelongToTheirWindow) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   // `framePlanItems` and friends live on the window, not on the process: two windows with different frame
   // policies must not read each other's numbers. A shared counter here would make a diagnostics overlay in
   // one window describe the other's frames.
@@ -2062,6 +2077,7 @@ TEST(UiRetained, AThreadedWindowWithAnOverlayPaintsWhatTheSameThreadPathPaints) 
 }
 
 TEST(UiRetained, AHighDpiPlanFramePaintsTheSamePixelsAsTheLegacyPath) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   // The plan's composite items carry a translation and a clip in *device* pixels, so the scale is where
   // those two can disagree with the canvas path. Every other pixel gate runs at 1.0. This one covers a
   // painted viewport at 1.5x with the offset at zero; the scrolled case is the DISABLED test below.

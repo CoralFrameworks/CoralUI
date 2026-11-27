@@ -16,6 +16,8 @@
 
 #include <gtest/gtest.h>
 
+#include "TestSupport.h"
+
 #include <ui/ColorLayer.h>
 #include <ui/Window.h>
 
@@ -87,6 +89,7 @@ void writeFile(const std::string& path, const graphics::Data& bytes) {
 } // namespace
 
 TEST(UiWindow, AFrameMatchesItsGoldenImage) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   constexpr int kWidth = 64;
   constexpr int kHeight = 64;
   const graphics::Bitmap actual = renderScene(kWidth, kHeight);
@@ -141,6 +144,7 @@ TEST(UiWindow, AFrameMatchesItsGoldenImage) {
 }
 
 TEST(UiWindow, AGpuFrameMatchesTheRasterReference) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   auto window = makeWindow(48, 48);
   if (window == nullptr) {
     GTEST_SKIP() << "no GPU device is available for the headless surface";

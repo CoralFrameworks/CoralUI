@@ -16,6 +16,8 @@
 
 #include <gtest/gtest.h>
 
+#include "TestSupport.h"
+
 #include <ui/ColorLayer.h>
 #include <ui/DSL.h>
 #include <ui/Reconciler.h>
@@ -238,6 +240,7 @@ int countMismatches(const graphics::Pixmap& actual, const graphics::Pixmap& expe
 } // namespace
 
 TEST(UiGolden, TheExtraScenesMatchTheirGoldenImages) {
+  CORAL_REQUIRE_RECORDING_BACKEND();
   const bool update = std::getenv("CORAL_UPDATE_GOLDEN") != nullptr;
   const std::string directory = goldenDirectory();
 
